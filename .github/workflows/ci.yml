@@ -1,5 +1,7 @@
 # Continuous integration: one line of defense against regressions.
 # Runs on every push/PR to main: lint → unit tests → build → dependency audit.
+# The project is Bun-based (bun.lock): setup-bun drives install/test/scripts,
+# and actions/cache persists Bun's global install cache between runs.
 # The reciter health job runs weekly to catch broken upstream CDN folders early.
 name: CI
 
@@ -10,6 +12,7 @@ on:
     branches: [main]
   schedule:
     - cron: '0 6 * * 1' # weekly, Mondays 06:00 UTC — reciter health drift check
+  workflow_dispatch: # manual trigger from the Actions tab
 
 jobs:
   verify:
@@ -18,30 +21,47 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Bun drives every command below (install, test, scripts). Pin the
+      # version the lockfile was generated with for reproducible installs.
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.14
+
+      # Node runtime for `next build` (its bin entry runs under node).
+      # NOTE: no `cache:` input here — npm lockfile caching is what broke CI
+      # before (this repo has no package-lock.json); the actions/cache step
+      # below handles dependency caching for Bun instead.
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Cache Bun's global install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
 
       - name: File size ceiling (≤ 600 lines per source file)
-        run: npx --yes tsx scripts/check-file-size.ts
+        run: bun run scripts/check-file-size.ts
 
       - name: Lint (eslint)
-        run: npm run lint
+        run: bun run lint
 
-      - name: Unit tests (node:test via tsx)
-        run: npx --yes tsx --test lib/*.test.ts
+      - name: Unit tests (bun test)
+        run: bun test
 
       - name: Production build
-        run: npm run build
+        run: bun run build
         env:
           DISABLE_HMR: 'true'
 
       - name: Dependency audit (high+)
-        run: npm audit --audit-level=high
+        run: bun audit --audit-level=high
 
   reciter-health:
     # Only the scheduled run probes all 38 upstream CDNs; PRs skip network flakiness.
@@ -51,13 +71,20 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - uses: actions/setup-node@v4
+      - uses: oven-sh/setup-bun@v2
         with:
-          node-version: 22
-          cache: npm
+          bun-version: 1.3.14
 
-      - name: Install dependencies
-        run: npm ci
+      - name: Cache Bun's global install cache
+        uses: actions/cache@v4
+        with:
+          path: ~/.bun/install/cache
+          key: ${{ runner.os }}-bun-${{ hashFiles('bun.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-bun-
+
+      - name: Install dependencies (frozen lockfile)
+        run: bun install --frozen-lockfile
 
       - name: Probe all reciter upstreams (HEAD per reciter)
-        run: npx --yes tsx scripts/check-reciters.ts
+        run: bun run scripts/check-reciters.ts
