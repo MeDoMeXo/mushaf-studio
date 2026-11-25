@@ -163,6 +163,7 @@ export function StudioView() {
     handleBgFileUpload,
     handleBgVideoUpload,
     handleRemoveBgVideo,
+    handleSelectBgLibrary,
     handleAudioFileUpload,
   } = useStudioMedia({ commitState, showToast });
   const {
@@ -473,6 +474,7 @@ export function StudioView() {
             onBgVideoUpload={handleBgVideoUpload}
             onToggleBgVideoPlaying={() => setBgVideoPlaying((v) => !v)}
             onRemoveBgVideo={handleRemoveBgVideo}
+            onSelectBgLibrary={handleSelectBgLibrary}
             onUpdateExportSettings={updateExportSettings}
             onSelectQualityPreset={(presetId) => {
               setActiveQualityPresetId(presetId);

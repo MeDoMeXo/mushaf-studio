@@ -5,7 +5,12 @@
  * Extracted from StudioDesignInspector (600-line rule).
  */
 import React from 'react';
-import { Film, Pause, Play, Upload } from 'lucide-react';
+import { Film, Library, Pause, Play, Upload } from 'lucide-react';
+import {
+  BUILTIN_BG_LIBRARY,
+  getBuiltinBackgroundPublicPath,
+  type BuiltinBackground,
+} from '@/lib/background-library';
 import {
   STUDIO_GRADIENTS,
   STUDIO_SOLIDS,
@@ -29,6 +34,7 @@ export interface StudioBackgroundPanelProps {
   onBgVideoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleBgVideoPlaying: () => void;
   onRemoveBgVideo: () => void;
+  onSelectBgLibrary: (bg: BuiltinBackground) => void;
 }
 
 export function StudioBackgroundPanel({
@@ -45,6 +51,7 @@ export function StudioBackgroundPanel({
   onBgVideoUpload,
   onToggleBgVideoPlaying,
   onRemoveBgVideo,
+  onSelectBgLibrary,
 }: StudioBackgroundPanelProps) {
   return (
     <StudioTabPanel value="background" className="space-y-4 focus:outline-none">
@@ -146,6 +153,47 @@ export function StudioBackgroundPanel({
 
       {state.bgType === 'video' && (
         <div className="space-y-3">
+          <div>
+            <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-[var(--ink-muted)]">
+              <Library className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
+              مكتبة الخلفيات الجاهزة
+            </p>
+            <div className="grid grid-cols-3 gap-1.5">
+              {BUILTIN_BG_LIBRARY.map((bg) => {
+                const active = state.bgLibraryId === bg.id && !bgVideoFile;
+                return (
+                  <button
+                    key={bg.id}
+                    type="button"
+                    aria-pressed={active}
+                    onClick={() => onSelectBgLibrary(bg)}
+                    className={`group relative overflow-hidden rounded-lg border text-right transition-transform hover:scale-[1.03] ${
+                      active
+                        ? 'border-[var(--brand-gold)] ring-2 ring-[var(--brand-gold)]/40'
+                        : 'border-[var(--border-hairline)]'
+                    }`}
+                  >
+                    <span
+                      aria-hidden="true"
+                      className="block aspect-[9/14] w-full"
+                      style={{
+                        background: `linear-gradient(160deg, ${bg.posterColors[0]}, ${bg.posterColors[1]})`,
+                      }}
+                    />
+                    <span className="absolute inset-x-0 bottom-0 bg-black/45 px-1 py-0.5 text-[9px] font-bold leading-tight text-white">
+                      {bg.name}
+                    </span>
+                    {bg.category === 'islamic' && (
+                      <span className="absolute right-1 top-1 rounded-full bg-[var(--brand-gold)]/90 px-1.5 py-px text-[8px] font-bold text-[#1F1705]">
+                        إسلامي
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
           <button
             type="button"
             onClick={() => bgVideoFileInputRef.current?.click()}
@@ -155,7 +203,9 @@ export function StudioBackgroundPanel({
             <span>
               {bgVideoFile
                 ? 'تغيير الفيديو المتحرك للخلفية'
-                : 'اختر فيديو متحرك (MP4 / WebM / MOV)'}
+                : state.bgLibraryId
+                  ? 'تم اختيار خلفية من المكتبة — أو ارفع فيديو خاصاً'
+                  : 'اختر فيديو متحرك (MP4 / WebM / MOV)'}
             </span>
             <span className="text-[10px] font-normal opacity-80">
               يُكرّر تلقائياً بدون صوت خلف الآيات عند المعاينة والتصدير
@@ -243,13 +293,18 @@ export function StudioBackgroundPanel({
         <p className="text-xs font-semibold text-[var(--ink-muted)]">
           حركة الخلفية (أثناء التشغيل والفيديو)
         </p>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+        <div className="mt-2 grid grid-cols-3 gap-1.5">
           {(
             [
+              { id: 'none', label: 'ساكن' },
               { id: 'stars', label: 'نجوم متلألئة' },
               { id: 'gold-dust', label: 'غبار ذهبي' },
               { id: 'aurora', label: 'شفق ناعم' },
-              { id: 'none', label: 'ساكن' },
+              { id: 'fireflies', label: 'يراعات' },
+              { id: 'petals', label: 'بتلات' },
+              { id: 'bokeh', label: 'بوكيه' },
+              { id: 'rain', label: 'مطر' },
+              { id: 'snow', label: 'ثلج' },
             ] as { id: AmbientEffect; label: string }[]
           ).map((amb) => (
             <button

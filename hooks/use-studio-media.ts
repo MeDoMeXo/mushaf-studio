@@ -6,6 +6,7 @@
  * and custom audio upload state plus their file-input handlers.
  */
 import { useCallback, useRef, useState } from 'react';
+import { getBuiltinBackgroundPublicPath, type BuiltinBackground } from '@/lib/background-library';
 import type { StudioState } from '@/lib/quran-data';
 
 export interface UseStudioMediaInput {
@@ -32,6 +33,7 @@ export interface UseStudioMediaResult {
   bgVideoElRef: React.RefObject<HTMLVideoElement | null>;
   handleBgFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   handleBgVideoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  handleSelectBgLibrary: (bg: BuiltinBackground) => void;
   handleRemoveBgVideo: () => void;
   handleAudioFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
@@ -79,9 +81,27 @@ export function useStudioMedia({
       setBgVideoFile(file);
       setBgVideoName(file.name);
       setBgVideoPlaying(true);
-      commitState((p) => ({ ...p, bgType: 'video' }));
+      commitState((p) => ({ ...p, bgType: 'video', bgLibraryId: null }));
       showToast(`تم تحميل الفيديو المتحرك للخلفية: ${file.name}`);
       e.target.value = '';
+    },
+    [commitState, showToast]
+  );
+
+  const handleSelectBgLibrary = useCallback(
+    (bg: BuiltinBackground) => {
+      const url = getBuiltinBackgroundPublicPath(bg.id);
+      if (!url) return;
+      bgVideoElRef.current?.pause();
+      // Library clips stream straight from public/ — no File object, so the
+      // export pipeline sends only the id and the server copies the asset.
+      setBgVideoUrl(url);
+      setBgVideoFile(null);
+      setBgVideoName(bg.name);
+      setBgVideoReady(false);
+      setBgVideoPlaying(true);
+      commitState((p) => ({ ...p, bgType: 'video', bgLibraryId: bg.id }));
+      showToast(`تم اختيار خلفية من المكتبة: ${bg.name}`);
     },
     [commitState, showToast]
   );
@@ -92,7 +112,7 @@ export function useStudioMedia({
     setBgVideoFile(null);
     setBgVideoName('');
     setBgVideoReady(false);
-    commitState((p) => ({ ...p, bgType: 'gradient' }));
+    commitState((p) => ({ ...p, bgType: 'gradient', bgLibraryId: null }));
     showToast('تمت إزالة الفيديو المتحرك');
   }, [commitState, showToast]);
 
@@ -127,6 +147,7 @@ export function useStudioMedia({
     bgVideoElRef,
     handleBgFileUpload,
     handleBgVideoUpload,
+    handleSelectBgLibrary,
     handleRemoveBgVideo,
     handleAudioFileUpload,
   };

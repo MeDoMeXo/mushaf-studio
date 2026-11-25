@@ -41,13 +41,25 @@ interface AmbientLayerParams {
 }
 
 /**
+ * The ambient gate: an animated ambient effect is enabled for a job whenever
+ * the effect is real — including jobs with a background video, matching the
+ * live preview which draws the effect above the bg video (preview/export parity).
+ */
+export function isAmbientEnabledForJob(
+  ambientEffect: string | undefined | null,
+  _hasBgVideoFile: boolean
+): boolean {
+  return shouldRenderAnimatedAmbient(ambientEffect);
+}
+
+/**
  * Detects uploaded ambient frames on disk and, when present, returns the FFmpeg
  * input args (`-stream_loop -1 -framerate 12 -i ambient_%03d.png`) plus the
  * overlay filter chain that turns the backdrop label into an animated `bgamb`.
  */
 export function resolveAmbientLayer(params: AmbientLayerParams): AmbientLayerResolution {
-  const { ambientEffect, hasBgVideoFile, jobDir, filesInDir } = params;
-  const enabled = shouldRenderAnimatedAmbient(ambientEffect) && !hasBgVideoFile;
+  const { ambientEffect, jobDir, filesInDir } = params;
+  const enabled = isAmbientEnabledForJob(ambientEffect, params.hasBgVideoFile);
   if (!enabled) {
     return { active: false, inputArgs: [], ambientFilters: null };
   }

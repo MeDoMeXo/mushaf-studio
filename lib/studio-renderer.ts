@@ -1,6 +1,7 @@
 import { isLightColor, resolveCanvasFontFamily } from './studio-renderer-shared';
 import { STUDIO_GRADIENTS, type ColorLutId, type LabelPosition, type StudioState } from './quran-data';
 import type { SlideTransitionType } from './video-export';
+import { drawBokeh, drawFireflies, drawPetals, drawRain, drawSnow } from './ambient-effects-extra';
 import {
   getTranslationDirection,
   resolveTranslationOption,
@@ -513,6 +514,16 @@ function drawAmbientEffect(
     rad.addColorStop(1, 'rgba(0, 0, 0, 0)');
     ctx.fillStyle = rad;
     ctx.fillRect(0, 0, w, h);
+  } else if (effect === 'fireflies') {
+    drawFireflies(ctx, w, h, timeSec);
+  } else if (effect === 'petals') {
+    drawPetals(ctx, w, h, timeSec);
+  } else if (effect === 'bokeh') {
+    drawBokeh(ctx, w, h, timeSec);
+  } else if (effect === 'rain') {
+    drawRain(ctx, w, h, timeSec);
+  } else if (effect === 'snow') {
+    drawSnow(ctx, w, h, timeSec);
   }
   ctx.restore();
 }

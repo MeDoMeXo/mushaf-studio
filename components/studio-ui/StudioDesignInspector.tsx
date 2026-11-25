@@ -33,6 +33,7 @@ import { filterTemplatesByCategory } from '@/lib/islamic-ornaments';
 import type { VideoExportSettings } from '@/lib/video-export';
 import { StudioOrnamentsPanel } from '../StudioOrnamentsPanel';
 import { StudioAudioPanel } from './StudioAudioPanel';
+import type { BuiltinBackground } from '@/lib/background-library';
 import { StudioBackgroundPanel } from './StudioBackgroundPanel';
 import { StudioTextPanel } from './StudioTextPanel';
 import {
@@ -101,6 +102,7 @@ interface StudioDesignInspectorProps {
   onBgVideoUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onToggleBgVideoPlaying: () => void;
   onRemoveBgVideo: () => void;
+  onSelectBgLibrary: (bg: BuiltinBackground) => void;
   onUpdateExportSettings: (patch: Partial<VideoExportSettings>) => void;
   onSelectQualityPreset: (presetId: string) => void;
   onAspectSelect: (presetId: AspectPresetId) => void;
@@ -138,6 +140,7 @@ export function StudioDesignInspector({
   onBgVideoUpload,
   onToggleBgVideoPlaying,
   onRemoveBgVideo,
+  onSelectBgLibrary,
   onUpdateExportSettings,
   onSelectQualityPreset,
   onAspectSelect,
@@ -408,6 +411,7 @@ export function StudioDesignInspector({
             onBgVideoUpload={onBgVideoUpload}
             onToggleBgVideoPlaying={onToggleBgVideoPlaying}
             onRemoveBgVideo={onRemoveBgVideo}
+            onSelectBgLibrary={onSelectBgLibrary}
           />
 
           {/* TAB 4: Typography & Elements */}

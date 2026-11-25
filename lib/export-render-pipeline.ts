@@ -147,12 +147,17 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     const videoArgs: string[] = ['-y'];
 
     if (hasBgVideoFile && xfadeName && slidePaths.length > 1 && slidePaths.length <= XFADE_MAX_SLIDES) {
-      // Loop background video [0:v] + smoothly xfade transparent verse overlay slides + mux audio
+      // Loop background video [0:v] + (optional animated ambient) + smoothly xfade
+      // transparent verse overlay slides + mux audio
       const shortestSlide = Math.min(...normalizedDurs);
       const requestedTransSec = meta.transitionDurationMs / 1000;
       const transDur = Math.min(requestedTransSec, Math.max(0.25, shortestSlide * 0.45));
 
       videoArgs.push('-stream_loop', '-1', '-i', bgVideoPath);
+      if (hasAmbientFrames) {
+        videoArgs.push(...ambientLayer.inputArgs);
+      }
+      const ambientInputOffset = hasAmbientFrames ? 1 : 0;
 
       for (let i = 0; i < slidePaths.length; i++) {
         const clipDur =
@@ -171,7 +176,7 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         );
       }
       videoArgs.push('-i', processedAudioPath);
-      const audioInputIdx = slidePaths.length + 1;
+      const audioInputIdx = slidePaths.length + 1 + ambientInputOffset;
 
       const bgFilter = buildVideoBackgroundFilterGraph({
         width,
@@ -180,8 +185,12 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         bgVideoSpeed: meta.bgVideoSpeed,
         fps: effectiveFps,
       });
-
+      // First fragment maps [0:v] (the bg video) into [bg]; ambient composites
+      // above it (label bgamb) exactly like the preview layer order.
       const vFilters: string[] = [bgFilter.split(';')[0]];
+      if (hasAmbientFrames && ambientLayer.ambientFilters) {
+        vFilters.push(...ambientLayer.ambientFilters);
+      }
       const { filters: slideFilters, outLabel } = buildChainedXfadeFilters({
         slideCount: slidePaths.length,
         normalizedDurs,
@@ -191,11 +200,12 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         height,
         effectiveFps,
         isRgba: true,
-        inputOffset: 1,
+        inputOffset: 1 + ambientInputOffset,
         finalLabel: 'ov',
       });
       vFilters.push(...slideFilters);
-      vFilters.push(`[bg][${outLabel}]overlay=0:0:shortest=1:eof_action=repeat,format=yuv420p[vout]`);
+      const bgBase = hasAmbientFrames ? 'bgamb' : 'bg';
+      vFilters.push(`[${bgBase}][${outLabel}]overlay=0:0:shortest=1:eof_action=repeat,format=yuv420p[vout]`);
       videoArgs.push('-filter_complex', vFilters.join(';'));
       videoArgs.push('-map', '[vout]', '-map', `${audioInputIdx}:a`);
     } else if (hasBgVideoFile) {
@@ -218,26 +228,64 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         fps: effectiveFps,
       });
 
-      videoArgs.push(
-        '-stream_loop',
-        '-1',
-        '-i',
-        bgVideoPath,
-        '-f',
-        'concat',
-        '-safe',
-        '0',
-        '-i',
-        slidesListPath,
-        '-i',
-        processedAudioPath,
-        '-filter_complex',
-        bgFilter,
-        '-map',
-        '[vout]',
-        '-map',
-        '2:a:0'
-      );
+      // With an animated ambient layer: [0:v]=bg video → [bg], [1:v]=ambient
+      // frames → [bgamb], then slides [2:v] overlay above it (preview parity).
+      if (hasAmbientFrames && ambientLayer.ambientFilters) {
+        const scaled = bgFilter.split(';');
+        // scaled[0] maps [0:v] (bg video) → [bg]; scaled[1] maps the slides
+        // input → [ov]. Ambient frames are input 1, slides become input 2.
+        const bgPrep = scaled[0];
+        const slidePrep = scaled[1].replace(/^\[1:v\]/, '[2:v]');
+        videoArgs.push(
+          '-stream_loop',
+          '-1',
+          '-i',
+          bgVideoPath,
+          ...ambientLayer.inputArgs,
+          '-f',
+          'concat',
+          '-safe',
+          '0',
+          '-i',
+          slidesListPath,
+          '-i',
+          processedAudioPath,
+          '-filter_complex',
+          [
+            bgPrep,
+            // ambient filters expect [1:v] (the frame sequence after the video)
+            ...ambientLayer.ambientFilters,
+            // slides prep references input 2 (after video + ambient inputs)
+            slidePrep,
+            `[bgamb][ov]overlay=0:0:shortest=1:eof_action=repeat,format=yuv420p[vout]`,
+          ].join(';'),
+          '-map',
+          '[vout]',
+          '-map',
+          '3:a:0'
+        );
+      } else {
+        videoArgs.push(
+          '-stream_loop',
+          '-1',
+          '-i',
+          bgVideoPath,
+          '-f',
+          'concat',
+          '-safe',
+          '0',
+          '-i',
+          slidesListPath,
+          '-i',
+          processedAudioPath,
+          '-filter_complex',
+          bgFilter,
+          '-map',
+          '[vout]',
+          '-map',
+          '2:a:0'
+        );
+      }
     } else if (hasBackdropFile && xfadeName && slidePaths.length > 1 && slidePaths.length <= XFADE_MAX_SLIDES) {
       // Stationary backdrop [0:v] + smoothly xfade transparent verse overlay slides + mux audio
       const shortestSlide = Math.min(...normalizedDurs);

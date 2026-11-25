@@ -105,3 +105,31 @@ test('buildAmbientOverlayFilters composites looping particles or swaying aurora 
     null
   );
 });
+
+test('resolveAmbientLayer stays active above a background video (preview/export parity)', async () => {
+  // The live preview draws the ambient effect above the bg video, so the
+  // export must composite it too — gating it off breaks parity.
+  const { resolveAmbientLayer } = await import('./export-ambient-layer');
+  const mkParams = (hasBgVideoFile: boolean) => ({
+    ambientEffect: 'stars',
+    hasBgVideoFile,
+    jobDir: '/tmp',
+    filesInDir: [] as string[],
+    width: 720,
+    height: 1280,
+    effectiveFps: 24,
+  });
+  const withVideo = resolveAmbientLayer(mkParams(true));
+  const withoutVideo = resolveAmbientLayer(mkParams(false));
+  // Without frames on disk neither activates; the point is the *gate*:
+  // hasBgVideoFile must not be the reason a frame-bearing job is disabled.
+  assert.equal(withoutVideo.active, false);
+  assert.equal(withVideo.active, false);
+  // The real assertion: simulate frames present by pointing at a job dir
+  // that contains ambient frames — verify via the exported gate helper.
+  const { isAmbientEnabledForJob } = await import('./export-ambient-layer');
+  assert.equal(isAmbientEnabledForJob('stars', true), true, 'ambient must stay on with bg video');
+  assert.equal(isAmbientEnabledForJob('stars', false), true);
+  assert.equal(isAmbientEnabledForJob('none', true), false);
+  assert.equal(isAmbientEnabledForJob('none', false), false);
+});
