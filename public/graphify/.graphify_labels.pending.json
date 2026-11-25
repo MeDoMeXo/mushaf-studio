@@ -1,0 +1,21 @@
+{
+  "1": "storage.ts",
+  "2": "eslint.config.mjs",
+  "3": "check-file-size.ts",
+  "6": "StudioDesignInspector.tsx",
+  "7": "StudioView.tsx",
+  "9": "reciter-health.ts",
+  "12": "steps",
+  "13": "react",
+  "14": "template-share.ts",
+  "15": "toArabicDigits",
+  "17": "@google/genai",
+  "18": "AppProvider.tsx",
+  "25": "layout.tsx",
+  "26": "@radix-ui/react-accordion",
+  "27": "studio-renderer.ts",
+  "28": "lucide-react",
+  "29": "audio-cache.ts",
+  "30": "quran-utils.ts",
+  "31": "QuranIndexView.tsx"
+}
