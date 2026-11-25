@@ -1,0 +1,16 @@
+import type { MetadataRoute } from 'next';
+
+export default function manifest(): MetadataRoute.Manifest {
+  return {
+    name: 'مصحف الاستوديو · قارئ القرآن واستوديو التلاوات',
+    short_name: 'مصحف الاستوديو',
+    description:
+      'منصة قرآنية متكاملة لقراءة القرآن الكريم بالرسم العثماني وتصميم صور وفيديوهات التلاوات بزخارف إسلامية أصيلة.',
+    start_url: '/',
+    display: 'standalone',
+    dir: 'rtl',
+    lang: 'ar',
+    background_color: '#F7F4EC',
+    theme_color: '#0B3D2E',
+  };
+}
