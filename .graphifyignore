@@ -1,0 +1,10 @@
+node_modules/
+.next/
+.aistudio/
+.playwright-cli/
+coverage/
+download/
+skills/
+upload/
+graphify-out/
+bun.lock
