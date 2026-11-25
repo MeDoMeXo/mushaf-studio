@@ -7,7 +7,8 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { toArabicDigits } from '@/lib/quran-utils';
-import { buildSrtFromTimeline } from '@/lib/srt-subtitles';import {
+import { buildSrtFromTimeline } from '@/lib/srt-subtitles';
+import {
   buildFfmpegConcatSlidesManifest,
   buildVideoBackgroundFilterGraph,
   getConcatSlideFadeSec,
@@ -127,6 +128,10 @@ export async function runExportPipeline(jobId: string): Promise<void> {
       width,
       height,
       effectiveFps,
+      // With a bg video the processed stream is labeled [bg] (scale/crop/
+      // speed/blur from buildVideoBackgroundFilterGraph) — the ambient layer
+      // must composite above THAT, never the raw [0:v] (dangling [bg] label).
+      baseLabel: hasBgVideoFile ? 'bg' : '0:v',
     });
     const hasAmbientFrames = ambientLayer.active;
 
@@ -550,7 +555,7 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     let userMsg = 'تعذّر معالجة وتصدير الفيديو — جرّب اختيار دقة 720p أو 480p أو أعد المحاولة';
     if (detail.includes('Failed to fetch verse audio') || detail.includes('HTTP ')) {
       userMsg = 'تعذّر تحميل بعض تلاوات القارئ من المصدر — جرّب إعادة المحاولة أو اختيار قارئ آخر';
-    } else if (detail.includes('مفقودة')) {
+    } else if (detail.includes('مفقودة') || detail.includes('الخلفية المختارة')) {
       userMsg = detail;
     }
     status.stage = 'error';

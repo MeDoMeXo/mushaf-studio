@@ -44,9 +44,9 @@ export function drawFireflies(
 ): void {
   const scale = Math.min(w, h) / 1080;
   for (const p of FIREFLY_SEED) {
-    const x = (p.x + Math.sin(timeSec * 0.35 * p.speed + p.phase) * 0.06 + 1) % 1;
-    const y = (p.y + Math.cos(timeSec * 0.28 * p.speed + p.phase * 1.7) * 0.05 + 1) % 1;
-    const pulse = 0.5 + 0.5 * Math.sin(timeSec * 2.2 * p.speed + p.phase);
+    const x = (p.x + Math.sin(quantizeSway(0.35 * p.speed) * timeSec + p.phase) * 0.06 + 1) % 1;
+    const y = (p.y + Math.cos(quantizeSway(0.28 * p.speed) * timeSec + p.phase * 1.7) * 0.05 + 1) % 1;
+    const pulse = 0.5 + 0.5 * Math.sin(quantizeSway(2.2 * p.speed) * timeSec + p.phase);
     const radius = p.r * scale * 1.6;
     const glow = ctx.createRadialGradient(x * w, y * h, 0, x * w, y * h, radius * 3.2);
     glow.addColorStop(0, `rgba(214, 255, 170, ${0.5 * pulse + 0.1})`);
@@ -59,6 +59,21 @@ export function drawFireflies(
   }
 }
 
+/**
+ * Loop-periodicity helpers: the export protocol loops an 8-second frame
+ * sequence, so every motion must return to its t=0 state at t=8. Fall rates
+ * are quantized to whole-canvas wraps per loop (n/8 per second) and sway
+ * frequencies to multiples of 2π/8 — otherwise particles teleport at the
+ * loop seam (review I5).
+ */
+const LOOP_SEC = 8;
+const quantizeFall = (perSec: number): number =>
+  Math.max(1, Math.round(perSec * LOOP_SEC)) / LOOP_SEC;
+const quantizeSway = (radPerSec: number): number => {
+  const unit = (Math.PI * 2) / LOOP_SEC;
+  return Math.max(unit, Math.round(radPerSec / unit) * unit);
+};
+
 /** Petals: soft pink/white petals falling with rotation and lateral sway. */
 export function drawPetals(
   ctx: CanvasRenderingContext2D,
@@ -70,10 +85,11 @@ export function drawPetals(
   const palette = ['rgba(244, 194, 194, 0.85)', 'rgba(249, 217, 226, 0.8)', 'rgba(255, 236, 240, 0.75)'];
   for (let i = 0; i < PETAL_SEED.length; i++) {
     const p = PETAL_SEED[i];
-    const fall = 0.03 * p.speed;
+    const fall = quantizeFall(0.03 * p.speed);
     const y = (p.y + timeSec * fall) % 1;
-    const x = (p.x + Math.sin(timeSec * 0.6 * p.speed + p.phase) * 0.03 + 1) % 1;
-    const rot = timeSec * (0.8 + p.speed * 0.6) + p.phase;
+    const x =
+      (p.x + Math.sin(quantizeSway(0.6 * p.speed) * timeSec + p.phase) * 0.03 + 1) % 1;
+    const rot = quantizeSway(0.8 + p.speed * 0.6) * timeSec + p.phase;
     const size = (7 + p.r * 5) * scale;
     ctx.save();
     ctx.translate(x * w, y * h);
@@ -100,9 +116,14 @@ export function drawBokeh(
   const palette = ['rgba(255, 236, 180, 0.16)', 'rgba(230, 199, 90, 0.13)', 'rgba(180, 215, 255, 0.12)'];
   for (let i = 0; i < BOKEH_SEED.length; i++) {
     const p = BOKEH_SEED[i];
-    const y = (p.y - timeSec * 0.012 * p.speed + 1) % 1;
-    const x = (p.x + Math.sin(timeSec * 0.25 + p.phase) * 0.015 + 1) % 1;
-    const breathe = 0.75 + 0.25 * Math.sin(timeSec * 0.9 * p.speed + p.phase);
+    // Purely oscillatory vertical drift (no net rise): keeps the slow bokeh
+    // feel while guaranteeing t=8 equals t=0 — and the double modulo keeps
+    // y in [0,1) for arbitrarily long preview sessions (review I4).
+    const y =
+      ((p.y + Math.sin(quantizeSway(0.15 * p.speed) * timeSec + p.phase) * 0.05) % 1 + 1) % 1;
+    const x =
+      (p.x + Math.sin(quantizeSway(0.25) * timeSec + p.phase) * 0.015 + 1) % 1;
+    const breathe = 0.75 + 0.25 * Math.sin(quantizeSway(0.9 * p.speed) * timeSec + p.phase);
     const radius = (18 + p.r * 22) * scale * breathe;
     const grad = ctx.createRadialGradient(x * w, y * h, radius * 0.55, x * w, y * h, radius);
     grad.addColorStop(0, palette[i % palette.length]);
@@ -127,7 +148,7 @@ export function drawRain(
   ctx.lineWidth = Math.max(1, 1.3 * scale);
   const slant = 0.18; // dx per dy
   for (const p of RAIN_SEED) {
-    const speed = 0.55 + p.speed * 0.45;
+    const speed = quantizeFall(0.55 + p.speed * 0.45) / 1;
     const y = (p.y + timeSec * speed) % 1;
     const x = (p.x + y * slant) % 1;
     const len = (26 + p.r * 16) * scale;
@@ -147,9 +168,10 @@ export function drawSnow(
 ): void {
   const scale = Math.min(w, h) / 1080;
   for (const p of SNOW_SEED) {
-    const speed = 0.02 + p.speed * 0.03;
+    const speed = quantizeFall(0.02 + p.speed * 0.03);
     const y = (p.y + timeSec * speed) % 1;
-    const x = (p.x + Math.sin(timeSec * 0.5 * p.speed + p.phase) * 0.02 + 1) % 1;
+    const x =
+      (p.x + Math.sin(quantizeSway(0.5 * p.speed) * timeSec + p.phase) * 0.02 + 1) % 1;
     const radius = p.r * scale * 1.5;
     const alpha = 0.35 + 0.4 * (0.5 + 0.5 * Math.sin(timeSec * p.speed + p.phase));
     ctx.beginPath();

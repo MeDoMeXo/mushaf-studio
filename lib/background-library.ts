@@ -120,6 +120,9 @@ export const BUILTIN_BG_LIBRARY: readonly BuiltinBackground[] = [
 
 export const BUILTIN_BG_COUNT = BUILTIN_BG_LIBRARY.length;
 
+/** All registry ids — handy for iteration/validators (plan Task 4 interface). */
+export const BUILTIN_BG_IDS: readonly string[] = BUILTIN_BG_LIBRARY.map((bg) => bg.id);
+
 const BG_BY_ID: ReadonlyMap<string, BuiltinBackground> = new Map(
   BUILTIN_BG_LIBRARY.map((bg) => [bg.id, bg])
 );

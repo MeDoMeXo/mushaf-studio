@@ -235,10 +235,17 @@ export async function createExportSession(
     slideCount,
     hasCustomAudio: Boolean(customAudioBuffer && customAudioBuffer.byteLength > 0),
     hasBgVideo: Boolean(rawMeta.hasBgVideo),
-    bgLibraryId:
-      typeof rawMeta.bgLibraryId === 'string' && isBuiltinBackgroundId(rawMeta.bgLibraryId)
-        ? rawMeta.bgLibraryId
-        : undefined,
+    bgLibraryId: (() => {
+      const raw = rawMeta.bgLibraryId;
+      if (raw === undefined || raw === null || raw === '') return undefined;
+      // An explicitly-supplied id outside the whitelist is rejected outright —
+      // silently dropping it would render the export over black instead of
+      // failing with a clear message (see review I2).
+      if (typeof raw !== 'string' || !isBuiltinBackgroundId(raw)) {
+        throw new Error('الخلفية المختارة غير متوفرة — اختر خلفية أخرى من المكتبة');
+      }
+      return raw;
+    })(),
     bgBlur: Math.max(0, Math.min(20, Number(rawMeta.bgBlur ?? 0))),
     bgVideoSpeed: Math.max(0.25, Math.min(2.5, Number(rawMeta.bgVideoSpeed ?? 1))),
     format: rawMeta.format === 'webm' ? 'webm' : 'mp4',

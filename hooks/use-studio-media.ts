@@ -5,8 +5,12 @@
  * Extracted from StudioView per the 600-line file rule: owns bg image/video
  * and custom audio upload state plus their file-input handlers.
  */
-import { useCallback, useRef, useState } from 'react';
-import { getBuiltinBackgroundPublicPath, type BuiltinBackground } from '@/lib/background-library';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import {
+  getBuiltinBackground,
+  getBuiltinBackgroundPublicPath,
+  type BuiltinBackground,
+} from '@/lib/background-library';
 import type { StudioState } from '@/lib/quran-data';
 
 export interface UseStudioMediaInput {
@@ -14,6 +18,11 @@ export interface UseStudioMediaInput {
     updater: (prev: StudioState) => StudioState
   ) => void;
   showToast: (msg: string) => void;
+  /** Current state.bgLibraryId — keeps the preview <video> in sync when a
+   * saved/shared template applies a library background (no File object then). */
+  bgLibraryId?: string | null;
+  /** Current state.bgType, to gate the sync below to video mode only. */
+  bgType?: StudioState['bgType'];
 }
 
 export interface UseStudioMediaResult {
@@ -41,6 +50,8 @@ export interface UseStudioMediaResult {
 export function useStudioMedia({
   commitState,
   showToast,
+  bgLibraryId,
+  bgType,
 }: UseStudioMediaInput): UseStudioMediaResult {
   const [bgVideoUrl, setBgVideoUrl] = useState<string | null>(null);
   const [bgVideoFile, setBgVideoFile] = useState<File | null>(null);
@@ -51,6 +62,24 @@ export function useStudioMedia({
   const [customAudioFile, setCustomAudioFile] = useState<File | null>(null);
   const [customAudioName, setCustomAudioName] = useState<string>('');
   const bgVideoElRef = useRef<HTMLVideoElement | null>(null);
+
+  // Template/share links can set bgLibraryId without touching local media
+  // state (no File object) — sync the preview <video> src to the library clip
+  // so the preview matches what the export will render (parity invariant).
+  useEffect(() => {
+    if (bgType !== 'video' || !bgLibraryId || bgVideoFile) return;
+    const url = getBuiltinBackgroundPublicPath(bgLibraryId);
+    if (!url || url === bgVideoUrl) return;
+    // Defer to a macrotask: setState must not run synchronously inside the
+    // effect body (react-hooks/set-state-in-effect — same fix as TransitionPreviewCard).
+    const tid = setTimeout(() => {
+      setBgVideoUrl(url);
+      setBgVideoName(getBuiltinBackground(bgLibraryId)?.name ?? '');
+      setBgVideoReady(false);
+      setBgVideoPlaying(true);
+    }, 0);
+    return () => clearTimeout(tid);
+  }, [bgType, bgLibraryId, bgVideoFile, bgVideoUrl]);
 
   const handleBgFileUpload = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {

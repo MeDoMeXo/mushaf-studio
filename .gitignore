@@ -22,3 +22,4 @@ scripts/.reciter-health.json
 # Runtime audio cache (regenerated on demand from upstream CDNs)
 public/audio-cache/
 tsconfig.tsbuildinfo
+__pycache__/

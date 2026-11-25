@@ -13,9 +13,9 @@ import {
   buildAmbientOverlayFilters,
   shouldRenderAnimatedAmbient,
 } from '@/lib/video-export';
+import { AMBIENT_MAX_FRAMES } from '@/lib/video-export-ambient';
 
-/** Number of ambient frames the export protocol allows (96 @ 12fps = 8s loop). */
-export const AMBIENT_MAX_FRAMES = 96;
+export { AMBIENT_MAX_FRAMES };
 
 export interface AmbientLayerResolution {
   /** True when animated ambient frames exist on disk and compositing is enabled. */
@@ -38,6 +38,13 @@ interface AmbientLayerParams {
   width: number;
   height: number;
   effectiveFps: number;
+  /**
+   * Label the ambient layer composites onto. '0:v' (the raw backdrop input)
+   * for backdrop jobs; 'bg' (the scaled/cropped/speed-adjusted video label
+   * from buildVideoBackgroundFilterGraph) for background-video jobs — overlaying
+   * raw [0:v] there would leave [bg] dangling and bypass bgBlur/speed/fps.
+   */
+  baseLabel?: string;
 }
 
 /**
@@ -83,7 +90,7 @@ export function resolveAmbientLayer(params: AmbientLayerParams): AmbientLayerRes
 
   const chain = buildAmbientOverlayFilters({
     effect: ambientEffect,
-    inputLabel: '0:v',
+    inputLabel: params.baseLabel ?? '0:v',
     width: params.width,
     height: params.height,
     outputLabel: 'bgamb',

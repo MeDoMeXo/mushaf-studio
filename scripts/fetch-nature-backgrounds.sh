@@ -62,7 +62,7 @@ for entry in "${CLIPS[@]}"; do
   # Try crf ladder until ≤3MB (visual quality stays high; 9s of soft nature)
   for crf in 28 30 32 34; do
     encode "$src" "$dst" "$crf" "$dur" "$side"
-    if probe_ok "$dst"; then echo "   OK ($(numfmt --to=iec --suffix=B $(stat -c%s "$dst")), crf=$crf)"; break; fi
+    if probe_ok "$dst" "$dur" "$side"; then echo "   OK ($(numfmt --to=iec --suffix=B $(stat -c%s "$dst")), crf=$crf)"; break; fi
     [[ "$crf" == 34 ]] && { echo "   cannot fit 3MB even at crf34 — FAILED"; exit 1; }
   done
 done

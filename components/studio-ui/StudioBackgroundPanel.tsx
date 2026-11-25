@@ -6,11 +6,7 @@
  */
 import React from 'react';
 import { Film, Library, Pause, Play, Upload } from 'lucide-react';
-import {
-  BUILTIN_BG_LIBRARY,
-  getBuiltinBackgroundPublicPath,
-  type BuiltinBackground,
-} from '@/lib/background-library';
+import { BUILTIN_BG_LIBRARY, type BuiltinBackground } from '@/lib/background-library';
 import {
   STUDIO_GRADIENTS,
   STUDIO_SOLIDS,

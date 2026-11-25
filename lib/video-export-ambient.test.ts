@@ -133,3 +133,36 @@ test('resolveAmbientLayer stays active above a background video (preview/export 
   assert.equal(isAmbientEnabledForJob('none', true), false);
   assert.equal(isAmbientEnabledForJob('none', false), false);
 });
+
+test('bg-video ambient graph leaves no dangling labels and overlays the processed [bg] stream', async () => {
+  // Regression for review C1: with a background video, the ambient chain must
+  // composite above the PROCESSED [bg] label (scale/crop/speed/blur applied),
+  // never the raw [0:v] — otherwise [bg] dangles and FFmpeg aborts.
+  const { buildVideoBackgroundFilterGraph } = await import('./video-export');
+  const { buildAmbientOverlayFilters: build } = await import('./video-export-ambient');
+  const bg = buildVideoBackgroundFilterGraph({ width: 1080, height: 1920, bgBlur: 4, bgVideoSpeed: 1.5, fps: 30 });
+  const chain = build({ effect: 'stars', inputLabel: 'bg', width: 1080, height: 1920, outputLabel: 'bgamb', fps: 30 })!;
+  // resolveAmbientLayer prefixes the first fragment with the ambient INPUT stream [1:v]
+  const fragments = chain.split(';').map((part, i) => (i === 0 ? `[1:v]${part}` : part));
+  const graph = [bg.split(';')[0], ...fragments].join(';');
+  // 1) ambient consumes the processed [bg] label, not raw [0:v]
+  assert.ok(graph.includes('[bg][amb]overlay'), 'ambient must overlay the processed [bg] stream');
+  assert.ok(!graph.includes('[0:v][amb]'), 'ambient must NOT overlay the raw [0:v] stream');
+  // 2) no dangling labels: every label produced inside the graph (not [vout])
+  //    is consumed as an input by a later filter
+  const labels = ['bg', 'amb', 'bgamb'];
+  for (const label of labels) {
+    const produced = new RegExp(`\\[${label}\\](?=[;,]|$)`).test(graph);
+    assert.ok(produced, `label [${label}] must be produced`);
+    // consumed = appears as an overlay input: "...[X][label]overlay" or "[label][X]overlay"
+    const consumedAsBase = graph.includes(`[${label}][amb]overlay`) || graph.includes(`[${label}][ov]overlay`);
+    const consumedAsTop = new RegExp(`\\[[a-z0-9]+\\]\\[${label}\\]overlay`).test(graph);
+    if (label !== 'bgamb') {
+      assert.ok(consumedAsBase || consumedAsTop, `label [${label}] must be consumed (dangling = FFmpeg abort)`);
+    }
+  }
+  // 3) the bg prep chain ran first (blur/speed applied before ambient overlay)
+  const bgIdx = graph.indexOf('[0:v]');
+  const ambIdx = graph.indexOf('[1:v]');
+  assert.ok(bgIdx !== -1 && ambIdx > bgIdx, 'bg video input precedes the ambient input');
+});

@@ -70,6 +70,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ jobId: status.jobId, status }, { status: 201 });
   } catch (err) {
     console.error('[studio/export/session:POST] failed:', err);
+    const detail = err instanceof Error ? err.message : '';
+    if (detail.includes('الخلفية المختارة')) {
+      return NextResponse.json({ error: detail }, { status: 400 });
+    }
     return NextResponse.json(
       { error: 'تعذّر إنشاء جلسة تصدير الفيديو' },
       { status: 500 }
