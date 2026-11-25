@@ -1,20 +1,48 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://ai.google.dev/static/site-assets/images/share-ais-513315318.png" />
-</div>
+# مصحف الاستوديو — دليل النقل والتشغيل السريع (Mushaf Studio)
 
-# Run and deploy your AI Studio app
+نسخة نقية ونظيفة وشاملة محدثة بالخطوط القرآنية الجديدة (خطوط مجمع الملك فهد لطباعة المصحف الشريف - عثمان طه) وجاهزة للتشغيل والنقل على الهاردسك الخارجي.
+تم تنظيف النسخة من مجلدات البناء الضخمة (`node_modules` و `.next` والكاش المؤقت) لضمان سرعة النقل وصغر الحجم وسهولة النسخ الاحتياطي.
 
-This contains everything you need to run your app locally.
+---
 
-View your app in AI Studio: https://ai.studio/apps/08a9d5f0-e51a-428b-a749-21cd4f2bd913
+## متطلبات التشغيل (System Requirements)
+1. **بيئة التشغيل**: أي نظام تشغيل (Windows / macOS / Linux).
+2. **محرك التشغيل (موصى به)**: **Bun** (الإصدار 1.2 فما فوق) أو **Node.js** (الإصدار 18 فما فوق).
+3. **FFmpeg (اختياري - مطلوب فقط لتصدير الفيديو)**.
 
-## Run Locally
+---
 
-**Prerequisites:**  Node.js
+## خطوات التشغيل السريع (Quick Start)
 
+### الخطوة الأولى: تثبيت الحزم (بأمر واحد سريع)
+```bash
+bun install
+# أو عبر npm:
+# npm install
+```
 
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+### الخطوة الثانية: بدء خادم التطوير
+```bash
+bun run dev
+# أو عبر npm:
+# npm run dev
+```
+
+افتح المتصفح على:
+- الصفحة الرئيسية: `http://localhost:3000`
+- استوديو تصميم التلاوات: `http://localhost:3000/studio`
+- لوحة التحكم والإحصائيات: `http://localhost:3000/admin`
+
+---
+
+## محتويات هذه النسخة النظيفة
+- **كافة الأكواد المصدرية الكاملة** (`app/`, `components/`, `lib/`, `hooks/`, `public/`, `scripts/`).
+- **المكتبة الصوتية الموحدة** (٤٩ قارئاً معتمداً مقطعاً آية بآية مع دعم CORS المباشر).
+- **الخطوط القرآنية المعتمدة** (أميري قرآن، خط مصحف المدينة لمجمع الملك فهد، خط عثمان طه، شهرزاد، نسخ نوتو، ريم كوفي، أميري، القاهرة).
+- **التوثيق الهندسي الشامل** (`doc/` يضم ١٣ وثيقة معمارية مفصلة).
+- **منظومة المهارات الهندسية** (`.agents/` تضم مهارات Superpowers الـ ١٥).
+- **مخطط المعرفة البصري والتفاعلي** (`graphify-out/`).
+- **الاختبارات الأوتوماتيكية** (`bun test` — ١٠٤ اختباراً ناجحاً بنسبة 100%).
+
+---
+تم تجهيز وتأكيد سلامة هذه النسخة في: 2026-11-24T16:23:28.768Z
