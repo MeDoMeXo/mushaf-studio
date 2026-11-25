@@ -66,8 +66,11 @@ export function TransitionPreviewCard({
 
   // Trigger preview automatically on transition settings change
   useEffect(() => {
-    playTransition();
+    // Defer to a macrotask so setState lands in a timer callback instead of
+    // running synchronously inside the effect body (react-hooks/set-state-in-effect).
+    const kickoff = setTimeout(() => playTransition(), 0);
     return () => {
+      clearTimeout(kickoff);
       if (timerRef.current) clearTimeout(timerRef.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
