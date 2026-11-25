@@ -28,6 +28,7 @@ import {
   getJobDir,
   getMetaPath,
   readJobStatus,
+  resolveBuiltinBackgroundForJob,
   writeJobStatus,
   type ActiveJobRuntime,
   type ExportJobMeta,
@@ -58,6 +59,11 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
   try {
     const meta = JSON.parse(await fs.readFile(getMetaPath(jobId), 'utf8')) as ExportJobMeta;
+    // Built-in library background: copy the whitelisted asset into the job dir
+    // as bg_video.bin before any hasBgVideo checks (client never uploads it).
+    if (meta.bgLibraryId) {
+      await resolveBuiltinBackgroundForJob(meta, dir);
+    }
     const filesInDir = await fs.readdir(dir);
 
     // Collect uploaded slide files in strict index order

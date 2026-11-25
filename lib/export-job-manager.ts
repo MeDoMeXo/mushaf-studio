@@ -3,6 +3,7 @@ import crypto from 'node:crypto';
 import { promises as fs } from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
+import { getBuiltinBackground, isBuiltinBackgroundId } from './background-library';
 import { RECITERS } from '@/lib/quran-data';
 import { toArabicDigits } from '@/lib/quran-utils';
 import {
@@ -40,6 +41,8 @@ export interface ExportJobMeta {
   slideCount: number;
   hasCustomAudio: boolean;
   hasBgVideo: boolean;
+  /** Built-in library background id (whitelist-checked) — server copies the asset. */
+  bgLibraryId?: string;
   bgBlur: number;
   bgVideoSpeed: number;
   format: VideoExportFormat;
@@ -75,6 +78,43 @@ globalForJobs.__quranExportActiveJobs = activeJobs;
 
 export function isValidJobId(jobId: string): boolean {
   return UUID_RE.test(jobId);
+}
+
+/**
+ * Resolves a built-in library background for an export job: copies the
+ * whitelisted asset from public/assets/bg-library/ into the job dir as
+ * bg_video.bin (so the render pipeline needs no changes) and persists the
+ * resolved id in meta.json. Rejects anything outside the registry.
+ */
+export async function resolveBuiltinBackgroundForJob(
+  meta: Pick<ExportJobMeta, 'bgLibraryId'>,
+  jobDir: string
+): Promise<boolean> {
+  const id = meta.bgLibraryId;
+  if (!id) return false;
+  if (!isBuiltinBackgroundId(id)) {
+    throw new Error('الخلفية المختارة غير متوفرة — اختر خلفية أخرى من المكتبة');
+  }
+  const bg = getBuiltinBackground(id);
+  if (!bg) {
+    throw new Error('الخلفية المختارة غير متوفرة — اختر خلفية أخرى من المكتبة');
+  }
+  const src = path.join(process.cwd(), 'public', 'assets', 'bg-library', bg.file);
+  const dst = path.join(jobDir, 'bg_video.bin');
+  try {
+    await fs.copyFile(src, dst);
+  } catch {
+    throw new Error('الخلفية المختارة غير متوفرة — جرّب إعادة المحاولة أو خلفية أخرى');
+  }
+  const metaPath = path.join(jobDir, 'meta.json');
+  try {
+    const raw = JSON.parse(await fs.readFile(metaPath, 'utf8')) as ExportJobMeta;
+    raw.bgLibraryId = id;
+    await fs.writeFile(metaPath, JSON.stringify(raw), 'utf8');
+  } catch {
+    // meta persistence is best-effort; the copied file is what matters
+  }
+  return true;
 }
 
 export function getJobDir(jobId: string): string {
@@ -195,6 +235,10 @@ export async function createExportSession(
     slideCount,
     hasCustomAudio: Boolean(customAudioBuffer && customAudioBuffer.byteLength > 0),
     hasBgVideo: Boolean(rawMeta.hasBgVideo),
+    bgLibraryId:
+      typeof rawMeta.bgLibraryId === 'string' && isBuiltinBackgroundId(rawMeta.bgLibraryId)
+        ? rawMeta.bgLibraryId
+        : undefined,
     bgBlur: Math.max(0, Math.min(20, Number(rawMeta.bgBlur ?? 0))),
     bgVideoSpeed: Math.max(0.25, Math.min(2.5, Number(rawMeta.bgVideoSpeed ?? 1))),
     format: rawMeta.format === 'webm' ? 'webm' : 'mp4',

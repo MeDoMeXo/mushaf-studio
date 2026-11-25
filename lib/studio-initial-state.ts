@@ -33,6 +33,7 @@ export function buildInitialStudioState(
     bgImage: null,
     bgBlur: 0,
     bgVideoSpeed: 1,
+    bgLibraryId: null,
     colorLut: 'none',
     ambient: 'gold-dust',
     overlay: 0.14,

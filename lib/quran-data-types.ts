@@ -99,6 +99,8 @@ export interface StudioState {
   bgIdx: number;
   bgColor: string;
   bgImage: string | null;
+  /** Built-in library background id when bgType==='video' via the library grid. */
+  bgLibraryId?: string | null;
   bgVideoSpeed: number;
   bgBlur: number;
   colorLut: ColorLutId;

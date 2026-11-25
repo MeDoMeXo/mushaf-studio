@@ -6,6 +6,7 @@
  * changes are reported through the progress callbacks the modal passes in.
  */
 import type { QulVerse, StudioState } from '@/lib/quran-data';
+import { isBuiltinBackgroundId } from '@/lib/background-library';
 import { toArabicDigits } from '@/lib/quran-utils';
 import {
   drawStudioFrame,
@@ -125,7 +126,15 @@ export async function runExportPipeline(
     return;
   }
 
-  const hasBgVideo = studioState.bgType === 'video' && Boolean(bgVideoFile);
+  const bgLibraryId =
+    studioState.bgType === 'video' &&
+    typeof studioState.bgLibraryId === 'string' &&
+    isBuiltinBackgroundId(studioState.bgLibraryId)
+      ? studioState.bgLibraryId
+      : undefined;
+  // A built-in library background streams server-side from public/ — the
+  // client never uploads it, so bgVideoFile stays null for library picks.
+  const hasBgVideo = studioState.bgType === 'video' && (Boolean(bgVideoFile) || Boolean(bgLibraryId));
   const includeIntroCover = exportSettings.includeIntroCover !== false;
   const totalSlides = resolveIntroCoverSlideCount(selectedVerses.length, includeIntroCover);
 
@@ -158,7 +167,8 @@ export async function runExportPipeline(
     baseWidth: studioState.width,
     baseHeight: studioState.height,
     hasBgVideo,
-    ambient: hasBgVideo ? 'none' : studioState.ambient,
+    bgLibraryId,
+    ambient: studioState.ambient,
     bgBlur: studioState.bgBlur,
     bgVideoSpeed: studioState.bgVideoSpeed,
   };
@@ -263,7 +273,6 @@ export async function runExportPipeline(
   // server composites them live between backdrop and verse slides (matching
   // the preview's drawAmbientEffect animation instead of a frozen frame).
   const wantsAnimatedAmbient =
-    !hasBgVideo &&
     shouldRenderAnimatedAmbient(studioState.ambient) &&
     resolveAmbientFrameSpecs(studioState.ambient, targetDims.width, targetDims.height, exportSettings.fps) !== null;
   const ambientSpec = wantsAnimatedAmbient
