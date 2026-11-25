@@ -1,0 +1,6 @@
+{
+  "name": "مصحف الاستوديو — قارئ القرآن واستوديو تصميم التلاوات",
+  "description": "منصة قرآنية متكاملة تعتمد على مكتبة QUL مفتوحة المصدر لقراءة القرآن الكريم بالرسم العثماني وتصميم صور وفيديوهات التلاوات مع لوحة تحكم متكاملة.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
