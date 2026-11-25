@@ -19,3 +19,5 @@ upload/
 .DS_Store
 # Reciter health check artifacts (regenerated per run)
 scripts/.reciter-health.json
+# Runtime audio cache (regenerated on demand from upstream CDNs)
+public/audio-cache/
