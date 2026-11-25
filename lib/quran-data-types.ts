@@ -72,7 +72,16 @@ export interface GradientPreset {
 }
 
 export type AspectPresetId = '9:16' | '1:1' | '16:9' | 'custom';
-export type AmbientEffect = 'none' | 'stars' | 'gold-dust' | 'aurora';
+export type AmbientEffect =
+  | 'none'
+  | 'stars'
+  | 'gold-dust'
+  | 'aurora'
+  | 'fireflies'
+  | 'petals'
+  | 'bokeh'
+  | 'rain'
+  | 'snow';
 export type TextSourceMode = 'uthmani' | 'translation' | 'both';
 export type LabelPosition = 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'hidden';
 export type ColorLutId = 'none' | 'golden' | 'cinema' | 'emerald' | 'sepia' | 'midnight';

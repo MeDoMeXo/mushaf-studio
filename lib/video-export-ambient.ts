@@ -14,11 +14,31 @@
 export const AMBIENT_MAX_FRAMES = 96;
 
 /** Visual ambient animation effect rendered above the background during export. */
-export type AmbientVisualEffect = 'none' | 'stars' | 'gold-dust' | 'aurora';
+export type AmbientVisualEffect =
+  | 'none'
+  | 'stars'
+  | 'gold-dust'
+  | 'aurora'
+  | 'fireflies'
+  | 'petals'
+  | 'bokeh'
+  | 'rain'
+  | 'snow';
+
+const ANIMATED_AMBIENT_EFFECTS: ReadonlySet<string> = new Set([
+  'stars',
+  'gold-dust',
+  'aurora',
+  'fireflies',
+  'petals',
+  'bokeh',
+  'rain',
+  'snow',
+]);
 
 /** True when the export must render a live animated ambient layer instead of a frozen backdrop. */
 export function shouldRenderAnimatedAmbient(effect: string | undefined | null): boolean {
-  return effect === 'stars' || effect === 'gold-dust' || effect === 'aurora';
+  return typeof effect === 'string' && ANIMATED_AMBIENT_EFFECTS.has(effect);
 }
 
 export interface AmbientFrameSpecs {

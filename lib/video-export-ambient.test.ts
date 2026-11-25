@@ -18,6 +18,14 @@ test('shouldRenderAnimatedAmbient enables the animated layer only for real effec
   assert.equal(shouldRenderAnimatedAmbient('stars'), true);
   assert.equal(shouldRenderAnimatedAmbient('gold-dust'), true);
   assert.equal(shouldRenderAnimatedAmbient('aurora'), true);
+  // expanded motion effects (fireflies / petals / bokeh / rain / snow)
+  assert.equal(shouldRenderAnimatedAmbient('fireflies'), true);
+  assert.equal(shouldRenderAnimatedAmbient('petals'), true);
+  assert.equal(shouldRenderAnimatedAmbient('bokeh'), true);
+  assert.equal(shouldRenderAnimatedAmbient('rain'), true);
+  assert.equal(shouldRenderAnimatedAmbient('snow'), true);
+  // unknown legacy values never animate
+  assert.equal(shouldRenderAnimatedAmbient('bogus-effect'), false);
 });
 
 test('resolveAmbientFrameSpecs returns loopable particle frame counts and a single aurora frame', () => {
@@ -44,6 +52,15 @@ test('resolveAmbientFrameSpecs returns loopable particle frame counts and a sing
   assert.ok(small.frameWidth! <= 480 && small.frameHeight! <= 960);
   // The frame ceiling matches the export protocol (96 @ 12fps = 8s loop)
   assert.equal(AMBIENT_MAX_FRAMES, 96);
+  // Every expanded particle effect follows the same loopable frame protocol
+  for (const effect of ['fireflies', 'petals', 'bokeh', 'rain', 'snow'] as const) {
+    const spec = resolveAmbientFrameSpecs(effect, 1080, 1920, 30)!;
+    assert.equal(spec.frameCount, 96, `${effect} loops 96 frames`);
+    assert.equal(spec.fps, 12);
+    assert.equal(spec.mode, 'frames');
+    assert.ok(spec.uploadBytesEstimate > 0);
+    assert.ok(spec.frameWidth! % 2 === 0 && spec.frameHeight! % 2 === 0);
+  }
 });
 
 test('buildAmbientOverlayFilters composites looping particles or swaying aurora above the backdrop', () => {
