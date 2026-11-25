@@ -1,0 +1,21 @@
+# Dependencies / build
+node_modules/
+.next/
+coverage/
+
+# Local environment & logs
+.env*
+!.env.example
+*.log
+quran-dev.log
+*.zip
+
+# Workspace sandbox folders (agent environment, not part of the project)
+download/
+skills/
+upload/
+
+# OS
+.DS_Store
+# Reciter health check artifacts (regenerated per run)
+scripts/.reciter-health.json
