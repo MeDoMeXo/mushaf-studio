@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#0D1B1A">
+<title>لوحة التحكم · قارئ القرآن</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;500;600;700;800&family=Reem+Kufi:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#0D1B1A; --bg2:#102522; --card:#122b26; --card2:#0e211d;
+  --line:#1e3a33; --line2:#27453d;
+  --text:#e9e6dd; --muted:#8fa39a;
+  --green:#1c6b4d; --green2:#23795a; --gold:#C9A227; --gold2:#E6C75A;
+  --danger:#c25353; --blue:#4a8ad9;
+  --r:16px; --r-sm:10px; --r-lg:22px;
+  --ui:'Cairo',system-ui,sans-serif; --head:'Reem Kufi','Cairo',sans-serif;
+  --shadow:0 8px 28px rgba(0,0,0,.35);
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:var(--ui);background:var(--bg);color:var(--text);min-height:100vh;line-height:1.65;-webkit-font-smoothing:antialiased;
+  background-image:radial-gradient(circle at 90% 5%,rgba(201,162,39,.05),transparent 40%),radial-gradient(circle at 5% 95%,rgba(28,107,77,.08),transparent 45%)}
+a{color:var(--gold2);text-decoration:none}
+button{font-family:inherit;cursor:pointer;border:none;background:none;color:inherit}
+input,select,textarea{font-family:inherit;color:var(--text)}
+:focus-visible{outline:2px solid var(--gold);outline-offset:2px;border-radius:6px}
+
+/* ===== Login ===== */
+.login{min-height:100vh;display:grid;place-items:center;padding:20px}
+.login .box{width:100%;max-width:380px;background:var(--card);border:1px solid var(--line);border-radius:var(--r-lg);padding:34px 28px;box-shadow:var(--shadow)}
+.login .logo{width:58px;height:58px;border-radius:16px;background:linear-gradient(135deg,var(--green),var(--green2));display:grid;place-items:center;margin:0 auto 14px;color:var(--gold2);font-size:1.6rem}
+.login h1{font-family:var(--head);text-align:center;font-size:1.5rem;margin-bottom:4px}
+.login .sub{text-align:center;color:var(--muted);font-size:.85rem;margin-bottom:22px}
+.login .field{margin-bottom:14px}
+.login label{display:block;font-size:.8rem;font-weight:600;color:var(--muted);margin-bottom:6px}
+.login input{width:100%;height:46px;border-radius:11px;border:1px solid var(--line2);background:var(--bg2);padding:0 14px;font-size:1rem;letter-spacing:2px;text-align:center;direction:ltr}
+.login input:focus{border-color:var(--gold);outline:none}
+.login .hint{background:rgba(201,162,39,.08);border:1px solid rgba(201,162,39,.25);border-radius:9px;padding:8px 12px;font-size:.78rem;color:var(--gold2);margin-bottom:16px;text-align:center}
+.login .err{color:var(--danger);font-size:.82rem;text-align:center;margin-bottom:12px;min-height:1.2em}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;padding:10px 18px;border-radius:11px;font-weight:700;font-size:.9rem;transition:.16s;border:1px solid transparent}
+.btn-primary{background:var(--green);color:#fff}
+.btn-primary:hover{background:var(--green2)}
+.btn-gold{background:linear-gradient(135deg,var(--gold),#a8851a);color:#231a05}
+.btn-gold:hover{filter:brightness(1.08)}
+.btn-ghost{background:var(--bg2);border-color:var(--line2);color:var(--text)}
+.btn-ghost:hover{border-color:var(--gold)}
+.btn-danger{background:rgba(194,83,83,.12);border-color:rgba(194,83,83,.4);color:var(--danger)}
+.btn-danger:hover{background:rgba(194,83,83,.22)}
+.btn-block{width:100%;padding:13px;font-size:1rem}
+.btn-sm{padding:6px 12px;font-size:.8rem;border-radius:8px}
+
+/* ===== Shell ===== */
+.shell{display:grid;grid-template-columns:250px 1fr;min-height:100vh}
+.side{background:var(--bg2);border-inline-end:1px solid var(--line);padding:18px 14px;display:flex;flex-direction:column;gap:6px;position:sticky;top:0;height:100vh;overflow:auto}
+.side .brand{display:flex;align-items:center;gap:10px;padding:8px 10px 18px}
+.side .brand .mark{width:40px;height:40px;border-radius:12px;background:linear-gradient(135deg,var(--green),var(--green2));display:grid;place-items:center;color:var(--gold2);font-size:1.2rem}
+.side .brand b{font-family:var(--head);font-size:1rem}
+.side .brand small{display:block;color:var(--muted);font-size:.68rem}
+.snav{display:flex;flex-direction:column;gap:3px}
+.snav button{display:flex;align-items:center;gap:10px;width:100%;text-align:right;padding:10px 12px;border-radius:10px;font-weight:600;font-size:.9rem;color:var(--muted);transition:.15s}
+.snav button .ic{width:20px;text-align:center;font-size:1rem}
+.snav button:hover{background:rgba(255,255,255,.05);color:var(--text)}
+.snav button.active{background:linear-gradient(90deg,rgba(28,107,77,.35),rgba(28,107,77,.12));color:var(--gold2);border-inline-start:2px solid var(--gold)}
+.side .foot{margin-top:auto;padding-top:14px;border-top:1px solid var(--line);font-size:.72rem;color:var(--muted)}
+.side .foot .row{display:flex;justify-content:space-between;padding:4px 0}
+.side .foot .row b{color:var(--text)}
+.main{padding:22px 26px 60px;min-width:0}
+.topbar{display:flex;align-items:center;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.topbar h1{font-family:var(--head);font-size:1.45rem;font-weight:600}
+.topbar .spacer{flex:1}
+.badge-dot{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--muted)}
+.badge-dot::before{content:"";width:8px;height:8px;border-radius:50%;background:#4caf7d;box-shadow:0 0 6px #4caf7d}
+.pill{display:inline-block;font-size:.72rem;font-weight:700;padding:3px 10px;border-radius:999px;background:rgba(201,162,39,.14);color:var(--gold2);border:1px solid rgba(201,162,39,.3)}
+
+/* ===== Cards / stats ===== */
+.stat-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:14px;margin-bottom:20px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:18px;position:relative;overflow:hidden}
+.stat .ic{position:absolute;inset-inline-end:14px;top:14px;font-size:1.4rem;opacity:.18}
+.stat .v{font-size:1.9rem;font-weight:800;font-family:var(--ui)}
+.stat .l{font-size:.8rem;color:var(--muted);font-weight:600}
+.stat .trend{font-size:.72rem;color:var(--green2);margin-top:4px}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:var(--r);padding:20px;margin-bottom:18px}
+.panel>h3{font-family:var(--head);font-size:1.05rem;margin-bottom:4px;color:var(--gold2)}
+.panel>.desc{font-size:.82rem;color:var(--muted);margin-bottom:16px}
+.panel .actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:18px}
+canvas.chart{width:100%;height:220px;display:block}
+.table{width:100%;border-collapse:collapse;font-size:.86rem}
+.table th{text-align:right;color:var(--muted);font-weight:600;font-size:.78rem;padding:8px 10px;border-bottom:1px solid var(--line2)}
+.table td{padding:9px 10px;border-bottom:1px solid var(--line)}
+.table tr:last-child td{border-bottom:none}
+.table .mono{font-family:ui-monospace,monospace;font-size:.78rem;direction:ltr;text-align:left}
+.tag{display:inline-block;font-size:.7rem;font-weight:700;padding:2px 8px;border-radius:6px}
+.tag.ok{background:rgba(76,175,125,.15);color:#7dd3a6}
+.tag.warn{background:rgba(201,162,39,.15);color:var(--gold2)}
+.tag.err{background:rgba(194,83,83,.15);color:#e08c8c}
+.row-flex{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.form-row{display:grid;grid-template-columns:160px 1fr;gap:12px;align-items:center;margin-bottom:14px}
+.form-row label{font-size:.84rem;font-weight:600;color:var(--muted)}
+.form-row .hintline{grid-column:2;font-size:.72rem;color:var(--muted);margin-top:-8px}
+.inp{width:100%;height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--bg2);padding:0 14px;font-size:.92rem}
+.inp:focus{border-color:var(--gold);outline:none}
+textarea.inp{height:auto;min-height:84px;padding:10px 14px;resize:vertical;line-height:1.8}
+select.inp{cursor:pointer}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+.form-grid .full{grid-column:1/-1}
+.color-row{display:flex;gap:8px;align-items:center}
+.color-row input[type=color]{width:52px;height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--bg2);padding:3px;cursor:pointer}
+.color-row input[type=text]{flex:1;direction:ltr;font-family:ui-monospace,monospace;font-size:.82rem}
+.color-row .reset{font-size:.76rem;color:var(--muted);text-decoration:underline;cursor:pointer}
+.switch-row{display:flex;align-items:center;justify-content:space-between;padding:11px 0;border-bottom:1px solid var(--line);font-size:.88rem;font-weight:600}
+.switch-row:last-child{border-bottom:none}
+.switch{position:relative;width:44px;height:24px;border-radius:999px;background:var(--bg2);border:1px solid var(--line2);transition:.18s;flex:0 0 auto;cursor:pointer}
+.switch::after{content:"";position:absolute;top:2px;inset-inline-start:2px;width:18px;height:18px;border-radius:50%;background:#7d8a84;transition:.18s}
+.switch.on{background:var(--green);border-color:var(--green)}
+.switch.on::after{inset-inline-start:22px;background:var(--gold2)}
+.range-row{display:flex;align-items:center;gap:12px}
+.range-row input[type=range]{flex:1;accent-color:var(--gold)}
+.range-row .v{font-weight:700;color:var(--gold2);min-width:56px;text-align:center;font-size:.84rem}
+.kpis-mini{display:flex;gap:18px;flex-wrap:wrap;font-size:.8rem;color:var(--muted)}
+.kpis-mini b{color:var(--text)}
+.note{background:rgba(74,138,217,.08);border:1px solid rgba(74,138,217,.25);border-radius:10px;padding:10px 14px;font-size:.8rem;color:#a8c4e6}
+.note.gold{background:rgba(201,162,39,.08);border-color:rgba(201,162,39,.25);color:var(--gold2)}
+.note.warn{background:rgba(194,83,83,.08);border-color:rgba(194,83,83,.3);color:#e08c8c}
+.hidden{display:none!important}
+.code-box{background:var(--bg2);border:1px solid var(--line2);border-radius:10px;padding:12px 14px;font-family:ui-monospace,monospace;font-size:.76rem;direction:ltr;text-align:left;white-space:pre-wrap;word-break:break-all;max-height:260px;overflow:auto;color:#b8d0c6}
+.saved-flash{position:fixed;inset-block-end:26px;inset-inline:0;margin:auto;width:max-content;max-width:90%;background:var(--green);color:#fff;padding:11px 20px;border-radius:999px;font-size:.86rem;font-weight:700;box-shadow:var(--shadow);opacity:0;transform:translateY(12px);transition:.25s;z-index:50;pointer-events:none}
+.saved-flash.show{opacity:1;transform:translateY(0)}
+.preview-hero{border-radius:12px;padding:18px 16px;text-align:center;background:linear-gradient(135deg,#06241c,#13513d);border:1px solid rgba(201,162,39,.3)}
+.preview-hero .b{font-size:.72rem;color:var(--gold2)}
+.preview-hero h4{font-size:.95rem;color:#fff;margin:6px 0}
+.preview-hero .vv{font-family:'Amiri','Cairo',serif;color:#e9e6dd;font-size:1rem;line-height:2}
+.toast2{position:fixed;top:18px;inset-inline:0;margin:auto;width:max-content;max-width:90%;background:#231a05;color:var(--gold2);padding:10px 18px;border-radius:999px;font-size:.84rem;font-weight:700;border:1px solid rgba(201,162,39,.4);z-index:60;opacity:0;transform:translateY(-8px);transition:.25s;pointer-events:none}
+.toast2.show{opacity:1;transform:translateY(0)}
+
+@media (max-width:980px){
+  .shell{grid-template-columns:1fr}
+  .side{position:static;height:auto;flex-direction:row;flex-wrap:wrap;align-items:center;border-inline-end:none;border-block-end:1px solid var(--line);padding:10px 12px}
+  .side .brand{padding:4px 8px}
+  .side .brand small{display:none}
+  .snav{flex-direction:row;flex-wrap:wrap}
+  .snav button{width:auto;padding:8px 12px;font-size:.8rem}
+  .snav button.active{border-inline-start:none;border-bottom:2px solid var(--gold)}
+  .side .foot{display:none}
+  .main{padding:16px 14px 60px}
+  .form-grid{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr;gap:6px}
+}
+</style>
+</head>
+<body>
+
+<!-- شاشة الدخول -->
+<div class="login" id="loginView">
+  <div class="box">
+    <div class="logo">◈</div>
+    <h1>لوحة التحكم</h1>
+    <div class="sub">قارئ القرآن · استوديو تصميم الآيات</div>
+    <div class="hint">رمز الدخول الافتراضي: <b>1234</b> — غيّره من قسم «الأمان» بعد أول دخول</div>
+    <div class="err" id="loginErr"></div>
+    <div class="field">
+      <label>رمز الدخول</label>
+      <input id="pinInput" type="password" inputmode="numeric" autocomplete="current-password" placeholder="••••" autofocus>
+    </div>
+    <button class="btn btn-gold btn-block" id="loginBtn">دخول</button>
+    <div style="text-align:center;margin-top:14px;font-size:.76rem;color:var(--muted)">
+      <a href="quran-studio.html" style="color:var(--muted)">← العودة إلى الموقع</a>
+    </div>
+  </div>
+</div>
+
+<!-- الهيكل الرئيسي -->
+<div class="shell hidden" id="shell">
+  <aside class="side">
+    <div class="brand">
+      <div class="mark">◈</div>
+      <div><b>لوحة التحكم</b><small>قارئ القرآن</small></div>
+    </div>
+    <nav class="snav" id="snav">
+      <button data-v="overview" class="active"><span class="ic">◎</span> نظرة عامة</button>
+      <button data-v="content"><span class="ic">✦</span> المحتوى</button>
+      <button data-v="reading"><span class="ic">📖</span> القراءة والاستماع</button>
+      <button data-v="studio"><span class="ic">🎨</span> الاستوديو</button>
+      <button data-v="appearance"><span class="ic">◐</span> المظهر</button>
+      <button data-v="backup"><span class="ic">⇅</span> النسخ والدمج</button>
+      <button data-v="security"><span class="ic">🔒</span> الأمان</button>
+    </nav>
+    <div class="foot">
+      <div class="row"><span>الإصدار</span><b>1.0</b></div>
+      <div class="row"><span>المصدر</span><b>QUL API</b></div>
+      <div class="row"><span>آخر تحديث</span><b id="footUpdated">—</b></div>
+      <button class="btn btn-ghost btn-sm" id="logoutBtn" style="margin-top:10px;width:100%">خروج</button>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <h1 id="viewTitle">نظرة عامة</h1>
+      <span class="spacer"></span>
+      <span class="badge-dot">متصل بمزامنة مباشرة</span>
+      <a class="btn btn-ghost btn-sm" href="quran-studio.html" target="_blank">↗ فتح الموقع</a>
+    </div>
+    <div id="view"></div>
+  </main>
+</div>
+
+<div class="saved-flash" id="flash">تم الحفظ ✓</div>
+<div class="toast2" id="toast2"></div>
+
+<script>
+/* ============================================================
+   لوحة التحكم — قارئ القرآن + استوديو تصميم الآيات
+   مستقلة تماماً · تخزين محلي (localStorage) · بدون خادم
+   ============================================================ */
+const LS={
+  CONFIG:"quran_config_v1", STATS:"quran_stats_v1", PIN:"quran_admin_pin",
+  SESSION:"quran_admin_session", LASTSYNC:"quran_config_sync",
+};
+const CONFIG_DEFAULTS={
+  siteName:"قارئ القرآن", tagline:"استوديو تصميم الآيات",
+  heroTitle:"القرآن الكريم · بنصّ عثماني وتصاميم تنشرها",
+  badge:"✦ آية اليوم",
+  verseOfDay:null,
+  primaryColor:"", accentColor:"", defaultTheme:"light",
+  defaultTranslation:131, defaultReciter:"ar.alafasy",
+  defaultVsize:1.7, defaultShowTrans:true,
+  studio:{fontFamily:"Amiri Quran", bgIdx:0, fontSize:120, color:"#FAF7F0", watermark:"قارئ القرآن", footer:true},
+  updatedAt:0,
+};
+const RECITERS=[
+  {slug:"ar.alafasy", name:"مشاري العفاسي"},
+  {slug:"ar.husary", name:"محمود خليل الحصري"},
+  {slug:"ar.minshawi", name:"محمد صديق المنشاوي"},
+  {slug:"ar.mahermuaiqly", name:"ماهر المعيقلي"},
+  {slug:"ar.shaatree", name:"أبو بكر الشاطري"},
+];
+const TRANSLATIONS=[
+  {id:131,name:"الدكتور مصطفى خطب — Clear Quran"},
+  {id:20,name:"Saheeh International"},
+  {id:149,name:"Fadel Soliman — Bridges’"},
+  {id:85,name:"عبد الله يوسف علي (مختصرة)"},
+  {id:95,name:"تفهم القرآن — المودودي (تفسيري)"},
+  {id:167,name:"معارف القرآن (تفسيري)"},
+];
+const GRADIENT_NAMES=["أخضر عميق","ليل ذهبي","زمرّد","فيروز","كهرمان","ذهبي ملكي","فجر دافئ","وردي","بنفسجي ليلي","نيلي","سماء","بحر","رمادي حجري","فحمي","عاجي دافئ","أخضر فاتح","صحراء","غروب","زيتي","نبيذي","فضي","نحاسي","فيروزي ذهبي","ليل وبدر"];
+const FONTS=["Amiri Quran","Scheherazade New","Noto Naskh Arabic","Reem Kufi","Amiri","Cairo"];
+const VOD_LIST=[
+  {s:2,a:255,t:"آية الكرسي — البقرة 255"},{s:2,a:286,t:"البقرة 286"},{s:3,a:8,t:"آل عمران 8"},
+  {s:13,a:28,t:"الرعد 28"},{s:94,a:5,t:"الشرح 5"},{s:2,a:153,t:"البقرة 153"},
+  {s:65,a:3,t:"الطلاق 3"},{s:39,a:53,t:"الزمر 53"},{s:40,a:60,t:"غافر 60"},
+  {s:55,a:13,t:"الرحمن 13"},{s:24,a:35,t:"النور 35 (النور)"},{s:3,a:185,t:"آل عمران 185"},
+  {s:10,a:57,t:"يونس 57"},{s:17,a:80,t:"الإسراء 80"},{s:16,a:97,t:"النحل 97"},
+  {s:41,a:46,t:"فصلت 46"},{s:42,a:13,t:"الشورى 13"},{s:7,a:156,t:"الأعراف 156"},
+];
+
+/* ============ Repo — قراءة/كتابة موحدة ============ */
+const $=(s,r=document)=>r.querySelector(s);
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function lsJSON(key,def){try{const v=JSON.parse(localStorage.getItem(key));return v==null?def:v;}catch(e){return def;}}
+const Repo={
+  config:lsJSON(LS.CONFIG,Object.assign({},CONFIG_DEFAULTS)),
+  stats:lsJSON(LS.STATS,{visits:0,reads:0,plays:0,exports:0,searches:0,firstVisit:0,lastVisit:0,daily:{},log:[]}),
+  load(){this.config=lsJSON(LS.CONFIG,Object.assign({},CONFIG_DEFAULTS));this.stats=lsJSON(LS.STATS,{visits:0,reads:0,plays:0,exports:0,searches:0,firstVisit:0,lastVisit:0,daily:{},log:[]});},
+  saveConfig(){this.config.updatedAt=Date.now();localStorage.setItem(LS.CONFIG,JSON.stringify(this.config));localStorage.setItem(LS.LASTSYNC,String(Date.now()));},
+  saveStats(){localStorage.setItem(LS.STATS,JSON.stringify(this.stats));},
+  exportAll(){return JSON.stringify({config:this.config,stats:this.stats},null,2);},
+  reset(){localStorage.removeItem(LS.CONFIG);localStorage.removeItem(LS.STATS);this.load();},
+};
+function flash(msg){const f=$("#flash");f.textContent=msg||"تم الحفظ ✓";f.classList.add("show");setTimeout(()=>f.classList.remove("show"),1800);}
+function toast2(msg){const t=$("#toast2");t.textContent=msg;t.classList.add("show");setTimeout(()=>t.classList.remove("show"),2400);}
+function arNum(n){return String(n).replace(/[0-9]/g,d=>"٠١٢٣٤٥٦٧٨٩"[d]);}
+function when(t){if(!t)return"—";const d=new Date(+t);return d.toLocaleDateString("ar")+" "+d.toLocaleTimeString("ar",{hour:"2-digit",minute:"2-digit"});}
+function relTime(t){if(!t)return"—";const s=Math.floor((Date.now()-t)/1000);if(s<60)return"قبل "+arNum(s)+" ثانية";if(s<3600)return"قبل "+arNum(Math.floor(s/60))+" دقيقة";if(s<86400)return"قبل "+arNum(Math.floor(s/3600))+" ساعة";return"قبل "+arNum(Math.floor(s/86400))+" يوم";}
+
+/* ============ Auth ============ */
+const Auth={
+  pin(){return localStorage.getItem(LS.PIN)||"1234";},
+  login(p){
+    if(p===this.pin()){
+      const s={t:Date.now()};localStorage.setItem(LS.SESSION,JSON.stringify(s));
+      return true;
+    }
+    return false;
+  },
+  logout(){localStorage.removeItem(LS.SESSION);},
+  isAuthed(){
+    const s=lsJSON(LS.SESSION,null);
+    if(!s)return false;
+    // جلسة تدوم 8 ساعات
+    if(Date.now()-s.t>8*3600*1000){localStorage.removeItem(LS.SESSION);return false;}
+    return true;
+  },
+};
+
+/* ============ Views ============ */
+const VIEWS={overview:null,content:null,reading:null,studio:null,appearance:null,backup:null,security:null};
+function switchView(v){
+  document.querySelectorAll("#snav button").forEach(b=>b.classList.toggle("active",b.dataset.v===v));
+  const titles={overview:"نظرة عامة",content:"المحتوى",reading:"القراءة والاستماع",studio:"الاستوديو",appearance:"المظهر",backup:"النسخ والدمج",security:"الأمان"};
+  $("#viewTitle").textContent=titles[v]||"";
+  const host=$("#view");host.innerHTML="";
+  const fn=VIEWS[v];
+  if(fn)fn(host);
+}
+
+/* ============ 1) Overview ============ */
+VIEWS.overview=function(host){
+  const st=Repo.stats;
+  const days=Object.keys(st.daily||{}).sort().slice(-14);
+  const today=days[days.length-1]||"—";
+  const todayStats=st.daily&&st.daily[today]?st.daily[today]:{visits:0,reads:0,plays:0,exports:0,searches:0};
+  const last7=days.slice(-7);
+  const sum7=k=>last7.reduce((a,d)=>a+((st.daily[d]&&st.daily[d][k])||0),0);
+  const logRows=(st.log||[]).slice(0,12).map(l=>{
+    const names={visits:"زيارة",reads:"قراءة سورة",plays:"تلاوة",exports:"تصدير صورة",searches:"بحث"};
+    return `<tr><td>${when(l.t)}</td><td><span class="tag ok">${names[l.e]||l.e}</span></td><td class="mono">${esc(l.d)}</td></tr>`;
+  }).join("")||`<tr><td colspan="3" style="color:var(--muted)">لا أحداث بعد — استخدم الموقع ثم عد هنا</td></tr>`;
+  host.innerHTML=`
+    <div class="stat-grid">
+      <div class="stat"><span class="ic">◎</span><div class="v">${arNum(st.visits||0)}</div><div class="l">زيارات إجمالي</div><div class="trend">اليوم ${arNum(todayStats.visits||0)} · آخر ٧ أيام ${arNum(sum7("visits"))}</div></div>
+      <div class="stat"><span class="ic">📖</span><div class="v">${arNum(st.reads||0)}</div><div class="l">سور مقروءة</div><div class="trend">اليوم ${arNum(todayStats.reads||0)}</div></div>
+      <div class="stat"><span class="ic">♫</span><div class="v">${arNum(st.plays||0)}</div><div class="l">تلاوات</div><div class="trend">اليوم ${arNum(todayStats.plays||0)}</div></div>
+      <div class="stat"><span class="ic">🎨</span><div class="v">${arNum(st.exports||0)}</div><div class="l">صور مصدّرة من الاستوديو</div><div class="trend">اليوم ${arNum(todayStats.exports||0)}</div></div>
+      <div class="stat"><span class="ic">⌕</span><div class="v">${arNum(st.searches||0)}</div><div class="l">عمليات بحث</div><div class="trend">اليوم ${arNum(todayStats.searches||0)}</div></div>
+    </div>
+    <div class="panel">
+      <h3>النشاط آخر ١٤ يوماً</h3>
+      <div class="desc">زيارات وقراءات وتلاوات وتصديرات يومياً (من بيانات الموقع المحلية)</div>
+      <canvas class="chart" id="chActivity" height="220"></canvas>
+    </div>
+    <div class="panel">
+      <h3>أحدث الأحداث</h3>
+      <div class="desc">سجل مبسّط لآخر ١٢ حدثاً على الموقع</div>
+      <table class="table"><thead><tr><th>الوقت</th><th>الحدث</th><th>التفصيل</th></tr></thead><tbody>${logRows}</tbody></table>
+    </div>
+    <div class="note gold">💡 الإحصائيات تُجمع محلياً في متصفح المستخدم نفسه (بدون خادم أو تتبع خارجي). هذه اللوحة تعرض بيانات المتصفح الحالي فقط.</div>
+  `;
+  drawActivityChart(days,st);
+};
+function drawActivityChart(days,st){
+  const cv=$("#chActivity");if(!cv)return;
+  const dpr=window.devicePixelRatio||1;
+  const W=cv.clientWidth||600,H=220;
+  cv.width=W*dpr;cv.height=H*dpr;
+  const ctx=cv.getContext("2d");ctx.scale(dpr,dpr);
+  ctx.clearRect(0,0,W,H);
+  const pad={t:16,r:14,b:34,l:44};
+  const series=[
+    {k:"visits",c:"#4a8ad9",n:"زيارات"},
+    {k:"reads",c:"#C9A227",n:"قراءات"},
+    {k:"plays",c:"#4caf7d",n:"تلاوات"},
+    {k:"exports",c:"#e08c8c",n:"تصديرات"},
+  ];
+  let max=1;
+  days.forEach(d=>series.forEach(s=>{max=Math.max(max,(st.daily[d]&&st.daily[d][s.k])||0);}));
+  if(!days.length)days=[new Date().toLocaleDateString("sv")];
+  const iw=(W-pad.l-pad.r)/days.length;
+  const y=v=>pad.t+(H-pad.t-pad.b)*(1-v/max);
+  // شبكة
+  ctx.strokeStyle="rgba(255,255,255,.07)";ctx.fillStyle="#8fa39a";ctx.font="10px Cairo";ctx.textAlign="center";
+  const steps=4;
+  for(let i=0;i<=steps;i++){
+    const v=Math.round(max*i/steps);const yy=y(v);
+    ctx.beginPath();ctx.moveTo(pad.l,yy);ctx.lineTo(W-pad.r,yy);ctx.stroke();
+    ctx.fillText(String(v),pad.l-18,yy+3);
+  }
+  // أعمدة مجمّعة
+  days.forEach((d,i)=>{
+    const x0=pad.l+i*iw;
+    const bw=Math.min(10,iw/series.length-2);
+    series.forEach((s,si)=>{
+      const v=(st.daily[d]&&st.daily[d][s.k])||0;
+      const h=(H-pad.t-pad.b)*(v/max);
+      ctx.fillStyle=s.c;
+      ctx.fillRect(x0+si*(bw+2)+(iw-bw*series.length-2*(series.length-1))/2,y(v),bw,Math.max(v>0?2:0,h));
+    });
+    ctx.fillStyle="#8fa39a";
+    if(days.length<=14||i%2===0)ctx.fillText(d.slice(5),x0+iw/2,H-12);
+  });
+  // legend
+  let lx=pad.l;
+  series.forEach(s=>{
+    ctx.fillStyle=s.c;ctx.fillRect(lx,H-4,8,8);
+    ctx.fillStyle="#8fa39a";ctx.textAlign="left";ctx.fillText(s.n,lx+12,H+2);
+    lx+=ctx.measureText(s.n).width+34;ctx.textAlign="left";
+  });
+}
+
+/* ============ 2) Content ============ */
+VIEWS.content=function(host){
+  const c=Repo.config;
+  const vod=c.verseOfDay;
+  const vodSel=vod&&vod.surah?vod.surah+"-"+vod.ayah:"";
+  host.innerHTML=`
+    <div class="panel">
+      <h3>هوية الموقع</h3>
+      <div class="desc">الاسم والشعار الظاهران في شريط الموقع وعنوان التبويب</div>
+      <div class="form-row"><label>اسم الموقع</label><input class="inp" id="fSiteName" value="${esc(c.siteName)}"></div>
+      <div class="form-row"><label>الوصف القصير</label><input class="inp" id="fTagline" value="${esc(c.tagline)}"></div>
+      <div class="form-row"><label>عنوان الواجهة (H1)</label><input class="inp" id="fHeroTitle" value="${esc(c.heroTitle)}"></div>
+      <div class="form-row"><label>نص الشارة</label><input class="inp" id="fBadge" value="${esc(c.badge)}"></div>
+      <div class="actions"><button class="btn btn-primary" id="bSaveIdentity">حفظ الهوية</button></div>
+    </div>
+    <div class="panel">
+      <h3>آية اليوم</h3>
+      <div class="desc">تظهر في الواجهة الرئيسية؛ اختر آية ثابتة أو اترك التدوير اليومي التلقائي</div>
+      <div class="form-row">
+        <label>آية اليوم</label>
+        <div style="display:flex;gap:10px;align-items:center">
+          <select class="inp" id="fVod" style="max-width:320px">
+            <option value="">— تدوير تلقائي يومي (18 آية مختارة) —</option>
+            ${VOD_LIST.map(v=>`<option value="${v.s}-${v.a}" ${vodSel===v.s+"-"+v.a?"selected":""}>${esc(v.t)}</option>`).join("")}
+            ${vodSel&&!VOD_LIST.some(v=>v.s+"-"+v.a===vodSel)?`<option value="${vodSel}" selected>${vodSel} (مخصص)</option>`:""}
+          </select>
+          <span class="pill" id="vodPill">${vod?`مخصص: ${vod.surah}:${vod.ayah}`:"تلقائي"}</span>
+        </div>
+      </div>
+      <div class="form-row"><label>سورة مخصصة</label><div style="display:flex;gap:8px;max-width:320px"><input class="inp" id="fVodS" type="number" min="1" max="114" placeholder="مثال 2" value="${vod?vod.surah||"":"2"}"><input class="inp" id="fVodA" type="number" min="1" placeholder="الآية" value="${vod?vod.ayah||"":"255"}"></div></div>
+      <div class="actions">
+        <button class="btn btn-primary" id="bSaveVod">حفظ آية اليوم</button>
+        <button class="btn btn-ghost" id="bVodAuto">رجوع للتلقائي</button>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>معاينة الواجهة الرئيسية</h3>
+      <div class="desc">تُحدَّث مباشرة عند الحفظ</div>
+      <div class="preview-hero" id="pvHero">
+        <div class="b">${esc(c.badge)}</div>
+        <h4>${esc(c.heroTitle)}</h4>
+        <div class="vv" id="pvVerse">﴿ آية اليوم ﴾</div>
+        <div style="font-size:.76rem;color:var(--gold2);margin-top:8px" id="pvRef"></div>
+      </div>
+    </div>
+  `;
+  function refreshPill(){
+    const v=Repo.config.verseOfDay;
+    $("#vodPill").textContent=v?`مخصص: ${v.surah}:${v.ayah}`:"تلقائي";
+  }
+  $("#bSaveIdentity").addEventListener("click",()=>{
+    Repo.config.siteName=$("#fSiteName").value.trim()||"قارئ القرآن";
+    Repo.config.tagline=$("#fTagline").value.trim();
+    Repo.config.heroTitle=$("#fHeroTitle").value.trim();
+    Repo.config.badge=$("#fBadge").value.trim()||"✦ آية اليوم";
+    Repo.saveConfig();updateFoot();flash("تم حفظ الهوية — افتح الموقع لرؤيتها");refreshPreview();
+  });
+  function parseVod(){
+    const s=parseInt($("#fVodS").value),a=parseInt($("#fVodA").value);
+    if(s>=1&&s<=114&&a>=1)return{surah:s,ayah:a};
+    return null;
+  }
+  $("#bSaveVod").addEventListener("click",()=>{
+    const sel=$("#fVod").value;
+    if(sel){const [s,a]=sel.split("-").map(Number);Repo.config.verseOfDay={surah:s,ayah:a};}
+    else Repo.config.verseOfDay=parseVod();
+    Repo.saveConfig();refreshPill();flash("تم حفظ آية اليوم");refreshPreview();
+  });
+  $("#bVodAuto").addEventListener("click",()=>{
+    Repo.config.verseOfDay=null;Repo.saveConfig();refreshPill();flash("عودة للتدوير اليومي التلقائي");refreshPreview();
+  });
+  function refreshPreview(){
+    const c=Repo.config;
+    $("#pvHero .b").textContent=c.badge;
+    $("#pvHero h4").textContent=c.heroTitle;
+    const v=c.verseOfDay;
+    $("#pvRef").textContent=v?`﴿ ${v.surah}:${v.ayah} ﴾ (مخصص) — يتغير فقط من هنا`:"تدوير تلقائي من 18 آية مختارة";
+  }
+  refreshPreview();
+};
+
+/* ============ 3) Reading ============ */
+VIEWS.reading=function(host){
+  const c=Repo.config;
+  host.innerHTML=`
+    <div class="panel">
+      <h3>الافتراضات للزوار الجدد</h3>
+      <div class="desc">تُطبَّق على كل من يفتح الموقع دون تفضيلات محفوظة</div>
+      <div class="form-row"><label>الترجمة الافتراضية</label>
+        <select class="inp" id="fTrans">${TRANSLATIONS.map(t=>`<option value="${t.id}" ${t.id===c.defaultTranslation?"selected":""}>${esc(t.name)}</option>`).join("")}</select>
+      </div>
+      <div class="form-row"><label>القارئ الافتراضي</label>
+        <select class="inp" id="fRecit">${RECITERS.map(r=>`<option value="${r.slug}" ${r.slug===c.defaultReciter?"selected":""}>${esc(r.name)}</option>`).join("")}</select>
+      </div>
+      <div class="form-row"><label>حجم خط الآيات</label>
+        <div class="range-row"><input type="range" id="fVsize" min="1.2" max="3" step="0.05" value="${c.defaultVsize||1.7}"><span class="v" id="vsizeOut">${(c.defaultVsize||1.7).toFixed(2)}rem</span></div>
+        <div class="hintline">من 1.2 (مريح للجوال) إلى 3.0 (كبير جداً)</div>
+      </div>
+      <div class="switch-row"><span>إظهار الترجمة افتراضياً</span><span class="switch ${c.defaultShowTrans!==false?"on":""}" id="fShowTrans"></span></div>
+      <div class="actions"><button class="btn btn-primary" id="bSaveReading">حفظ الافتراضيات</button></div>
+    </div>
+    <div class="panel">
+      <h3>مكتبة القراء النشطة</h3>
+      <div class="desc">مصدر الصوت: islamic.network CDN — تُجرّب قبل التفعيل</div>
+      <table class="table">
+        <thead><tr><th>القارئ</th><th>المعرّف</th><th>الحالة</th></tr></thead>
+        <tbody>
+          ${RECITERS.map(r=>`<tr><td>${esc(r.name)}</td><td class="mono">${r.slug}</td><td><span class="tag ok">يعمل</span></td></tr>`).join("")}
+        </tbody>
+      </table>
+      <div class="note" style="margin-top:14px">أُبقي القراء الخمسة المتحقق من عملهم فقط. لإضافة قارئ آخر مستقبلاً: عدّل مصفوفة RECITERS في كلا الملفين.</div>
+    </div>
+    <div class="panel">
+      <h3>مصادر البيانات</h3>
+      <table class="table">
+        <thead><tr><th>المورد</th><th>النقطة</th><th>الحالة</th></tr></thead>
+        <tbody>
+          <tr><td>الفصول والآيات (نص عثماني + ترجمات)</td><td class="mono">qul.tarteel.ai/api/v1/chapters/&#123;id&#125;/verses</td><td><span class="tag ok">مُتحقّق</span></td></tr>
+          <tr><td>الصوت لكل آية</td><td class="mono">cdn.islamic.network/quran/audio/128/&#123;slug&#125;/&#123;id&#125;.mp3</td><td><span class="tag ok">مُتحقّق</span></td></tr>
+          <tr><td>صور الآيات وصفحات المصحف</td><td class="mono">—</td><td><span class="tag err">محجوب (403)</span></td></tr>
+        </tbody>
+      </table>
+    </div>
+  `;
+  $("#fVsize").addEventListener("input",e=>$("#vsizeOut").textContent=parseFloat(e.target.value).toFixed(2)+"rem");
+  $("#fShowTrans").addEventListener("click",e=>e.currentTarget.classList.toggle("on"));
+  $("#bSaveReading").addEventListener("click",()=>{
+    Repo.config.defaultTranslation=parseInt($("#fTrans").value);
+    Repo.config.defaultReciter=$("#fRecit").value;
+    Repo.config.defaultVsize=parseFloat($("#fVsize").value);
+    Repo.config.defaultShowTrans=$("#fShowTrans").classList.contains("on");
+    Repo.saveConfig();flash("تم حفظ افتراضيات القراءة");
+  });
+};
+
+/* ============ 4) Studio ============ */
+VIEWS.studio=function(host){
+  const c=Repo.config;const s=c.studio||{};
+  host.innerHTML=`
+    <div class="panel">
+      <h3>افتراضيات الاستوديو</h3>
+      <div class="desc">تُطبَّق عند أول فتح للاستوديو لدى أي زائر</div>
+      <div class="form-grid">
+        <div class="form-row"><label>عائلة الخط</label><select class="inp" id="sFont">${FONTS.map(f=>`<option ${f===s.fontFamily?"selected":""}>${f}</option>`).join("")}</select></div>
+        <div class="form-row"><label>الخلفية الافتراضية</label><select class="inp" id="sBg">${GRADIENT_NAMES.map((g,i)=>`<option value="${i}" ${i===(s.bgIdx||0)?"selected":""}>${g}</option>`).join("")}</select></div>
+        <div class="form-row"><label>حجم الخط (px)</label><div class="range-row"><input type="range" id="sSize" min="40" max="220" step="2" value="${s.fontSize||120}"><span class="v" id="sSizeOut">${s.fontSize||120}px</span></div></div>
+        <div class="form-row"><label>لون النص</label>
+          <div class="color-row">
+            <input type="color" id="sColor" value="${s.color||"#FAF7F0"}">
+            <input type="text" id="sColorTxt" value="${s.color||"#FAF7F0"}" style="height:42px;border-radius:10px;border:1px solid var(--line2);background:var(--bg2);padding:0 10px" readonly>
+          </div>
+        </div>
+        <div class="form-row full"><label>العلامة المائية (تذييل الصورة)</label><input class="inp" id="sWm" value="${esc(s.watermark||"")}"></div>
+      </div>
+      <div class="switch-row"><span>إظهار اسم السورة ورقم الآية أسفل الصورة</span><span class="switch ${s.footer!==false?"on":""}" id="sFooter"></span></div>
+      <div class="actions"><button class="btn btn-primary" id="bSaveStudio">حفظ افتراضيات الاستوديو</button></div>
+    </div>
+    <div class="panel">
+      <h3>معاينة افتراضية</h3>
+      <div class="desc">مقربة لشكل الآية على الخلفية الافتراضية</div>
+      <canvas id="sPreviewCv" style="width:100%;max-width:460px;border-radius:12px;display:block;margin:0 auto;aspect-ratio:1/1"></canvas>
+    </div>
+    <div class="note gold">💡 عيّنة نص المعاينة: «ٱللَّهُ لَآ إِلَـٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ» — تُرسم بنفس محرك الموقع (Canvas) وبنفس الخطوط.</div>
+  `;
+  const pv=$("#sPreviewCv");
+  const GR=[["#06241c","#0B3D2E","#13513d"],["#0a1f1c","#102a26","#1c1410"],["#0f3d2e","#1f7a5a"],["#0a2e36","#2a8a8a"],["#3a2a08","#C9A227"],["#7a5d12","#C9A227","#E6C75A"]];
+  async function paintPreview(){
+    const font=$("#sFont").value,size=parseInt($("#sSize").value),bg=parseInt($("#sBg").value),color=$("#sColor").value;
+    const W=460,H=460;
+    pv.width=W;pv.height=H;
+    const ctx=pv.getContext("2d");
+    const cols=GR[bg%GR.length];
+    const g=ctx.createLinearGradient(0,0,W,H);
+    cols.forEach((cc,i)=>g.addColorStop(i/(cols.length-1),cc));
+    ctx.fillStyle=g;ctx.fillRect(0,0,W,H);
+    ctx.strokeStyle="rgba(201,162,39,.8)";ctx.lineWidth=2;ctx.strokeRect(14,14,W-28,H-28);
+    try{await document.fonts.load(size*0.4+'px "'+font+'"');}catch(e){}
+    ctx.font=(size*0.4)+'px "'+font+'", serif';
+    ctx.fillStyle=color;ctx.textAlign="center";ctx.textBaseline="middle";ctx.direction="rtl";
+    const text="ٱللَّهُ لَآ إِلَـٰهَ إِلَّا هُوَ ٱلْحَىُّ ٱلْقَيُّومُ";
+    const words=text.split(" ");const lines=[];let ln="";
+    words.forEach(w=>{const t=ln?ln+" "+w:w;if(ctx.measureText(t).width>W*0.8&&ln){lines.push(ln);ln=w;}else ln=t;});
+    if(ln)lines.push(ln);
+    const lh=size*0.4*1.7;let y=H/2-(lines.length*lh)/2+lh/2-20;
+    lines.forEach(l=>{ctx.fillText(l,W/2,y);y+=lh;});
+    if($("#sFooter").classList.contains("on")){
+      ctx.font='18px "Reem Kufi",Cairo';ctx.fillStyle="#E6C75A";
+      ctx.fillText("﴿ البقرة · ٢٥٥ ﴾",W/2,H-36);
+    }
+    const wm=$("#sWm").value.trim();
+    if(wm){ctx.font='12px Cairo';ctx.fillStyle="rgba(250,247,240,.6)";ctx.textAlign="left";ctx.direction="ltr";ctx.fillText(wm,20,H-14);ctx.direction="rtl";}
+  }
+  $("#sColor").addEventListener("input",e=>{$("#sColorTxt").value=e.target.value;paintPreview();});
+  ["sFont","sSize","sBg"].forEach(id=>$("#"+id).addEventListener("input",()=>{
+    if(id==="sSize")$("#sSizeOut").textContent=$("#sSize").value+"px";
+    paintPreview();
+  }));
+  $("#sFooter").addEventListener("click",e=>{e.currentTarget.classList.toggle("on");paintPreview();});
+  paintPreview();
+  $("#bSaveStudio").addEventListener("click",()=>{
+    Repo.config.studio={
+      fontFamily:$("#sFont").value,bgIdx:parseInt($("#sBg").value),
+      fontSize:parseInt($("#sSize").value),color:$("#sColor").value,
+      watermark:$("#sWm").value.trim(),footer:$("#sFooter").classList.contains("on"),
+    };
+    Repo.saveConfig();flash("تم حفظ افتراضيات الاستوديو");
+  });
+};
+
+/* ============ 5) Appearance ============ */
+VIEWS.appearance=function(host){
+  const c=Repo.config;
+  host.innerHTML=`
+    <div class="panel">
+      <h3>الألوان</h3>
+      <div class="desc">اللون الأساسي (الأخضر) ولون التأكيد (الذهبي) — تُطبَّق على الموقع كمتغيرات CSS</div>
+      <div class="form-row"><label>اللون الأساسي (Green)</label>
+        <div class="color-row">
+          <input type="color" id="aPrimary" value="${c.primaryColor||"#0B3D2E"}">
+          <input type="text" id="aPrimaryTxt" value="${c.primaryColor||""}" placeholder="اتركه فارغاً للافتراضي #0B3D2E">
+          <span class="reset" id="aPrimaryReset">افتراضي</span>
+        </div>
+      </div>
+      <div class="form-row"><label>لون التأكيد (Gold)</label>
+        <div class="color-row">
+          <input type="color" id="aAccent" value="${c.accentColor||"#C9A227"}">
+          <input type="text" id="aAccentTxt" value="${c.accentColor||""}" placeholder="اتركه فارغاً للافتراضي #C9A227">
+          <span class="reset" id="aAccentReset">افتراضي</span>
+        </div>
+      </div>
+      <div class="form-row"><label>الوضع الافتراضي</label>
+        <div class="row-flex">
+          <button class="btn ${c.defaultTheme!=="dark"?"btn-gold":"btn-ghost"}" data-theme="light">☀️ فاتح</button>
+          <button class="btn ${c.defaultTheme==="dark"?"btn-gold":"btn-ghost"}" data-theme="dark">🌙 ليلي</button>
+        </div>
+      </div>
+      <div class="actions"><button class="btn btn-primary" id="bSaveAppearance">حفظ المظهر</button></div>
+    </div>
+    <div class="panel">
+      <h3>معاينة الألوان</h3>
+      <div id="pvColors" style="display:flex;gap:12px;flex-wrap:wrap">
+        <div style="flex:1;min-width:180px;border-radius:12px;padding:18px;background:var(--p1,#0B3D2E);color:#fff;text-align:center">زر أساسي<button style="display:block;width:80%;margin:10px auto 0;padding:9px;border-radius:9px;background:var(--p2,#C9A227);color:#231a05;font-weight:700">زر ذهبي</button></div>
+        <div style="flex:1;min-width:180px;border-radius:12px;padding:18px;border:2px solid var(--p2,#C9A227);color:var(--gold2);text-align:center">إطار ذهبي<span style="display:block;margin-top:10px;font-size:.8rem;color:#8fa39a">تطبيق مباشر على الموقع</span></div>
+      </div>
+    </div>
+  `;
+  function pvUpdate(){
+    const p=$("#aPrimary").value,a=$("#aAccent").value;
+    const box=$("#pvColors");
+    box.style.setProperty("--p1",p);box.style.setProperty("--p2",a);
+    $("#pvColors > div:first-child").style.background=p;
+    $("#pvColors > div:last-child").style.borderColor=a;
+  }
+  $("#aPrimary").addEventListener("input",e=>{$("#aPrimaryTxt").value=e.target.value;pvUpdate();});
+  $("#aAccent").addEventListener("input",e=>{$("#aAccentTxt").value=e.target.value;pvUpdate();});
+  $("#aPrimaryReset").addEventListener("click",()=>{$("#aPrimaryTxt").value="";$("#aPrimary").value="#0B3D2E";pvUpdate();});
+  $("#aAccentReset").addEventListener("click",()=>{$("#aAccentTxt").value="";$("#aAccent").value="#C9A227";pvUpdate();});
+  host.querySelectorAll("[data-theme]").forEach(b=>b.addEventListener("click",()=>{
+    host.querySelectorAll("[data-theme]").forEach(x=>{x.classList.remove("btn-gold");x.classList.add("btn-ghost");});
+    b.classList.remove("btn-ghost");b.classList.add("btn-gold");
+  }));
+  pvUpdate();
+  $("#bSaveAppearance").addEventListener("click",()=>{
+    Repo.config.primaryColor=$("#aPrimaryTxt").value.trim();
+    Repo.config.accentColor=$("#aAccentTxt").value.trim();
+    const active=host.querySelector("[data-theme].btn-gold");
+    if(active)Repo.config.defaultTheme=active.dataset.theme;
+    Repo.saveConfig();flash("تم حفظ المظهر — سيظهر على الموقع فوراً");
+  });
+};
+
+/* ============ 6) Backup ============ */
+VIEWS.backup=function(host){
+  host.innerHTML=`
+    <div class="panel">
+      <h3>نسخة احتياطية كاملة</h3>
+      <div class="desc">الإعدادات والإحصائيات معاً بصيغة JSON — تنزيل أو نسخ</div>
+      <div class="actions">
+        <button class="btn btn-gold" id="bExport">⬇ تنزيل نسخة (JSON)</button>
+        <button class="btn btn-ghost" id="bCopy">📋 نسخ إلى الحافظة</button>
+        <label class="btn btn-primary" style="cursor:pointer">⬆ استيراد نسخة<input type="file" id="fImport" accept=".json,application/json" style="display:none"></label>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>محتوى النسخة الحالي</h3>
+      <div class="code-box" id="codeBox">${esc(Repo.exportAll())}</div>
+      <div class="kpis-mini" style="margin-top:12px">
+        <span>الإعدادات: <b>${Repo.config.updatedAt?when(Repo.config.updatedAt):"لم تُعدَّل بعد"}</b></span>
+        <span>حجم الإحصائيات: <b>${arNum(Object.keys(Repo.stats.daily||{}).length)} يوم · ${arNum((Repo.stats.log||[]).length)} حدث</b></span>
+      </div>
+    </div>
+    <div class="panel">
+      <h3>إعادة تعيين</h3>
+      <div class="desc">يمسح كل الإعدادات والإحصائيات من هذا المتصفح ويعيد الافتراضيات</div>
+      <div class="actions">
+        <button class="btn btn-danger" id="bResetSettings">محو الإعدادات فقط</button>
+        <button class="btn btn-danger" id="bResetAll">محو كل شيء (إعدادات + إحصائيات)</button>
+      </div>
+      <div class="note warn" style="margin-top:14px">⚠️ لا يمكن التراجع. نزّل نسخة احتياطية أولاً.</div>
+    </div>
+  `;
+  $("#bExport").addEventListener("click",()=>{
+    const blob=new Blob([Repo.exportAll()],{type:"application/json"});
+    const a=document.createElement("a");
+    a.href=URL.createObjectURL(blob);
+    a.download="quran-backup-"+new Date().toISOString().slice(0,10)+".json";
+    document.body.appendChild(a);a.click();a.remove();
+    flash("تم تنزيل النسخة");
+  });
+  $("#bCopy").addEventListener("click",async()=>{
+    try{await navigator.clipboard.writeText(Repo.exportAll());flash("نُسخ إلى الحافظة");}
+    catch(e){toast2("تعذّر النسخ — حدد النص يدوياً");}
+  });
+  $("#fImport").addEventListener("change",e=>{
+    const f=e.target.files[0];if(!f)return;
+    const r=new FileReader();
+    r.onload=()=>{
+      try{
+        const d=JSON.parse(r.result);
+        if(d.config)Repo.config=Object.assign({},CONFIG_DEFAULTS,d.config);
+        if(d.stats)Repo.stats=Object.assign({visits:0,reads:0,plays:0,exports:0,searches:0,firstVisit:0,lastVisit:0,daily:{},log:[]},d.stats);
+        Repo.saveConfig();Repo.saveStats();updateFoot();flash("تم الاستيراد ✓");switchView("backup");
+      }catch(err){toast2("ملف غير صالح");
+      }
+    };
+    r.readAsText(f);
+  });
+  const confirmBox=(msg,fn)=>{
+    if(confirm(msg))fn();
+  };
+  $("#bResetSettings").addEventListener("click",()=>confirmBox("محو الإعدادات وإعادة الافتراضات؟",()=>{
+    localStorage.removeItem(LS.CONFIG);Repo.load();updateFoot();flash("أُعيدت الإعدادات الافتراضية");switchView("backup");
+  }));
+  $("#bResetAll").addEventListener("click",()=>confirmBox("محو الإعدادات والإحصائيات معاً؟",()=>{
+    localStorage.removeItem(LS.CONFIG);localStorage.removeItem(LS.STATS);Repo.load();updateFoot();flash("تم المحو");switchView("backup");
+  }));
+};
+
+/* ============ 7) Security ============ */
+VIEWS.security=function(host){
+  host.innerHTML=`
+    <div class="panel">
+      <h3>رمز الدخول</h3>
+      <div class="desc">رمز محلي بسيط يمنع الوصول العابر — يُخزَّن في متصفحك فقط</div>
+      <div class="form-row"><label>الرمز الحالي</label><input class="inp" id="secCur" type="password" placeholder="أدخل الرمز الحالي" autocomplete="current-password"></div>
+      <div class="form-row"><label>الرمز الجديد</label><input class="inp" id="secNew" type="password" placeholder="4-8 خانات" autocomplete="new-password" inputmode="numeric"></div>
+      <div class="form-row"><label>تأكيد الرمز الجديد</label><input class="inp" id="secNew2" type="password" autocomplete="new-password"></div>
+      <div class="actions"><button class="btn btn-primary" id="bChangePin">تغيير الرمز</button></div>
+    </div>
+    <div class="panel">
+      <h3>الجلسة</h3>
+      <div class="desc">تُغلق تلقائياً بعد 8 ساعات أو عند الضغط على «خروج»</div>
+      <div class="switch-row"><span>مدة الجلسة: 8 ساعات</span><span class="pill">ثابتة</span></div>
+      <div class="switch-row"><span>الحماية</span><span class="tag warn">مستوى محلي</span></div>
+      <div class="note warn" style="margin-top:12px">⚠️ هذه لوحة تحكم بدون خادم: القفل رمزي ويحمي من الوصول العابر فقط. لا يخزن الموقع أي بيانات على أي خادم، ولا يوجد اسم مستخدم أو كلمات مرور حقيقية. لأي استخدام عام على الإنترنت استضف الملفين خلف خادم مع مصادقة حقيقية.</div>
+    </div>
+  `;
+  $("#bChangePin").addEventListener("click",()=>{
+    const cur=$("#secCur").value,nw=$("#secNew").value,nw2=$("#secNew2").value;
+    if(cur!==Auth.pin()){toast2("الرمز الحالي غير صحيح");return;}
+    if(!/^\d{4,8}$/.test(nw)){toast2("الرمز الجديد يجب أن يكون 4-8 خانات رقمية");return;}
+    if(nw!==nw2){toast2("التأكيد لا يطابق");return;}
+    localStorage.setItem(LS.PIN,nw);
+    $("#secCur").value="";$("#secNew").value="";$("#secNew2").value="";
+    flash("تم تغيير الرمز ✓");
+  });
+};
+
+/* ============ Boot ============ */
+function updateFoot(){
+  const t=Repo.config.updatedAt;
+  $("#footUpdated").textContent=t?new Date(+t).toLocaleDateString("ar"):"—";
+}
+function enterShell(){
+  $("#loginView").classList.add("hidden");
+  $("#shell").classList.remove("hidden");
+  Repo.load();updateFoot();
+  switchView("overview");
+}
+(function init(){
+  // تسجيل الدخول
+  const tryLogin=()=>{
+    const v=$("#pinInput").value.trim();
+    if(Auth.login(v))enterShell();
+    else $("#loginErr").textContent="رمز غير صحيح — الافتراضي 1234";
+  };
+  $("#loginBtn").addEventListener("click",tryLogin);
+  $("#pinInput").addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+  if(Auth.isAuthed())enterShell();
+  // التنقل
+  $("#snav").addEventListener("click",e=>{const b=e.target.closest("button[data-v]");if(b)switchView(b.dataset.v);});
+  $("#logoutBtn").addEventListener("click",()=>{Auth.logout();location.reload();});
+  // تحديث مباشر عند تغيّر البيانات من الموقع
+  window.addEventListener("storage",e=>{
+    if(e.key===LS.STATS){Repo.stats=lsJSON(LS.STATS,Repo.stats);if($("#snav button.active").dataset.v==="overview")switchView("overview");}
+    if(e.key===LS.CONFIG){Repo.load();updateFoot();}
+  });
+})();
+
+
+</script>
+</body>
+</html>
