@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "description": "مكتبة الخلفيات المتحركة المدمجة — مصحف الاستوديو",
+  "backgrounds": [
+    {
+      "id": "islamic-1-star-rotate",
+      "name": "نجمة ثمانية دوّارة",
+      "category": "islamic",
+      "file": "islamic-1-star-rotate.mp4",
+      "posterColors": ["#1a2440", "#c9a227"],
+      "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
+      "sourceUrl": ""
+    },
+    {
+      "id": "islamic-2-arabesque",
+      "name": "أرابيسك يتنفس",
+      "category": "islamic",
+      "file": "islamic-2-arabesque.mp4",
+      "posterColors": ["#102e2c", "#44b298"],
+      "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
+      "sourceUrl": ""
+    },
+    {
+      "id": "islamic-3-geometry",
+      "name": "شبكة ثمانيات متلألئة",
+      "category": "islamic",
+      "file": "islamic-3-geometry.mp4",
+      "posterColors": ["#181e38", "#e6c75a"],
+      "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
+      "sourceUrl": ""
+    },
+    {
+      "id": "islamic-4-lanterns",
+      "name": "قناديل رمضان",
+      "category": "islamic",
+      "file": "islamic-4-lanterns.mp4",
+      "posterColors": ["#1e183a", "#e6c75a"],
+      "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
+      "sourceUrl": ""
+    },
+    {
+      "id": "islamic-5-light-rays",
+      "name": "أشعة نور",
+      "category": "islamic",
+      "file": "islamic-5-light-rays.mp4",
+      "posterColors": ["#403a58", "#fff0c8"],
+      "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
+      "sourceUrl": ""
+    }
+  ]
+}
