@@ -7,7 +7,10 @@
       "name": "نجمة ثمانية دوّارة",
       "category": "islamic",
       "file": "islamic-1-star-rotate.mp4",
-      "posterColors": ["#1a2440", "#c9a227"],
+      "posterColors": [
+        "#1a2440",
+        "#c9a227"
+      ],
       "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
       "sourceUrl": ""
     },
@@ -16,7 +19,10 @@
       "name": "أرابيسك يتنفس",
       "category": "islamic",
       "file": "islamic-2-arabesque.mp4",
-      "posterColors": ["#102e2c", "#44b298"],
+      "posterColors": [
+        "#102e2c",
+        "#44b298"
+      ],
       "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
       "sourceUrl": ""
     },
@@ -25,7 +31,10 @@
       "name": "شبكة ثمانيات متلألئة",
       "category": "islamic",
       "file": "islamic-3-geometry.mp4",
-      "posterColors": ["#181e38", "#e6c75a"],
+      "posterColors": [
+        "#181e38",
+        "#e6c75a"
+      ],
       "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
       "sourceUrl": ""
     },
@@ -34,7 +43,10 @@
       "name": "قناديل رمضان",
       "category": "islamic",
       "file": "islamic-4-lanterns.mp4",
-      "posterColors": ["#1e183a", "#e6c75a"],
+      "posterColors": [
+        "#1e183a",
+        "#e6c75a"
+      ],
       "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
       "sourceUrl": ""
     },
@@ -43,9 +55,72 @@
       "name": "أشعة نور",
       "category": "islamic",
       "file": "islamic-5-light-rays.mp4",
-      "posterColors": ["#403a58", "#fff0c8"],
+      "posterColors": [
+        "#403a58",
+        "#fff0c8"
+      ],
       "license": "Procedural (generated in-repo, scripts/generate-islamic-backgrounds.py)",
       "sourceUrl": ""
+    },
+    {
+      "id": "nature-1-clouds",
+      "name": "غيوم فوق الجبال",
+      "category": "nature",
+      "file": "nature-1-clouds.mp4",
+      "posterColors": [
+        "#8fa8c8",
+        "#e8eef6"
+      ],
+      "license": "Mixkit License",
+      "sourceUrl": "https://mixkit.co/free-stock-video/clouds/"
+    },
+    {
+      "id": "nature-2-waves",
+      "name": "أمواج البحر",
+      "category": "nature",
+      "file": "nature-2-waves.mp4",
+      "posterColors": [
+        "#2a6b8f",
+        "#bfe3f0"
+      ],
+      "license": "Mixkit License",
+      "sourceUrl": "https://mixkit.co/free-stock-video/waves/"
+    },
+    {
+      "id": "nature-3-sunset",
+      "name": "غروب السحر",
+      "category": "nature",
+      "file": "nature-3-sunset.mp4",
+      "posterColors": [
+        "#8a4a2f",
+        "#f2c17d"
+      ],
+      "license": "Mixkit License",
+      "sourceUrl": "https://mixkit.co/free-stock-video/sunset/"
+    },
+    {
+      "id": "nature-4-leaves",
+      "name": "أوراق تتمايل",
+      "category": "nature",
+      "file": "nature-4-leaves.mp4",
+      "posterColors": [
+        "#3d5a3a",
+        "#b8d4a8"
+      ],
+      "license": "Mixkit License",
+      "sourceUrl": "https://mixkit.co/free-stock-video/leaves/"
+    },
+    {
+      "id": "nature-5-river",
+      "name": "جدول رقراق",
+      "category": "nature",
+      "file": "nature-5-river.mp4",
+      "posterColors": [
+        "#35566b",
+        "#cfe8f2"
+      ],
+      "license": "Mixkit License",
+      "sourceUrl": "https://mixkit.co/free-stock-video/river/"
     }
   ]
 }
