@@ -7,21 +7,20 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { toArabicDigits } from '@/lib/quran-utils';
-import { buildSrtFromTimeline } from '@/lib/srt-subtitles';
-import {
+import { buildSrtFromTimeline } from '@/lib/srt-subtitles';import {
   buildFfmpegConcatSlidesManifest,
-  buildSafeExportFilename,
   buildVideoBackgroundFilterGraph,
   getConcatSlideFadeSec,
   getCrfForQuality,
   getEffectiveExportFps,
   getXfadeTransitionName,
   resolveExportDimensions,
-  resolveVideoBitrateBounds,
   shouldUseFastConcatEngine,
   XFADE_MAX_SLIDES,
   type ExportJobStatus,
 } from '@/lib/video-export';
+import { resolveAmbientLayer } from './export-ambient-layer';
+import { appendEncodeTail } from './export-encode-args';
 
 // Shared session-layer symbols (storage half of the old module)
 import {
@@ -39,7 +38,6 @@ import {
   spawnFfmpegTracked,
 } from './export-job-helpers';
 import { prepareExportAudio } from './export-audio-prep';
-import { buildArabicExportFilename, buildVideoShareMetadata } from './video-share';
 
 
 export async function runExportPipeline(jobId: string): Promise<void> {
@@ -111,6 +109,20 @@ export async function runExportPipeline(jobId: string): Promise<void> {
       meta.transition,
       hasBgVideoFile
     );
+
+    // Animated ambient layer (stars / gold-dust / aurora) composited live between
+    // the stationary backdrop and the verse slides — mirrors the preview animation
+    // instead of the frozen timeSec=0 frame baked into backdrop.png.
+    const ambientLayer = resolveAmbientLayer({
+      ambientEffect: meta.ambient,
+      hasBgVideoFile,
+      jobDir: dir,
+      filesInDir,
+      width,
+      height,
+      effectiveFps,
+    });
+    const hasAmbientFrames = ambientLayer.active;
 
     const sumDurs = slideDurations.reduce((a, b) => a + b, 0) || totalAudioDur;
     const scaleDur = totalAudioDur / sumDurs;
@@ -233,6 +245,11 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         '-i', backdropPath
       );
 
+      // Animated ambient input: looping particle sequence or single swayed frame
+      if (hasAmbientFrames) {
+        videoArgs.push(...ambientLayer.inputArgs);
+      }
+
       for (let i = 0; i < slidePaths.length; i++) {
         const clipDur =
           i < slidePaths.length - 1
@@ -246,7 +263,7 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         );
       }
       videoArgs.push('-i', processedAudioPath);
-      const audioInputIdx = slidePaths.length + 1;
+      const audioInputIdx = slidePaths.length + (hasAmbientFrames ? 2 : 1);
 
       const { filters: vFilters, outLabel } = buildChainedXfadeFilters({
         slideCount: slidePaths.length,
@@ -257,10 +274,16 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         height,
         effectiveFps,
         isRgba: true,
-        inputOffset: 1,
+        inputOffset: hasAmbientFrames ? 2 : 1,
         finalLabel: 'ov',
       });
-      vFilters.push(`[0:v][${outLabel}]overlay=0:0,format=yuv420p[vout]`);
+      if (hasAmbientFrames && ambientLayer.ambientFilters) {
+        // backdrop [0:v] + animated ambient [1:v] → [bgamb], then slides overlay [bgamb]
+        vFilters.unshift(...ambientLayer.ambientFilters);
+        vFilters.push(`[bgamb][${outLabel}]overlay=0:0,format=yuv420p[vout]`);
+      } else {
+        vFilters.push(`[0:v][${outLabel}]overlay=0:0,format=yuv420p[vout]`);
+      }
       videoArgs.push('-filter_complex', vFilters.join(';'));
       videoArgs.push('-map', '[vout]', '-map', `${audioInputIdx}:a`);
     } else if (hasBackdropFile) {
@@ -279,15 +302,34 @@ export async function runExportPipeline(jobId: string): Promise<void> {
         '-loop', '1',
         '-framerate', String(effectiveFps),
         '-t', (totalAudioDur + 1.0).toFixed(3),
-        '-i', backdropPath,
+        '-i', backdropPath
+      );
+      if (hasAmbientFrames) {
+        videoArgs.push(...ambientLayer.inputArgs);
+      }
+      videoArgs.push(
         '-f', 'concat',
         '-safe', '0',
         '-i', slidesListPath,
-        '-i', processedAudioPath,
+        '-i', processedAudioPath
+      );
+      const ambientFilters = ambientLayer.ambientFilters;
+      const slidesSrc = hasAmbientFrames ? 'bgamb' : '0:v';
+      const filters = hasAmbientFrames && ambientFilters
+        ? [
+            ...ambientFilters,
+            `[2:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides]`,
+            `[${slidesSrc}][slides]overlay=0:0,format=yuv420p[vout]`,
+          ]
+        : [
+            `[1:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides]`,
+            `[${slidesSrc}][slides]overlay=0:0,format=yuv420p[vout]`,
+          ];
+      videoArgs.push(
         '-filter_complex',
-        `[1:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides];[0:v][slides]overlay=0:0,format=yuv420p[vout]`,
+        filters.join(';'),
         '-map', '[vout]',
-        '-map', '2:a:0'
+        '-map', `${hasAmbientFrames ? 3 : 2}:a:0`
       );
     } else if (useFastConcat || slidePaths.length === 1) {
       const slidesListPath = path.join(dir, 'slides_list.txt');
@@ -369,122 +411,18 @@ export async function runExportPipeline(jobId: string): Promise<void> {
       videoArgs.push('-map', `[${outLabel}]`, '-map', `${audioInputIdx}:a`);
     }
 
-    const filename = buildSafeExportFilename(
-      meta.surahId,
-      meta.fromAyah,
-      meta.toAyah,
-      meta.format
-    );
-    const displayFilename = buildArabicExportFilename({
-      surahName: meta.surahName,
-      fromAyah: meta.fromAyah,
-      toAyah: meta.toAyah,
-      reciterName: meta.reciterName,
-      format: meta.format,
+    // Final encoding tail (filenames, container metadata, codec args) lives in
+    // lib/export-encode-args.ts per the 600-line rule.
+    const { filename, displayFilename } = appendEncodeTail(videoArgs, {
+      meta,
+      crf,
+      effectiveFps,
+      hasBgVideoFile,
+      hasAnimatedVisualLayer: hasAmbientFrames,
+      slideCount: slidePaths.length,
+      totalAudioDur,
+      outputPath,
     });
-    const containerMeta = buildVideoShareMetadata({
-      surahName: meta.surahName || `رقم ${meta.surahId}`,
-      fromAyah: meta.fromAyah,
-      toAyah: meta.toAyah,
-      reciterName: meta.reciterName || '',
-      filename: displayFilename,
-    });
-
-    const metadataArgs = [
-      '-metadata',
-      `title=${containerMeta.title}`,
-      '-metadata',
-      `artist=${meta.reciterName || 'مصحف الاستوديو'}`,
-      '-metadata',
-      'album=مصحف الاستوديو',
-      '-metadata',
-      `comment=${containerMeta.text.replace(/\n/g, ' ')}`,
-    ];
-
-    const gopSize = Math.max(15, effectiveFps * 2);
-    const bitrateBounds = resolveVideoBitrateBounds(
-      meta.resolution,
-      meta.quality,
-      hasBgVideoFile
-    );
-
-    if (meta.format === 'mp4') {
-      const mp4EncArgs = [
-        '-c:v',
-        'libx264',
-        '-preset',
-        'veryfast',
-        '-profile:v',
-        'main',
-        '-level:v',
-        '4.0',
-        '-crf',
-        String(crf),
-        '-maxrate',
-        bitrateBounds.maxrate,
-        '-bufsize',
-        bitrateBounds.bufsize,
-      ];
-      if (!hasBgVideoFile) {
-        mp4EncArgs.push('-tune', 'stillimage');
-      }
-      videoArgs.push(
-        ...mp4EncArgs,
-        '-pix_fmt',
-        'yuv420p',
-        '-tag:v',
-        'avc1',
-        '-colorspace',
-        'bt709',
-        '-color_primaries',
-        'bt709',
-        '-color_trc',
-        'bt709',
-        '-fps_mode',
-        'cfr',
-        '-r',
-        String(effectiveFps),
-        '-g',
-        String(gopSize),
-        '-c:a',
-        'copy',
-        ...metadataArgs,
-        '-brand',
-        'mp42',
-        '-movflags',
-        '+faststart',
-        '-t',
-        totalAudioDur.toFixed(3),
-        outputPath
-      );
-    } else {
-      videoArgs.push(
-        '-c:v',
-        'libvpx',
-        '-deadline',
-        'realtime',
-        '-cpu-used',
-        hasBgVideoFile || slidePaths.length > 60 ? '8' : slidePaths.length > 24 ? '6' : '4',
-        '-crf',
-        String(crf),
-        '-b:v',
-        bitrateBounds.maxrate,
-        '-pix_fmt',
-        'yuv420p',
-        '-fps_mode',
-        'cfr',
-        '-r',
-        String(effectiveFps),
-        '-g',
-        String(gopSize),
-        '-c:a',
-        'copy',
-        ...metadataArgs,
-        '-t',
-        totalAudioDur.toFixed(3),
-        outputPath
-      );
-    }
 
     let lastEncUpdate = Date.now();
     await spawnFfmpegTracked(videoArgs, runtime, (sec) => {

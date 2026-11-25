@@ -116,6 +116,7 @@ export async function PUT(req: NextRequest) {
     const formData = await req.formData();
     const batch: { index: number; ext: 'png' | 'jpg'; buffer: Buffer }[] = [];
     const audioBatch: { index: number; buffer: Buffer }[] = [];
+    const ambientFrames: { index: number; buffer: Buffer }[] = [];
     let backdropBuffer: Buffer | undefined;
 
     for (const [key, val] of formData.entries()) {
@@ -125,6 +126,28 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ error: 'حجم خلفية الفيديو يتجاوز الحد المسموح' }, { status: 413 });
         }
         backdropBuffer = Buffer.from(await val.arrayBuffer());
+        continue;
+      }
+      // Animated ambient particle/aurora frames (transparent PNGs, tiny ~4-8KB each)
+      const ambientMatch = /^ambient_(\d{3})$/.exec(key);
+      if (ambientMatch) {
+        if (val.size > 512 * 1024) {
+          return NextResponse.json(
+            { error: 'حجم إطار حركة الخلفية يتجاوز الحد المسموح' },
+            { status: 413 }
+          );
+        }
+        const head = new Uint8Array(await val.slice(0, 12).arrayBuffer());
+        if (!isValidUploadedMediaHeader(head, 'png')) {
+          return NextResponse.json(
+            { error: 'صيغة إطار حركة الخلفية غير صالحة — يُسمح بصور PNG فقط' },
+            { status: 415 }
+          );
+        }
+        ambientFrames.push({
+          index: Number(ambientMatch[1]),
+          buffer: Buffer.from(await val.arrayBuffer()),
+        });
         continue;
       }
       const slideMatch = /^slide_(\d+)$/.exec(key);
@@ -169,11 +192,11 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    if (!batch.length && !audioBatch.length && !backdropBuffer) {
+    if (!batch.length && !audioBatch.length && !backdropBuffer && !ambientFrames.length) {
       return NextResponse.json({ error: 'لم يتم إرفاق شرائح في هذه الدفعة' }, { status: 400 });
     }
 
-    const res = await saveUploadedSlideBatch(jobId, batch, audioBatch, backdropBuffer);
+    const res = await saveUploadedSlideBatch(jobId, batch, audioBatch, backdropBuffer, ambientFrames);
     return NextResponse.json(res, { status: 200 });
   } catch (err) {
     console.error(`[studio/export/session:PUT:${jobId}] failed:`, err);

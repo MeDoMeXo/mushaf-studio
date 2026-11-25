@@ -9,6 +9,7 @@ import {
   DEFAULT_VIDEO_EXPORT_SETTINGS,
   MAX_EXPORT_SLIDES,
   MAX_EXPORT_VERSES,
+  shouldRenderAnimatedAmbient,
   type AmbientSoundPreset,
   type AudioEffectPreset,
   type ExportJobStatus,
@@ -50,6 +51,8 @@ export interface ExportJobMeta {
   audioPreset: AudioEffectPreset;
   ambientSound: AmbientSoundPreset;
   ambientVolume: number;
+  /** Visual ambient animation ('stars' | 'gold-dust' | 'aurora' | 'none') rendered live above the backdrop. */
+  ambient: string;
   audioBitrate: 128 | 192 | 320;
   audioFade: boolean;
   verseGapSec: number;
@@ -220,6 +223,9 @@ export async function createExportSession(
     audioPreset: rawMeta.audioPreset ?? DEFAULT_VIDEO_EXPORT_SETTINGS.audioPreset,
     ambientSound: rawMeta.ambientSound ?? 'none',
     ambientVolume: Math.max(0, Math.min(0.55, Number(rawMeta.ambientVolume ?? 0.16))),
+    ambient: shouldRenderAnimatedAmbient(rawMeta.ambient)
+      ? (rawMeta.ambient as string)
+      : 'none',
     audioBitrate:
       rawMeta.audioBitrate === 128 || rawMeta.audioBitrate === 320 ? rawMeta.audioBitrate : 192,
     audioFade: rawMeta.audioFade !== false,
@@ -258,7 +264,8 @@ export async function saveUploadedSlideBatch(
   jobId: string,
   slides: { index: number; ext: 'png' | 'jpg'; buffer: Buffer }[],
   audios: { index: number; buffer: Buffer }[] = [],
-  backdropBuffer?: Buffer
+  backdropBuffer?: Buffer,
+  ambientFrames: { index: number; buffer: Buffer }[] = []
 ): Promise<{ uploadedSlides: number; uploadedAudios: number }> {
   const dir = getJobDir(jobId);
   const status = await readJobStatus(jobId);
@@ -270,6 +277,12 @@ export async function saveUploadedSlideBatch(
     ...(backdropBuffer && backdropBuffer.byteLength > 0
       ? [fs.writeFile(path.join(dir, 'backdrop.png'), backdropBuffer)]
       : []),
+    // Animated ambient layer frames (stars/gold-dust particle sequence or single aurora frame)
+    ...ambientFrames
+      .filter((f) => f.index >= 0 && f.index < 96 && f.buffer.byteLength > 0)
+      .map((f) =>
+        fs.writeFile(path.join(dir, `ambient_${String(f.index).padStart(3, '0')}.png`), f.buffer)
+      ),
     ...slides.map(async (s) => {
       if (s.index < 0 || s.index >= MAX_EXPORT_SLIDES) return;
       const filename = `slide_${s.index}.${s.ext}`;

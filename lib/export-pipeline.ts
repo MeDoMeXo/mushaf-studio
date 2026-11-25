@@ -9,6 +9,7 @@ import type { QulVerse, StudioState } from '@/lib/quran-data';
 import { toArabicDigits } from '@/lib/quran-utils';
 import {
   drawStudioFrame,
+  renderAmbientFrames,
   renderExportBackdropCanvas,
   renderStaticBackdropCanvas,
   renderTransparentOverlayBackdropCanvas,
@@ -32,6 +33,8 @@ import {
   getPollIntervalMs,
   getSlideImageEncoding,
   MAX_EXPORT_VERSES,
+  resolveAmbientFrameSpecs,
+  shouldRenderAnimatedAmbient,
   XFADE_MAX_SLIDES,
   type ExportJobStatus,
   type VideoExportFormat,
@@ -155,6 +158,7 @@ export async function runExportPipeline(
     baseWidth: studioState.width,
     baseHeight: studioState.height,
     hasBgVideo,
+    ambient: hasBgVideo ? 'none' : studioState.ambient,
     bgBlur: studioState.bgBlur,
     bgVideoSpeed: studioState.bgVideoSpeed,
   };
@@ -254,8 +258,45 @@ export async function runExportPipeline(
 
   const imgEnc = { mime: 'image/png' as const, ext: 'png' as const };
   const batches = chunkIndices(totalSlides, EXPORT_SLIDE_BATCH_SIZE);
+
+  // Animated ambient layer: client renders the particle/aurora frames and the
+  // server composites them live between backdrop and verse slides (matching
+  // the preview's drawAmbientEffect animation instead of a frozen frame).
+  const wantsAnimatedAmbient =
+    !hasBgVideo &&
+    shouldRenderAnimatedAmbient(studioState.ambient) &&
+    resolveAmbientFrameSpecs(studioState.ambient, targetDims.width, targetDims.height, exportSettings.fps) !== null;
+  const ambientSpec = wantsAnimatedAmbient
+    ? resolveAmbientFrameSpecs(studioState.ambient, targetDims.width, targetDims.height, exportSettings.fps)!
+    : null;
+  const ambientFrames: Blob[] = [];
+  if (ambientSpec) {
+    cb.onStageLabel('جاري توليد إطارات حركة الخلفية المتحركة...');
+    ambientFrames.push(
+      ...(await renderAmbientFrames(
+        studioState.ambient,
+        ambientSpec.frameCount,
+        ambientSpec.fps,
+        ambientSpec.frameWidth ?? targetDims.width,
+        ambientSpec.frameHeight ?? targetDims.height
+      ))
+    );
+  }
+
+  // The backdrop canvas is always generated when no bg video exists — it carries
+  // the background fill, ornaments, overlay, vignette and watermark. When an
+  // animated ambient layer is active, the ambient effect itself is EXCLUDED from
+  // the backdrop (it would freeze at timeSec=0) and rendered live by the server
+  // as looping frames composited between backdrop and verse slides.
   const backdropCanvas = !hasBgVideo
-    ? renderExportBackdropCanvas(renderState, getBgImageEl(), surahName, reciterName)
+    ? renderExportBackdropCanvas(
+        ambientSpec
+          ? { ...renderState, ambient: 'none' }
+          : renderState,
+        getBgImageEl(),
+        surahName,
+        reciterName
+      )
     : null;
   const backdropBlob = backdropCanvas
     ? await new Promise<Blob | null>((res) => backdropCanvas.toBlob(res, 'image/png'))
@@ -280,6 +321,15 @@ export async function runExportPipeline(
     const batchForm = new FormData();
     if (bIdx === 0 && backdropBlob) {
       batchForm.append('backdrop', backdropBlob, 'backdrop.png');
+    }
+    if (bIdx === 0 && ambientFrames.length) {
+      for (let f = 0; f < ambientFrames.length; f++) {
+        batchForm.append(
+          `ambient_${String(f).padStart(3, '0')}`,
+          ambientFrames[f],
+          `ambient_${String(f).padStart(3, '0')}.png`
+        );
+      }
     }
     let batchAudioBytes = 0;
 

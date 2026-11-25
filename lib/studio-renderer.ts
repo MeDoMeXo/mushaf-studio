@@ -85,7 +85,7 @@ export function renderExportBackdropCanvas(
 }
 
 /**
- * Pre-renders ONLY the semi-transparent overlay layers (color LUT, darkening overlay,
+ * Pre-renders the semi-transparent overlay layers (color LUT, darkening overlay,
  * vignette, gold frame, corner rosettes, and watermark) onto a transparent canvas
  * for FFmpeg video-background compositing.
  */
@@ -102,6 +102,44 @@ export function renderTransparentOverlayBackdropCanvas(
   drawBackdropLayers(ctx, state, null, null, 0, true);
   if (!state.coverMode) drawWatermarkLayer(ctx, state);
   return cv;
+}
+
+/**
+ * Renders the animated ambient effect (stars / gold-dust / aurora) as a series of
+ * transparent PNG frame Blobs for video export. Each frame uses the exact same
+ * drawAmbientEffect() math as the live preview, sampled at evenly spaced times
+ * so FFmpeg can loop the sequence (-stream_loop -1) and the exported background
+ * animates exactly like the preview instead of freezing at timeSec=0.
+ */
+export async function renderAmbientFrames(
+  effect: StudioState['ambient'],
+  frameCount: number,
+  fps: number,
+  frameWidth: number,
+  frameHeight: number
+): Promise<Blob[]> {
+  if (typeof document === 'undefined' || effect === 'none') return [];
+  const cv = document.createElement('canvas');
+  cv.width = frameWidth;
+  cv.height = frameHeight;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return [];
+
+  const blobs: Blob[] = [];
+  const loopSec = frameCount / Math.max(1, fps);
+  for (let i = 0; i < frameCount; i++) {
+    // Sample time inside ONE seamless loop period; the sequence repeats forever.
+    const timeSec = (i / frameCount) * loopSec;
+    ctx.clearRect(0, 0, frameWidth, frameHeight);
+    drawAmbientEffect(ctx, effect, frameWidth, frameHeight, timeSec);
+    const blob = await new Promise<Blob | null>((res) => cv.toBlob(res, 'image/png'));
+    if (blob) blobs.push(blob);
+    if ((i + 1) % 16 === 0) {
+      // Yield to the event loop so the export modal stays responsive on 96 frames
+      await new Promise<void>((r) => setTimeout(r, 0));
+    }
+  }
+  return blobs;
 }
 
 function drawBackdropLayers(
