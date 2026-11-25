@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>Mushaf Studio — graphify tree viewer</title>
+  <style>
+    body {
+      font-family: 'Segoe UI', sans-serif;
+      margin: 0;
+      padding: 0;
+      background: #f9f9f9;
+      color: #333;
+    }
+    h1 {
+      margin: 20px 0 0 24px;
+      font-size: 2.2rem;
+      font-weight: bold;
+      color: #1e3a56;
+    }
+    .controls {
+      margin: 20px 0 15px 24px;
+    }
+    button {
+      margin-right: 10px;
+      padding: 8px 18px;
+      background: #007bff;
+      color: #fff;
+      border: none;
+      border-radius: 5px;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    }
+    button:hover {
+      background: #0056b3;
+    }
+    button:active {
+      background: #004085;
+    }
+    #tree-container {
+      width: calc(100vw - 48px); /* Adjust for body margin/padding */
+      height: 85vh;
+      overflow: auto;
+      border-radius: 8px;
+      background: #fff;
+      margin-left: 24px;
+      margin-right: 24px;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+      border: 1px solid #ddd;
+    }
+    svg {
+      background: #fff;
+      border-radius: 8px;
+      display: block; /* Important for D3 */
+    }
+    .node circle {
+      stroke-width: 2.5px;
+    }
+    .node text { /* Base style for the <text> container */
+      font: 13px 'Segoe UI', sans-serif;
+      paint-order: stroke fill; /* Ensures text is readable over lines */
+      stroke: #fff; /* White halo */
+      stroke-width: 3px; /* Halo thickness */
+      stroke-linejoin: round;
+      stroke-opacity: 0.85; /* Halo opacity */
+    }
+    .link {
+      fill: none;
+      stroke-opacity: 0.7;
+      stroke-width: 2px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Mushaf Studio — Knowledge Graph</h1>
+  <div class="controls">
+    <button onclick="expandAll()">Expand All</button>
+    <button onclick="collapseAll()">Collapse All</button>
+    <button onclick="resetView()">Reset View</button>
+  </div>
+  <div id="tree-container">
+    <svg id="tree-svg" width="6000" height="8000"></svg>
+  </div>
+
+  <script src="https://d3js.org/d3.v7.min.js"></script>
+  <script>
+    const initialJsonData = {"name":"Mushaf Studio","total_count":704,"children":[{"name":".eslintrc.json","total_count":2,"children":[{"name":"extends","total_count":1,"children":[]},{"name":"next","total_count":1,"children":[]}]},{"name":".github","total_count":26,"children":[{"name":"workflows","total_count":26,"children":[{"name":"ci.yml","total_count":26,"children":[{"name":"branches","total_count":1,"children":[]},{"name":"branches","total_count":1,"children":[]},{"name":"cache","total_count":1,"children":[]},{"name":"cron","total_count":1,"children":[]},{"name":"DISABLE_HMR","total_count":1,"children":[]},{"name":"env","total_count":1,"children":[]},{"name":"if","total_count":1,"children":[]},{"name":"jobs","total_count":1,"children":[]},{"name":"name","total_count":1,"children":[]},{"name":"name","total_count":1,"children":[]},{"name":"node-version","total_count":1,"children":[]},{"name":"on","total_count":1,"children":[]},{"name":"pull_request","total_count":1,"children":[]},{"name":"push","total_count":1,"children":[]},{"name":"reciter-health","total_count":1,"children":[]},{"name":"run","total_count":1,"children":[]},{"name":"runs-on","total_count":1,"children":[]},{"name":"runs-on","total_count":1,"children":[]},{"name":"schedule","total_count":1,"children":[]},{"name":"steps","total_count":1,"children":[]},{"name":"steps","total_count":1,"children":[]},{"name":"timeout-minutes","total_count":1,"children":[]},{"name":"timeout-minutes","total_count":1,"children":[]},{"name":"uses","total_count":1,"children":[]},{"name":"verify","total_count":1,"children":[]},{"name":"with","total_count":1,"children":[]}]}]}]},{"name":"app","total_count":45,"children":[{"name":"admin","total_count":1,"children":[{"name":"page.tsx","total_count":1,"children":[{"name":"AdminPage()","total_count":1,"children":[]}]}]},{"name":"api","total_count":26,"children":[{"name":"audio","total_count":7,"children":[{"name":"[reciter]","total_count":3,"children":[{"name":"[ayah]","total_count":3,"children":[{"name":"route.ts","total_count":3,"children":[{"name":"GET()","total_count":1,"children":[]},{"name":"resolveParams()","total_count":1,"children":[]},{"name":"runtime","total_count":1,"children":[]}]}]}]},{"name":"batch","total_count":4,"children":[{"name":"route.ts","total_count":4,"children":[{"name":"fetchSingleVerseBytes()","total_count":1,"children":[]},{"name":"maxDuration","total_count":1,"children":[]},{"name":"POST()","total_count":1,"children":[]},{"name":"runtime","total_count":1,"children":[]}]}]}]},{"name":"qul","total_count":4,"children":[{"name":"chapters","total_count":4,"children":[{"name":"[id]","total_count":2,"children":[{"name":"verses","total_count":2,"children":[{"name":"route.ts","total_count":2,"children":[{"name":"GET()","total_count":1,"children":[]},{"name":"revalidate","total_count":1,"children":[]}]}]}]},{"name":"route.ts","total_count":2,"children":[{"name":"GET()","total_count":1,"children":[]},{"name":"revalidate","total_count":1,"children":[]}]}]}]},{"name":"studio","total_count":15,"children":[{"name":"export","total_count":15,"children":[{"name":"route.ts","total_count":8,"children":[{"name":"downloadVerseAudio()","total_count":1,"children":[]},{"name":"execFileAsync","total_count":1,"children":[]},{"name":"ExportPayloadMeta","total_count":1,"children":[]},{"name":"maxDuration","total_count":1,"children":[]},{"name":"POST()","total_count":1,"children":[]},{"name":"probeDurationSeconds()","total_count":1,"children":[]},{"name":"runtime","total_count":1,"children":[]},{"name":"runWithConcurrency()","total_count":1,"children":[]}]},{"name":"session","total_count":7,"children":[{"name":"route.ts","total_count":7,"children":[{"name":"DELETE()","total_count":1,"children":[]},{"name":"GET()","total_count":1,"children":[]},{"name":"maxDuration","total_count":1,"children":[]},{"name":"PATCH()","total_count":1,"children":[]},{"name":"POST()","total_count":1,"children":[]},{"name":"PUT()","total_count":1,"children":[]},{"name":"runtime","total_count":1,"children":[]}]}]}]}]}]},{"name":"layout.tsx","total_count":11,"children":[{"name":"amiri","total_count":1,"children":[]},{"name":"amiriQuran","total_count":1,"children":[]},{"name":"cairo","total_count":1,"children":[]},{"name":"FONT_VARIABLES","total_count":1,"children":[]},{"name":"JSON_LD_WEB_APP","total_count":1,"children":[]},{"name":"metadata","total_count":1,"children":[]},{"name":"notoNaskh","total_count":1,"children":[]},{"name":"reemKufi","total_count":1,"children":[]},{"name":"RootLayout()","total_count":1,"children":[]},{"name":"scheherazade","total_count":1,"children":[]},{"name":"viewport","total_count":1,"children":[]}]},{"name":"manifest.ts","total_count":1,"children":[{"name":"manifest()","total_count":1,"children":[]}]},{"name":"page.tsx","total_count":1,"children":[{"name":"HomePage()","total_count":1,"children":[]}]},{"name":"quran","total_count":2,"children":[{"name":"[id]","total_count":1,"children":[{"name":"page.tsx","total_count":1,"children":[{"name":"SurahReaderPage()","total_count":1,"children":[]}]}]},{"name":"page.tsx","total_count":1,"children":[{"name":"QuranIndexPage()","total_count":1,"children":[]}]}]},{"name":"robots.ts","total_count":1,"children":[{"name":"robots()","total_count":1,"children":[]}]},{"name":"search","total_count":1,"children":[{"name":"page.tsx","total_count":1,"children":[{"name":"SearchPage()","total_count":1,"children":[]}]}]},{"name":"studio","total_count":1,"children":[{"name":"page.tsx","total_count":1,"children":[{"name":"StudioPage()","total_count":1,"children":[]}]}]}]},{"name":"components","total_count":106,"children":[{"name":"admin-ui","total_count":17,"children":[{"name":"AdminAppearanceSection.tsx","total_count":2,"children":[{"name":"AdminAppearanceSection()","total_count":1,"children":[]},{"name":"AdminAppearanceSectionProps","total_count":1,"children":[]}]},{"name":"AdminBackupSection.tsx","total_count":2,"children":[{"name":"AdminBackupSection()","total_count":1,"children":[]},{"name":"AdminBackupSectionProps","total_count":1,"children":[]}]},{"name":"AdminContentSection.tsx","total_count":2,"children":[{"name":"AdminContentSection()","total_count":1,"children":[]},{"name":"AdminContentSectionProps","total_count":1,"children":[]}]},{"name":"AdminFooterSection.tsx","total_count":2,"children":[{"name":"AdminFooterSection()","total_count":1,"children":[]},{"name":"AdminFooterSectionProps","total_count":1,"children":[]}]},{"name":"AdminOverviewSection.tsx","total_count":3,"children":[{"name":"AdminOverviewSection()","total_count":1,"children":[]},{"name":"AdminOverviewSectionProps","total_count":1,"children":[]},{"name":"EVENT_LABELS","total_count":1,"children":[]}]},{"name":"AdminReadingSection.tsx","total_count":2,"children":[{"name":"AdminReadingSection()","total_count":1,"children":[]},{"name":"AdminReadingSectionProps","total_count":1,"children":[]}]},{"name":"AdminSecuritySection.tsx","total_count":2,"children":[{"name":"AdminSecuritySection()","total_count":1,"children":[]},{"name":"AdminSecuritySectionProps","total_count":1,"children":[]}]},{"name":"AdminStudioSection.tsx","total_count":2,"children":[{"name":"AdminStudioSection()","total_count":1,"children":[]},{"name":"AdminStudioSectionProps","total_count":1,"children":[]}]}]},{"name":"AdminView.tsx","total_count":4,"children":[{"name":"AdminSection","total_count":1,"children":[]},{"name":"AdminView()","total_count":1,"children":[]},{"name":"NAV_ITEMS","total_count":1,"children":[]},{"name":"todayBucket()","total_count":1,"children":[]}]},{"name":"AppProvider.tsx","total_count":6,"children":[{"name":"ActiveAudioState","total_count":1,"children":[]},{"name":"AppContext","total_count":1,"children":[]},{"name":"AppContextValue","total_count":1,"children":[]},{"name":"AppProvider()","total_count":1,"children":[]},{"name":"ReaderSurahContext","total_count":1,"children":[]},{"name":"useApp()","total_count":1,"children":[]}]},{"name":"AppShell.tsx","total_count":1,"children":[{"name":"AppShell()","total_count":1,"children":[]}]},{"name":"AudioPlayerBar.tsx","total_count":1,"children":[{"name":"AudioPlayerBar()","total_count":1,"children":[]}]},{"name":"Footer.tsx","total_count":3,"children":[{"name":"Footer()","total_count":1,"children":[]},{"name":"FooterProps","total_count":1,"children":[]},{"name":"QUICK_LINKS","total_count":1,"children":[]}]},{"name":"Header.tsx","total_count":2,"children":[{"name":"Header()","total_count":1,"children":[]},{"name":"NAV_LINKS","total_count":1,"children":[]}]},{"name":"HomeView.tsx","total_count":3,"children":[{"name":"HomeView()","total_count":1,"children":[]},{"name":"PLACE_FILTER_TABS","total_count":1,"children":[]},{"name":"PLACE_FILTER_VALUES","total_count":1,"children":[]}]},{"name":"QuranIndexView.tsx","total_count":5,"children":[{"name":"MAIN_SECTION_VALUES","total_count":1,"children":[]},{"name":"PLACE_TAB_VALUES","total_count":1,"children":[]},{"name":"PLACE_TABS","total_count":1,"children":[]},{"name":"QuranIndexView()","total_count":1,"children":[]},{"name":"RECITER_TAB_VALUES","total_count":1,"children":[]}]},{"name":"reader-ui","total_count":2,"children":[{"name":"ReaderSettingsPanel.tsx","total_count":2,"children":[{"name":"ReaderSettingsPanel()","total_count":1,"children":[]},{"name":"ReaderSettingsPanelProps","total_count":1,"children":[]}]}]},{"name":"ReaderView.tsx","total_count":2,"children":[{"name":"ReaderView()","total_count":1,"children":[]},{"name":"ReaderViewProps","total_count":1,"children":[]}]},{"name":"ReciterPickerModal.tsx","total_count":3,"children":[{"name":"RECITER_PICKER_TAB_VALUES","total_count":1,"children":[]},{"name":"ReciterPickerModal()","total_count":1,"children":[]},{"name":"ReciterPickerModalProps","total_count":1,"children":[]}]},{"name":"SearchView.tsx","total_count":3,"children":[{"name":"QUICK_TERMS","total_count":1,"children":[]},{"name":"SearchHit","total_count":1,"children":[]},{"name":"SearchView()","total_count":1,"children":[]}]},{"name":"studio-ui","total_count":47,"children":[{"name":"ExportSettingsSections.tsx","total_count":2,"children":[{"name":"ExportSettingsSections()","total_count":1,"children":[]},{"name":"ExportSettingsSectionsProps","total_count":1,"children":[]}]},{"name":"StudioAudioPanel.tsx","total_count":2,"children":[{"name":"StudioAudioPanel()","total_count":1,"children":[]},{"name":"StudioAudioPanelProps","total_count":1,"children":[]}]},{"name":"StudioBackgroundPanel.tsx","total_count":2,"children":[{"name":"StudioBackgroundPanel()","total_count":1,"children":[]},{"name":"StudioBackgroundPanelProps","total_count":1,"children":[]}]},{"name":"StudioCommandBar.tsx","total_count":2,"children":[{"name":"StudioCommandBar()","total_count":1,"children":[]},{"name":"StudioCommandBarProps","total_count":1,"children":[]}]},{"name":"StudioCommandPalette.tsx","total_count":2,"children":[{"name":"StudioCommandPalette()","total_count":1,"children":[]},{"name":"StudioCommandPaletteProps","total_count":1,"children":[]}]},{"name":"StudioControls.tsx","total_count":7,"children":[{"name":"StudioSlider()","total_count":1,"children":[]},{"name":"StudioSliderProps","total_count":1,"children":[]},{"name":"StudioSwitch()","total_count":1,"children":[]},{"name":"StudioSwitchProps","total_count":1,"children":[]},{"name":"StudioTooltip()","total_count":1,"children":[]},{"name":"StudioTooltipProps","total_count":1,"children":[]},{"name":"StudioTooltipProvider","total_count":1,"children":[]}]},{"name":"StudioDesignInspector.tsx","total_count":7,"children":[{"name":"StudioDesignInspector()","total_count":1,"children":[]},{"name":"StudioDesignInspectorProps","total_count":1,"children":[]},{"name":"STYLE_TAB_VALUES","total_count":1,"children":[]},{"name":"STYLE_TABS","total_count":1,"children":[]},{"name":"StyleTab","total_count":1,"children":[]},{"name":"TEMPLATE_CATEGORIES","total_count":1,"children":[]},{"name":"TemplateCategory","total_count":1,"children":[]}]},{"name":"StudioRecitationPanel.tsx","total_count":5,"children":[{"name":"RECITER_FILTER_TABS","total_count":1,"children":[]},{"name":"ReciterFilter","total_count":1,"children":[]},{"name":"StudioRecitationPanel()","total_count":1,"children":[]},{"name":"StudioRecitationPanelProps","total_count":1,"children":[]},{"name":"TEXT_SOURCE_OPTIONS","total_count":1,"children":[]}]},{"name":"StudioStagePanel.tsx","total_count":2,"children":[{"name":"StudioStagePanel()","total_count":1,"children":[]},{"name":"StudioStagePanelProps","total_count":1,"children":[]}]},{"name":"StudioTabs.tsx","total_count":11,"children":[{"name":"StudioTabPanel()","total_count":1,"children":[]},{"name":"StudioTabPanelProps","total_count":1,"children":[]},{"name":"StudioTabsContext","total_count":1,"children":[]},{"name":"StudioTabsContextValue","total_count":1,"children":[]},{"name":"StudioTabsList()","total_count":1,"children":[]},{"name":"StudioTabsListProps","total_count":1,"children":[]},{"name":"StudioTabsRoot()","total_count":1,"children":[]},{"name":"StudioTabsRootProps","total_count":1,"children":[]},{"name":"StudioTabTrigger()","total_count":1,"children":[]},{"name":"StudioTabTriggerProps","total_count":1,"children":[]},{"name":"useStudioTabsContext()","total_count":1,"children":[]}]},{"name":"StudioTextPanel.tsx","total_count":5,"children":[{"name":"LABEL_POSITION_OPTIONS","total_count":1,"children":[]},{"name":"META_WEIGHT_OPTIONS","total_count":1,"children":[]},{"name":"StudioTextPanel()","total_count":1,"children":[]},{"name":"StudioTextPanelProps","total_count":1,"children":[]},{"name":"VERSE_WEIGHT_OPTIONS","total_count":1,"children":[]}]}]},{"name":"StudioExportModal.tsx","total_count":3,"children":[{"name":"RenderStage","total_count":1,"children":[]},{"name":"StudioExportModal()","total_count":1,"children":[]},{"name":"StudioExportModalProps","total_count":1,"children":[]}]},{"name":"StudioOrnamentsPanel.tsx","total_count":3,"children":[{"name":"HARMONIZED_PRESETS","total_count":1,"children":[]},{"name":"StudioOrnamentsPanel()","total_count":1,"children":[]},{"name":"StudioOrnamentsPanelProps","total_count":1,"children":[]}]},{"name":"StudioView.tsx","total_count":1,"children":[{"name":"StudioView()","total_count":1,"children":[]}]}]},{"name":"eslint.config.mjs","total_count":2,"children":[{"name":"__dirname","total_count":1,"children":[]},{"name":"__filename","total_count":1,"children":[]}]},{"name":"hooks","total_count":28,"children":[{"name":"use-image-actions.ts","total_count":3,"children":[{"name":"useImageActions()","total_count":1,"children":[]},{"name":"UseImageActionsInput","total_count":1,"children":[]},{"name":"UseImageActionsResult","total_count":1,"children":[]}]},{"name":"use-mobile.ts","total_count":1,"children":[{"name":"useIsMobile()","total_count":1,"children":[]}]},{"name":"use-studio-canvas.ts","total_count":4,"children":[{"name":"AudioCacheRecord","total_count":1,"children":[]},{"name":"useStudioCanvas()","total_count":1,"children":[]},{"name":"UseStudioCanvasInput","total_count":1,"children":[]},{"name":"UseStudioCanvasResult","total_count":1,"children":[]}]},{"name":"use-studio-media.ts","total_count":3,"children":[{"name":"useStudioMedia()","total_count":1,"children":[]},{"name":"UseStudioMediaInput","total_count":1,"children":[]},{"name":"UseStudioMediaResult","total_count":1,"children":[]}]},{"name":"use-studio-misc.ts","total_count":3,"children":[{"name":"useStudioMisc()","total_count":1,"children":[]},{"name":"UseStudioMiscInput","total_count":1,"children":[]},{"name":"UseStudioMiscResult","total_count":1,"children":[]}]},{"name":"use-studio-playback.ts","total_count":3,"children":[{"name":"useStudioPlayback()","total_count":1,"children":[]},{"name":"UseStudioPlaybackInput","total_count":1,"children":[]},{"name":"UseStudioPlaybackResult","total_count":1,"children":[]}]},{"name":"use-studio-shortcuts.ts","total_count":2,"children":[{"name":"useStudioShortcuts()","total_count":1,"children":[]},{"name":"UseStudioShortcutsInput","total_count":1,"children":[]}]},{"name":"use-template-actions.ts","total_count":3,"children":[{"name":"useTemplateActions()","total_count":1,"children":[]},{"name":"UseTemplateActionsInput","total_count":1,"children":[]},{"name":"UseTemplateActionsResult","total_count":1,"children":[]}]},{"name":"use-verse-actions.ts","total_count":3,"children":[{"name":"useVerseActions()","total_count":1,"children":[]},{"name":"UseVerseActionsInput","total_count":1,"children":[]},{"name":"UseVerseActionsResult","total_count":1,"children":[]}]},{"name":"use-verses-source.ts","total_count":3,"children":[{"name":"useVersesSource()","total_count":1,"children":[]},{"name":"UseVersesSourceInput","total_count":1,"children":[]},{"name":"UseVersesSourceResult","total_count":1,"children":[]}]}]},{"name":"lib","total_count":359,"children":[{"name":"audio-batch-codec.ts","total_count":9,"children":[{"name":"AUDIO_BATCH_CLIENT_CHUNK_SIZE","total_count":1,"children":[]},{"name":"AUDIO_BATCH_MAX_RESPONSE_BYTES","total_count":1,"children":[]},{"name":"AUDIO_BATCH_MAX_VERSES","total_count":1,"children":[]},{"name":"AudioBatchFrame","total_count":1,"children":[]},{"name":"computeRateLimitBackoffMs()","total_count":1,"children":[]},{"name":"decodeAudioBatchFrames()","total_count":1,"children":[]},{"name":"encodeAudioBatchFrames()","total_count":1,"children":[]},{"name":"isRetryableHttpStatus()","total_count":1,"children":[]},{"name":"parseRetryAfterMs()","total_count":1,"children":[]}]},{"name":"audio-cache.ts","total_count":20,"children":[{"name":"abortableSleep()","total_count":1,"children":[]},{"name":"AUDIO_CACHE_NAME","total_count":1,"children":[]},{"name":"AudioCacheProgress","total_count":1,"children":[]},{"name":"AudioCacheStatus","total_count":1,"children":[]},{"name":"buildAudioCacheKey()","total_count":1,"children":[]},{"name":"clearBrowserAudioCache()","total_count":1,"children":[]},{"name":"computeCacheProgress()","total_count":1,"children":[]},{"name":"fetchAndCacheVerseAudio()","total_count":1,"children":[]},{"name":"fetchBatchFromServer()","total_count":1,"children":[]},{"name":"fetchDirectEveryAyahBlob()","total_count":1,"children":[]},{"name":"getCachedVerseAudioBlob()","total_count":1,"children":[]},{"name":"MAX_BATCH_AUDIO_BYTES","total_count":1,"children":[]},{"name":"MAX_MEMORY_AUDIO_ENTRIES","total_count":1,"children":[]},{"name":"memoryAudioCache","total_count":1,"children":[]},{"name":"openAudioCacheStorage()","total_count":1,"children":[]},{"name":"preloadVersesToBrowserCache()","total_count":1,"children":[]},{"name":"putCachedVerseAudioBlob()","total_count":1,"children":[]},{"name":"setMemoryAudio()","total_count":1,"children":[]},{"name":"shouldAttachAudioToBatch()","total_count":1,"children":[]},{"name":"supportsDirectBrowserCors()","total_count":1,"children":[]}]},{"name":"export-audio-prep.ts","total_count":3,"children":[{"name":"PrepareAudioContext","total_count":1,"children":[]},{"name":"PrepareAudioResult","total_count":1,"children":[]},{"name":"prepareExportAudio()","total_count":1,"children":[]}]},{"name":"export-download.ts","total_count":5,"children":[{"name":"buildSrtDownloadFilename()","total_count":1,"children":[]},{"name":"ByteRangeParseResult","total_count":1,"children":[]},{"name":"parseByteRangeHeader()","total_count":1,"children":[]},{"name":"resolveExportDownloadDisposition()","total_count":1,"children":[]},{"name":"RFC-9110","total_count":1,"children":[]}]},{"name":"export-job-helpers.ts","total_count":8,"children":[{"name":"AudioProbeInfo","total_count":1,"children":[]},{"name":"downloadVerseAudio()","total_count":1,"children":[]},{"name":"execFileAsync","total_count":1,"children":[]},{"name":"OutputVideoProbeInfo","total_count":1,"children":[]},{"name":"probeAudioInfo()","total_count":1,"children":[]},{"name":"probeOutputVideo()","total_count":1,"children":[]},{"name":"runWithConcurrency()","total_count":1,"children":[]},{"name":"spawnFfmpegTracked()","total_count":1,"children":[]}]},{"name":"export-job-manager.ts","total_count":16,"children":[{"name":"ActiveJobRuntime","total_count":1,"children":[]},{"name":"activeJobs","total_count":1,"children":[]},{"name":"appendBgVideoChunk()","total_count":1,"children":[]},{"name":"cancelExportJob()","total_count":1,"children":[]},{"name":"cleanupExpiredJobs()","total_count":1,"children":[]},{"name":"createExportSession()","total_count":1,"children":[]},{"name":"ExportJobMeta","total_count":1,"children":[]},{"name":"getJobDir()","total_count":1,"children":[]},{"name":"getMetaPath()","total_count":1,"children":[]},{"name":"getStatusPath()","total_count":1,"children":[]},{"name":"globalForJobs","total_count":1,"children":[]},{"name":"isValidJobId()","total_count":1,"children":[]},{"name":"JOBS_ROOT","total_count":1,"children":[]},{"name":"readJobStatus()","total_count":1,"children":[]},{"name":"saveUploadedSlideBatch()","total_count":1,"children":[]},{"name":"writeJobStatus()","total_count":1,"children":[]}]},{"name":"export-network.ts","total_count":5,"children":[{"name":"abortableSleep()","total_count":1,"children":[]},{"name":"fetchVerifiedVideoBlobUrl()","total_count":1,"children":[]},{"name":"fetchWithRateLimitRetry()","total_count":1,"children":[]},{"name":"triggerDownload()","total_count":1,"children":[]},{"name":"verifyAndDownload()","total_count":1,"children":[]}]},{"name":"export-pipeline.ts","total_count":7,"children":[{"name":"computeBackoff()","total_count":1,"children":[]},{"name":"computeBackoffWithHeader()","total_count":1,"children":[]},{"name":"ExportPipelineCallbacks","total_count":1,"children":[]},{"name":"ExportPipelineInput","total_count":1,"children":[]},{"name":"extractErrorMessage()","total_count":1,"children":[]},{"name":"isRetryableStatus()","total_count":1,"children":[]},{"name":"runExportPipeline()","total_count":1,"children":[]}]},{"name":"export-render-pipeline.ts","total_count":2,"children":[{"name":"runExportPipeline()","total_count":1,"children":[]},{"name":"startExportJob()","total_count":1,"children":[]}]},{"name":"ornaments","total_count":32,"children":[{"name":"ornaments-geometry.ts","total_count":16,"children":[{"name":"AYAH_MEDALLION_OPTIONS","total_count":1,"children":[]},{"name":"buildCartoucheBounds()","total_count":1,"children":[]},{"name":"buildMihrabArchGeometry()","total_count":1,"children":[]},{"name":"buildRubElHizbSquares()","total_count":1,"children":[]},{"name":"buildStarPolygonPoints()","total_count":1,"children":[]},{"name":"CartoucheBounds","total_count":1,"children":[]},{"name":"DEFAULT_ORNAMENT_COLOR","total_count":1,"children":[]},{"name":"filterTemplatesByCategory()","total_count":1,"children":[]},{"name":"hexToRgba()","total_count":1,"children":[]},{"name":"ISLAMIC_CORNER_OPTIONS","total_count":1,"children":[]},{"name":"ISLAMIC_FRAME_OPTIONS","total_count":1,"children":[]},{"name":"ISLAMIC_PATTERN_OPTIONS","total_count":1,"children":[]},{"name":"MihrabArchGeometry","total_count":1,"children":[]},{"name":"ORNAMENT_COLOR_PRESETS","total_count":1,"children":[]},{"name":"resolveOrnamentConfig()","total_count":1,"children":[]},{"name":"SURAH_BANNER_OPTIONS","total_count":1,"children":[]}]},{"name":"ornaments-paint-background.ts","total_count":3,"children":[{"name":"drawIslamicFrameLayer()","total_count":1,"children":[]},{"name":"drawIslamicPatternLayer()","total_count":1,"children":[]},{"name":"traceClosedPolygon()","total_count":1,"children":[]}]},{"name":"ornaments-paint-surface.ts","total_count":3,"children":[{"name":"drawIslamicAyahMedallionV2()","total_count":1,"children":[]},{"name":"drawIslamicCornerOrnaments()","total_count":1,"children":[]},{"name":"drawSurahTitleBanner()","total_count":1,"children":[]}]},{"name":"ornaments-types.ts","total_count":10,"children":[{"name":"IslamicAyahMedallionStyle","total_count":1,"children":[]},{"name":"IslamicCornerStyle","total_count":1,"children":[]},{"name":"IslamicFrameStyle","total_count":1,"children":[]},{"name":"IslamicPatternStyle","total_count":1,"children":[]},{"name":"OrnamentColorPreset","total_count":1,"children":[]},{"name":"OrnamentInputState","total_count":1,"children":[]},{"name":"OrnamentOptionMeta","total_count":1,"children":[]},{"name":"Point2D","total_count":1,"children":[]},{"name":"ResolvedOrnamentConfig","total_count":1,"children":[]},{"name":"SurahBannerStyle","total_count":1,"children":[]}]}]},{"name":"qul-client.ts","total_count":4,"children":[{"name":"fetchChapters()","total_count":1,"children":[]},{"name":"fetchChapterVerses()","total_count":1,"children":[]},{"name":"fetchSingleVerse()","total_count":1,"children":[]},{"name":"versesCache","total_count":1,"children":[]}]},{"name":"quran-data-types.ts","total_count":23,"children":[{"name":"AmbientEffect","total_count":1,"children":[]},{"name":"AspectPresetId","total_count":1,"children":[]},{"name":"AyahNumberStyle","total_count":1,"children":[]},{"name":"ColorLutId","total_count":1,"children":[]},{"name":"DailyStatBucket","total_count":1,"children":[]},{"name":"GradientPreset","total_count":1,"children":[]},{"name":"LabelPosition","total_count":1,"children":[]},{"name":"QulChapter","total_count":1,"children":[]},{"name":"QulTranslation","total_count":1,"children":[]},{"name":"QulVerse","total_count":1,"children":[]},{"name":"ReciterOption","total_count":1,"children":[]},{"name":"ReciterStyle","total_count":1,"children":[]},{"name":"SavedCustomTemplate","total_count":1,"children":[]},{"name":"SiteConfig","total_count":1,"children":[]},{"name":"SiteFooterConfig","total_count":1,"children":[]},{"name":"SiteFooterLink","total_count":1,"children":[]},{"name":"SiteStats","total_count":1,"children":[]},{"name":"StatLogEntry","total_count":1,"children":[]},{"name":"StudioState","total_count":1,"children":[]},{"name":"StudioTemplate","total_count":1,"children":[]},{"name":"StudioTemplateCategory","total_count":1,"children":[]},{"name":"TextSourceMode","total_count":1,"children":[]},{"name":"TranslationOption","total_count":1,"children":[]}]},{"name":"quran-data.ts","total_count":17,"children":[{"name":"ASPECT_PRESETS","total_count":1,"children":[]},{"name":"AUDIO_CDN_BASE","total_count":1,"children":[]},{"name":"COLOR_LUT_PRESETS","total_count":1,"children":[]},{"name":"CONFIG_DEFAULTS","total_count":1,"children":[]},{"name":"DEFAULT_TRANSLATION_ID","total_count":1,"children":[]},{"name":"EMPTY_STATS","total_count":1,"children":[]},{"name":"EVERYAYAH_CDN_BASE","total_count":1,"children":[]},{"name":"FALLBACK_CHAPTERS","total_count":1,"children":[]},{"name":"FALLBACK_VERSES","total_count":1,"children":[]},{"name":"QUL_API_BASE","total_count":1,"children":[]},{"name":"RECITERS","total_count":1,"children":[]},{"name":"STUDIO_FONTS","total_count":1,"children":[]},{"name":"STUDIO_GRADIENTS","total_count":1,"children":[]},{"name":"STUDIO_SOLIDS","total_count":1,"children":[]},{"name":"STUDIO_TEXT_COLORS","total_count":1,"children":[]},{"name":"TRANSLATIONS","total_count":1,"children":[]},{"name":"VERSE_OF_DAY_CURATED","total_count":1,"children":[]}]},{"name":"quran-utils.ts","total_count":21,"children":[{"name":"ARABIC_DIGITS","total_count":1,"children":[]},{"name":"buildArabicSearchRegex()","total_count":1,"children":[]},{"name":"clampVerseRange()","total_count":1,"children":[]},{"name":"filterChapters()","total_count":1,"children":[]},{"name":"formatAudioTime()","total_count":1,"children":[]},{"name":"getReciterAudioUrl()","total_count":1,"children":[]},{"name":"getTranslationDirection()","total_count":1,"children":[]},{"name":"getUpstreamAudioUrl()","total_count":1,"children":[]},{"name":"globalVerseIdToSurahAyah()","total_count":1,"children":[]},{"name":"mergeSiteConfig()","total_count":1,"children":[]},{"name":"pickVerseOfDay()","total_count":1,"children":[]},{"name":"recordStatEvent()","total_count":1,"children":[]},{"name":"resolveTranslationOption()","total_count":1,"children":[]},{"name":"RTL_LANG_CODES","total_count":1,"children":[]},{"name":"sanitizeFooterLinkHref()","total_count":1,"children":[]},{"name":"stripArabicDiacritics()","total_count":1,"children":[]},{"name":"stripHtmlTags()","total_count":1,"children":[]},{"name":"SURAH_VERSE_COUNTS","total_count":1,"children":[]},{"name":"toArabicDigits()","total_count":1,"children":[]},{"name":"validatePinChange()","total_count":1,"children":[]},{"name":"wrapWordsToLines()","total_count":1,"children":[]}]},{"name":"reciter-filter.ts","total_count":6,"children":[{"name":"filterAndSortReciters()","total_count":1,"children":[]},{"name":"getReaderPlaybackAudioUrl()","total_count":1,"children":[]},{"name":"RECITER_FILTER_TABS","total_count":1,"children":[]},{"name":"ReciterFilterTab","total_count":1,"children":[]},{"name":"resolveReciterOption()","total_count":1,"children":[]},{"name":"toggleFavoriteReciterSlug()","total_count":1,"children":[]}]},{"name":"reciter-health.ts","total_count":10,"children":[{"name":"checkAllRecitersHealth()","total_count":1,"children":[]},{"name":"getReciterProbeUrl()","total_count":1,"children":[]},{"name":"isHealthyStatus()","total_count":1,"children":[]},{"name":"RECITER_HEALTH_SAMPLE_VERSE","total_count":1,"children":[]},{"name":"RECITER_HEALTH_TIMEOUT_MS","total_count":1,"children":[]},{"name":"ReciterHealthReport","total_count":1,"children":[]},{"name":"ReciterHealthResult","total_count":1,"children":[]},{"name":"renderHealthReport()","total_count":1,"children":[]},{"name":"toHealthResult()","total_count":1,"children":[]},{"name":"worker()","total_count":1,"children":[]}]},{"name":"roving-tabs.test.ts","total_count":1,"children":[{"name":"TABS","total_count":1,"children":[]}]},{"name":"roving-tabs.ts","total_count":4,"children":[{"name":"buildTabDomIds()","total_count":1,"children":[]},{"name":"resolveRovingTabIndex()","total_count":1,"children":[]},{"name":"RovingDirection","total_count":1,"children":[]},{"name":"RovingTabItem","total_count":1,"children":[]}]},{"name":"server-audio-cache.ts","total_count":9,"children":[{"name":"AUDIO_CACHE_MAX_BYTES","total_count":1,"children":[]},{"name":"AUDIO_CACHE_MAX_FILE_BYTES","total_count":1,"children":[]},{"name":"AUDIO_CACHE_MAX_FILES","total_count":1,"children":[]},{"name":"AUDIO_CACHE_ROOT","total_count":1,"children":[]},{"name":"buildServerAudioCacheKey()","total_count":1,"children":[]},{"name":"isCacheableAudioPayload()","total_count":1,"children":[]},{"name":"pickEvictionVictims()","total_count":1,"children":[]},{"name":"readCachedAudio()","total_count":1,"children":[]},{"name":"writeCachedAudio()","total_count":1,"children":[]}]},{"name":"srt-subtitles.ts","total_count":9,"children":[{"name":"applySrtOffset()","total_count":1,"children":[]},{"name":"buildSrtCues()","total_count":1,"children":[]},{"name":"buildSrtFromTimeline()","total_count":1,"children":[]},{"name":"formatSrtTimestamp()","total_count":1,"children":[]},{"name":"renderSrtFile()","total_count":1,"children":[]},{"name":"sanitizeSrtText()","total_count":1,"children":[]},{"name":"SRT_MAX_VERSE_TEXT_CHARS","total_count":1,"children":[]},{"name":"SrtCue","total_count":1,"children":[]},{"name":"SrtCueInput","total_count":1,"children":[]}]},{"name":"storage.ts","total_count":27,"children":[{"name":"BookmarkItem","total_count":1,"children":[]},{"name":"bumpStat()","total_count":1,"children":[]},{"name":"CONFIG_EVENT","total_count":1,"children":[]},{"name":"getAdminPin()","total_count":1,"children":[]},{"name":"isAdminAuthenticated()","total_count":1,"children":[]},{"name":"LastReadInfo","total_count":1,"children":[]},{"name":"loadBookmarks()","total_count":1,"children":[]},{"name":"loadCustomTemplates()","total_count":1,"children":[]},{"name":"loadFavoriteReciters()","total_count":1,"children":[]},{"name":"loadLastRead()","total_count":1,"children":[]},{"name":"loadSiteConfig()","total_count":1,"children":[]},{"name":"loadStats()","total_count":1,"children":[]},{"name":"loginAdmin()","total_count":1,"children":[]},{"name":"logoutAdmin()","total_count":1,"children":[]},{"name":"readJson()","total_count":1,"children":[]},{"name":"resetSiteConfig()","total_count":1,"children":[]},{"name":"resetStats()","total_count":1,"children":[]},{"name":"saveBookmarks()","total_count":1,"children":[]},{"name":"saveCustomTemplates()","total_count":1,"children":[]},{"name":"saveFavoriteReciters()","total_count":1,"children":[]},{"name":"saveLastRead()","total_count":1,"children":[]},{"name":"saveSiteConfig()","total_count":1,"children":[]},{"name":"saveStats()","total_count":1,"children":[]},{"name":"setAdminPin()","total_count":1,"children":[]},{"name":"STATS_EVENT","total_count":1,"children":[]},{"name":"STORAGE_KEYS","total_count":1,"children":[]},{"name":"writeJson()","total_count":1,"children":[]}]},{"name":"studio-audio-dsp.ts","total_count":8,"children":[{"name":".applyPreset()","total_count":1,"children":[]},{"name":".buildImpulseBuffer()","total_count":1,"children":[]},{"name":".buildNoiseBuffer()","total_count":1,"children":[]},{"name":".dispose()","total_count":1,"children":[]},{"name":".ensureContext()","total_count":1,"children":[]},{"name":".stopAmbient()","total_count":1,"children":[]},{"name":".syncAmbient()","total_count":1,"children":[]},{"name":"StudioAudioDsp","total_count":1,"children":[]}]},{"name":"studio-history.ts","total_count":9,"children":[{"name":"canRedoHistory()","total_count":1,"children":[]},{"name":"canUndoHistory()","total_count":1,"children":[]},{"name":"createStudioHistory()","total_count":1,"children":[]},{"name":"pushStudioHistory()","total_count":1,"children":[]},{"name":"redoStudioHistory()","total_count":1,"children":[]},{"name":"replaceStudioPresent()","total_count":1,"children":[]},{"name":"shallowEqualStudioObject()","total_count":1,"children":[]},{"name":"StudioHistory","total_count":1,"children":[]},{"name":"undoStudioHistory()","total_count":1,"children":[]}]},{"name":"studio-initial-state.ts","total_count":1,"children":[{"name":"buildInitialStudioState()","total_count":1,"children":[]}]},{"name":"studio-renderer-shared.ts","total_count":4,"children":[{"name":"FONT_CSS_VAR_MAP","total_count":1,"children":[]},{"name":"isLightColor()","total_count":1,"children":[]},{"name":"resolveCanvasFontFamily()","total_count":1,"children":[]},{"name":"resolvedFontCache","total_count":1,"children":[]}]},{"name":"studio-renderer.ts","total_count":12,"children":[{"name":"buildLinearGradient()","total_count":1,"children":[]},{"name":"drawAmbientEffect()","total_count":1,"children":[]},{"name":"drawBackdropLayers()","total_count":1,"children":[]},{"name":"drawColorLutOverlay()","total_count":1,"children":[]},{"name":"drawCoverMedia()","total_count":1,"children":[]},{"name":"drawStudioFrame()","total_count":1,"children":[]},{"name":"drawWatermarkLayer()","total_count":1,"children":[]},{"name":"RenderFramePayload","total_count":1,"children":[]},{"name":"renderStaticBackdropCanvas()","total_count":1,"children":[]},{"name":"renderTransparentOverlayBackdropCanvas()","total_count":1,"children":[]},{"name":"STAR_SEED","total_count":1,"children":[]},{"name":"StarParticle","total_count":1,"children":[]}]},{"name":"studio-templates.ts","total_count":1,"children":[{"name":"STUDIO_TEMPLATES","total_count":1,"children":[]}]},{"name":"studio-text-renderer.ts","total_count":4,"children":[{"name":"drawMainText()","total_count":1,"children":[]},{"name":"drawMetadataLabels()","total_count":1,"children":[]},{"name":"drawProgressDots()","total_count":1,"children":[]},{"name":"resolveLabelCoords()","total_count":1,"children":[]}]},{"name":"teacher-mode.ts","total_count":9,"children":[{"name":"describeTeacherProgress()","total_count":1,"children":[]},{"name":"resolveTeacherStep()","total_count":1,"children":[]},{"name":"sanitizeTeacherMode()","total_count":1,"children":[]},{"name":"studentAdvanceAction()","total_count":1,"children":[]},{"name":"TEACHER_MODE_DEFAULTS","total_count":1,"children":[]},{"name":"TEACHER_MODE_MAX_REPEATS","total_count":1,"children":[]},{"name":"TEACHER_MODE_MIN_REPEATS","total_count":1,"children":[]},{"name":"TeacherModeState","total_count":1,"children":[]},{"name":"TeacherStep","total_count":1,"children":[]}]},{"name":"template-share.test.ts","total_count":1,"children":[{"name":"sampleTemplate","total_count":1,"children":[]}]},{"name":"template-share.ts","total_count":13,"children":[{"name":"exportTemplatesToJson()","total_count":1,"children":[]},{"name":"importTemplatesFromJson()","total_count":1,"children":[]},{"name":"isNumber()","total_count":1,"children":[]},{"name":"isValidSharedTemplate()","total_count":1,"children":[]},{"name":"PATCH_FIELD_TYPE_GUARDS","total_count":1,"children":[]},{"name":"sanitizeTemplatePatch()","total_count":1,"children":[]},{"name":"SharedTemplateFile","total_count":1,"children":[]},{"name":"TEMPLATE_PATCH_FIELDS","total_count":1,"children":[]},{"name":"TEMPLATE_SHARE_FORMAT","total_count":1,"children":[]},{"name":"TEMPLATE_SHARE_MAX_TEMPLATES","total_count":1,"children":[]},{"name":"TEMPLATE_SHARE_VERSION","total_count":1,"children":[]},{"name":"TemplateImportResult","total_count":1,"children":[]},{"name":"TemplatePatchKey","total_count":1,"children":[]}]},{"name":"utils.ts","total_count":1,"children":[{"name":"cn()","total_count":1,"children":[]}]},{"name":"video-export.ts","total_count":45,"children":[{"name":"AMBIENT_SOUND_PRESETS","total_count":1,"children":[]},{"name":"AmbientSoundPreset","total_count":1,"children":[]},{"name":"AUDIO_EFFECT_PRESETS","total_count":1,"children":[]},{"name":"AudioEffectPreset","total_count":1,"children":[]},{"name":"BG_VIDEO_CHUNK_BYTES","total_count":1,"children":[]},{"name":"BLOB_DOWNLOAD_MAX_BYTES","total_count":1,"children":[]},{"name":"buildAmbientNoiseFilter()","total_count":1,"children":[]},{"name":"buildAudioEffectFilter()","total_count":1,"children":[]},{"name":"buildFfmpegConcatAudioManifest()","total_count":1,"children":[]},{"name":"buildFfmpegConcatSlidesManifest()","total_count":1,"children":[]},{"name":"buildSafeExportFilename()","total_count":1,"children":[]},{"name":"buildVideoBackgroundFilterGraph()","total_count":1,"children":[]},{"name":"chunkIndices()","total_count":1,"children":[]},{"name":"DEFAULT_VIDEO_EXPORT_SETTINGS","total_count":1,"children":[]},{"name":"estimateExportSizeMb()","total_count":1,"children":[]},{"name":"EXPORT_DHIKR_LIST","total_count":1,"children":[]},{"name":"EXPORT_QUALITY_PRESETS","total_count":1,"children":[]},{"name":"EXPORT_SLIDE_BATCH_SIZE","total_count":1,"children":[]},{"name":"ExportJobStage","total_count":1,"children":[]},{"name":"ExportJobStatus","total_count":1,"children":[]},{"name":"ExportQualityPreset","total_count":1,"children":[]},{"name":"getConcatSlideFadeSec()","total_count":1,"children":[]},{"name":"getCrfForQuality()","total_count":1,"children":[]},{"name":"getEffectiveExportFps()","total_count":1,"children":[]},{"name":"getPollIntervalMs()","total_count":1,"children":[]},{"name":"getSlideImageEncoding()","total_count":1,"children":[]},{"name":"getXfadeTransitionName()","total_count":1,"children":[]},{"name":"isValidUploadedMediaHeader()","total_count":1,"children":[]},{"name":"isValidVideoBinaryHeader()","total_count":1,"children":[]},{"name":"MAX_EXPORT_FORM_BYTES","total_count":1,"children":[]},{"name":"MAX_EXPORT_VERSES","total_count":1,"children":[]},{"name":"MAX_UPLOADED_AUDIO_BYTES","total_count":1,"children":[]},{"name":"MAX_UPLOADED_SLIDE_BYTES","total_count":1,"children":[]},{"name":"parseFfmpegTimeSeconds()","total_count":1,"children":[]},{"name":"resolveExportDimensions()","total_count":1,"children":[]},{"name":"shouldUseFastConcatEngine()","total_count":1,"children":[]},{"name":"SLIDE_TRANSITION_OPTIONS","total_count":1,"children":[]},{"name":"SlideTransitionType","total_count":1,"children":[]},{"name":"toEven()","total_count":1,"children":[]},{"name":"VideoExportFormat","total_count":1,"children":[]},{"name":"VideoExportSettings","total_count":1,"children":[]},{"name":"VideoFpsOption","total_count":1,"children":[]},{"name":"VideoQualityTier","total_count":1,"children":[]},{"name":"VideoResolutionTier","total_count":1,"children":[]},{"name":"XFADE_MAX_SLIDES","total_count":1,"children":[]}]},{"name":"audio-batch-codec.test.ts","total_count":1,"children":[]},{"name":"audio-cache.test.ts","total_count":1,"children":[]},{"name":"export-download.test.ts","total_count":1,"children":[]},{"name":"islamic-ornaments.test.ts","total_count":1,"children":[]},{"name":"islamic-ornaments.ts","total_count":1,"children":[]},{"name":"quran-utils.test.ts","total_count":1,"children":[]},{"name":"reciter-filter.test.ts","total_count":1,"children":[]},{"name":"reciter-health.test.ts","total_count":1,"children":[]},{"name":"server-audio-cache.test.ts","total_count":1,"children":[]},{"name":"srt-subtitles.test.ts","total_count":1,"children":[]},{"name":"studio-history.test.ts","total_count":1,"children":[]},{"name":"teacher-mode.test.ts","total_count":1,"children":[]},{"name":"video-export.test.ts","total_count":1,"children":[]}]},{"name":"next-env.d.ts","total_count":1,"children":[{"name":"NOTE: This file should not be edited","total_count":1,"children":[]}]},{"name":"next.config.ts","total_count":1,"children":[{"name":"nextConfig","total_count":1,"children":[]}]},{"name":"package.json","total_count":80,"children":[{"name":"@google/genai@2.32.0","total_count":1,"children":[]},{"name":"@radix-ui/react-accordion","total_count":1,"children":[]},{"name":"@radix-ui/react-accordion@^1.3.1","total_count":1,"children":[]},{"name":"@radix-ui/react-dialog","total_count":1,"children":[]},{"name":"@radix-ui/react-dialog@^1.3.1","total_count":1,"children":[]},{"name":"@radix-ui/react-slider","total_count":1,"children":[]},{"name":"@radix-ui/react-slider@^1.6.1","total_count":1,"children":[]},{"name":"@radix-ui/react-switch","total_count":1,"children":[]},{"name":"@radix-ui/react-switch@^1.4.1","total_count":1,"children":[]},{"name":"@radix-ui/react-tooltip","total_count":1,"children":[]},{"name":"@radix-ui/react-tooltip@^1.4.1","total_count":1,"children":[]},{"name":"@tailwindcss/oxide@4.1.11","total_count":1,"children":[]},{"name":"@tailwindcss/postcss","total_count":1,"children":[]},{"name":"@tailwindcss/postcss@^4.1.11","total_count":1,"children":[]},{"name":"@tailwindcss/typography","total_count":1,"children":[]},{"name":"@tailwindcss/typography@^0.5.20","total_count":1,"children":[]},{"name":"@types/node","total_count":1,"children":[]},{"name":"@types/node@^20","total_count":1,"children":[]},{"name":"@types/react","total_count":1,"children":[]},{"name":"@types/react-dom","total_count":1,"children":[]},{"name":"@types/react-dom@^19","total_count":1,"children":[]},{"name":"@types/react@^19","total_count":1,"children":[]},{"name":"@typescript-eslint/ast-spec","total_count":1,"children":[]},{"name":"@typescript-eslint/eslint-plugin","total_count":1,"children":[]},{"name":"@typescript-eslint/parser","total_count":1,"children":[]},{"name":"@typescript-eslint/type-utils","total_count":1,"children":[]},{"name":"@typescript-eslint/types","total_count":1,"children":[]},{"name":"@typescript-eslint/typescript-estree","total_count":1,"children":[]},{"name":"@typescript-eslint/utils","total_count":1,"children":[]},{"name":"@typescript-eslint/visitor-keys","total_count":1,"children":[]},{"name":"allowScripts","total_count":1,"children":[]},{"name":"autoprefixer","total_count":1,"children":[]},{"name":"autoprefixer@^10.4.21","total_count":1,"children":[]},{"name":"build","total_count":1,"children":[]},{"name":"clean","total_count":1,"children":[]},{"name":"clsx","total_count":1,"children":[]},{"name":"clsx@^2.1.1","total_count":1,"children":[]},{"name":"cmdk","total_count":1,"children":[]},{"name":"cmdk@^1.1.1","total_count":1,"children":[]},{"name":"dependencies","total_count":1,"children":[]},{"name":"description","total_count":1,"children":[]},{"name":"dev","total_count":1,"children":[]},{"name":"devDependencies","total_count":1,"children":[]},{"name":"eslint","total_count":1,"children":[]},{"name":"eslint-config-next","total_count":1,"children":[]},{"name":"eslint-config-next@16.0.8","total_count":1,"children":[]},{"name":"eslint@9.39.1","total_count":1,"children":[]},{"name":"license","total_count":1,"children":[]},{"name":"lint","total_count":1,"children":[]},{"name":"lucide-react","total_count":1,"children":[]},{"name":"lucide-react@^0.553.0","total_count":1,"children":[]},{"name":"motion","total_count":1,"children":[]},{"name":"motion@^12.23.24","total_count":1,"children":[]},{"name":"name","total_count":1,"children":[]},{"name":"next","total_count":1,"children":[]},{"name":"next@^15.4.9","total_count":1,"children":[]},{"name":"overrides","total_count":1,"children":[]},{"name":"postcss","total_count":1,"children":[]},{"name":"postcss","total_count":1,"children":[]},{"name":"postcss-selector-parser","total_count":1,"children":[]},{"name":"postcss@^8.5.33","total_count":1,"children":[]},{"name":"private","total_count":1,"children":[]},{"name":"protobufjs@7.6.6","total_count":1,"children":[]},{"name":"re2@1.27.2","total_count":1,"children":[]},{"name":"react","total_count":1,"children":[]},{"name":"react-dom","total_count":1,"children":[]},{"name":"react-dom@^19.2.1","total_count":1,"children":[]},{"name":"react@^19.2.1","total_count":1,"children":[]},{"name":"scripts","total_count":1,"children":[]},{"name":"sonner","total_count":1,"children":[]},{"name":"sonner@^2.0.8","total_count":1,"children":[]},{"name":"start","total_count":1,"children":[]},{"name":"tailwind-merge","total_count":1,"children":[]},{"name":"tailwind-merge@^3.3.1","total_count":1,"children":[]},{"name":"tailwindcss","total_count":1,"children":[]},{"name":"tailwindcss@4.1.11","total_count":1,"children":[]},{"name":"typescript","total_count":1,"children":[]},{"name":"typescript-eslint","total_count":1,"children":[]},{"name":"typescript@5.9.3","total_count":1,"children":[]},{"name":"version","total_count":1,"children":[]}]},{"name":"postcss.config.mjs","total_count":1,"children":[{"name":"config","total_count":1,"children":[]}]},{"name":"scripts","total_count":32,"children":[{"name":"check-file-size.ts","total_count":7,"children":[{"name":"countLines()","total_count":1,"children":[]},{"name":"files","total_count":1,"children":[]},{"name":"offenders","total_count":1,"children":[]},{"name":"readFileSyncSafe()","total_count":1,"children":[]},{"name":"ROOT","total_count":1,"children":[]},{"name":"SKIP_DIRS","total_count":1,"children":[]},{"name":"walk()","total_count":1,"children":[]}]},{"name":"check-reciters.ts","total_count":1,"children":[{"name":"main()","total_count":1,"children":[]}]},{"name":"gen_audit_report.js","total_count":11,"children":[{"name":"body","total_count":1,"children":[]},{"name":"coverChildren","total_count":1,"children":[]},{"name":"coverTable","total_count":1,"children":[]},{"name":"doc","total_count":1,"children":[]},{"name":"footerArabic","total_count":1,"children":[]},{"name":"footerRoman","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"header","total_count":1,"children":[]},{"name":"metaLines","total_count":1,"children":[]},{"name":"spacing","total_count":1,"children":[]},{"name":"{ titlePt, titleLines }","total_count":1,"children":[]}]},{"name":"report_lib.js","total_count":13,"children":[{"name":"allNoBorders","total_count":1,"children":[]},{"name":"calcCoverSpacing()","total_count":1,"children":[]},{"name":"calcTitleLayout()","total_count":1,"children":[]},{"name":"fs","total_count":1,"children":[]},{"name":"h1()","total_count":1,"children":[]},{"name":"h2()","total_count":1,"children":[]},{"name":"li()","total_count":1,"children":[]},{"name":"makeTable()","total_count":1,"children":[]},{"name":"noBorders","total_count":1,"children":[]},{"name":"P","total_count":1,"children":[]},{"name":"p()","total_count":1,"children":[]},{"name":"splitTitleLines()","total_count":1,"children":[]},{"name":"{\n  Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell, WidthType,\n  TableLayoutType, BorderStyle, ShadingType, AlignmentType, HeadingLevel,\n  TableOfContents, PageBreak, Header, Footer, PageNumber, NumberFormat,\n  convertInchesToTwip, VerticalAlign, TabStopType,\n}","total_count":1,"children":[]}]}]},{"name":"tsconfig.json","total_count":20,"children":[{"name":"allowImportingTsExtensions","total_count":1,"children":[]},{"name":"allowJs","total_count":1,"children":[]},{"name":"baseUrl","total_count":1,"children":[]},{"name":"compilerOptions","total_count":1,"children":[]},{"name":"esModuleInterop","total_count":1,"children":[]},{"name":"exclude","total_count":1,"children":[]},{"name":"include","total_count":1,"children":[]},{"name":"incremental","total_count":1,"children":[]},{"name":"isolatedModules","total_count":1,"children":[]},{"name":"jsx","total_count":1,"children":[]},{"name":"lib","total_count":1,"children":[]},{"name":"module","total_count":1,"children":[]},{"name":"moduleResolution","total_count":1,"children":[]},{"name":"noEmit","total_count":1,"children":[]},{"name":"paths","total_count":1,"children":[]},{"name":"plugins","total_count":1,"children":[]},{"name":"resolveJsonModule","total_count":1,"children":[]},{"name":"skipLibCheck","total_count":1,"children":[]},{"name":"strict","total_count":1,"children":[]},{"name":"target","total_count":1,"children":[]}]},{"name":"postcss-load-config","total_count":1,"children":[]}]};
+
+    function transformData(jsonData) {
+        // Helper function to recursively build the children structure
+        function processNode(node, parentL1StageName) {
+            let displayName = node.name;
+            // Append total_count if it exists and is not already in the name
+            if (node.total_count !== undefined) {
+                if (!/\(Total Count: \d+\)$/.test(displayName)) {
+                    displayName += ` (Total Count: ${node.total_count})`;
+                }
+            }
+
+            const newNode = { name: displayName };
+
+            if (parentL1StageName === "Root") {
+                 newNode.originalStageName = node.name;
+            } else {
+                newNode.originalStageName = parentL1StageName;
+            }
+
+            if (node.children && node.children.length > 0) {
+                const stageNameToPass = (parentL1StageName === "Root") ? node.name : parentL1StageName;
+                newNode.children = node.children.map(child => processNode(child, stageNameToPass));
+            }
+
+            return newNode;
+        }
+
+        let rootDisplayName = jsonData.name;
+        if (jsonData.total_count !== undefined && !/\(Total Count: \d+\)$/.test(rootDisplayName)) {
+            rootDisplayName += ` (Total Count: ${jsonData.total_count})`;
+        }
+
+        return {
+            name: rootDisplayName,
+            originalStageName: "Root",
+            children: (jsonData.children || []).map(child => processNode(child, "Root"))
+        };
+    }
+
+    const treeData = transformData(initialJsonData);
+
+    // Auto-populated phaseColors: every depth-1 child of the root gets
+    // a stable colour from a bigger palette so all top-level dirs are
+    // distinguishable.
+    const PALETTE = [
+      ["#3498DB","#2980B9","#AED6F1"], ["#2ECC71","#27AE60","#A9DFBF"],
+      ["#E74C3C","#C0392B","#F5B7B1"], ["#9B59B6","#8E44AD","#D7BDE2"],
+      ["#F39C12","#D68910","#FAD7A0"], ["#1ABC9C","#117864","#A2D9CE"],
+      ["#34495E","#1B2631","#ABB2B9"], ["#E67E22","#BA4A00","#F5CBA7"],
+      ["#16A085","#0E6655","#A2D9CE"], ["#D35400","#A04000","#EDBB99"],
+      ["#7F8C8D","#566573","#D5DBDB"], ["#C0392B","#7B241C","#F5B7B1"],
+      ["#2E86C1","#1B4F72","#A9CCE3"], ["#28B463","#196F3D","#A9DFBF"],
+      ["#AF7AC5","#6C3483","#D2B4DE"],
+    ];
+    const phaseColors = { "Root": { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+                          "Default": { fill: "#BDC3C7", stroke: "#95A5A6", collapsedFill: "#ECF0F1" } };
+    (initialJsonData.children || []).forEach((c, i) => {
+      const pal = PALETTE[i % PALETTE.length];
+      phaseColors[c.name] = { fill: pal[0], stroke: pal[1], collapsedFill: pal[2] };
+    });
+
+    const levelSpecificPalettes = {
+      0: { fill: "#4A4A4A", stroke: "#333333", collapsedFill: "#6C757D" },
+      2: { fill: "#6ab04c", stroke: "#508a38", collapsedFill: "#a3d391" },
+      3: { fill: "#f0932b", stroke: "#d0730f", collapsedFill: "#f6c07e" },
+      4: { fill: "#be2edd", stroke: "#a01cb3", collapsedFill: "#e08bf2" },
+      5: { fill: "#00a8ff", stroke: "#007ac1", collapsedFill: "#74d2ff" },
+      6: { fill: "#e55039", stroke: "#c23620", collapsedFill: "#f09a8d" },
+      default: { fill: "#747d8c", stroke: "#57606f", collapsedFill: "#a4b0be" }
+    };
+
+    const svgElement = d3.select("#tree-svg");
+    const initialSvgWidth = +svgElement.attr("width");
+    const initialSvgHeight = +svgElement.attr("height");
+    const margin = { top: 40, right: 120, bottom: 80, left: 450 };
+    let width = initialSvgWidth - margin.left - margin.right;
+    let height = initialSvgHeight - margin.top - margin.bottom;
+    const duration = 500;
+    let nodeCounter = 0;
+    const g = svgElement.append("g").attr("transform", `translate(${margin.left},${margin.top})`);
+    const treemap = d3.tree().nodeSize([40, 0]);
+    let rootNode = d3.hierarchy(treeData, d => d.children);
+    rootNode.x0 = 0;
+    rootNode.y0 = 0;
+
+    if (rootNode.children) {
+      rootNode.children.forEach(d_child => {
+        if (d_child.children) { collapseBranch(d_child); }
+      });
+    }
+    updateTree(rootNode);
+
+    function collapseBranch(d) { if (d.children) { d._children = d.children; d._children.forEach(collapseBranch); d.children = null; } }
+    function expandBranch(d) { if (d._children) { d.children = d._children; d._children = null; } if (d.children) { d.children.forEach(expandBranch); } }
+    window.expandAll = () => { expandBranch(rootNode); updateTree(rootNode); };
+    window.collapseAll = () => { if (rootNode.children) { rootNode.children.forEach(collapseBranch); } updateTree(rootNode); };
+    window.resetView = () => { if (rootNode.children) { rootNode.children.forEach(d_child => { if (d_child.children || d_child._children) { collapseBranch(d_child); } }); } if (rootNode._children && !rootNode.children) { rootNode.children = rootNode._children; rootNode._children = null; } updateTree(rootNode); };
+
+    function updateTree(source) {
+      const treeLayoutData = treemap(rootNode);
+      let nodes = treeLayoutData.descendants();
+      let links = treeLayoutData.descendants().slice(1);
+
+      let minX = 0;
+      let maxX = 0;
+      if (nodes.length > 0) {
+        minX = d3.min(nodes, d => d.x);
+        maxX = d3.max(nodes, d => d.x);
+      }
+
+      let neededHeight = Math.max(initialSvgHeight, maxX - minX + margin.top + margin.bottom + 100);
+      svgElement.transition().duration(duration / 2).attr("height", neededHeight);
+      g.transition().duration(duration / 2).attr("transform", `translate(${margin.left},${margin.top - minX + 40})`);
+
+      nodes.forEach(d => { d.y = d.depth * 400; }); // Adjust horizontal separation if needed
+
+      const node = g.selectAll('g.node').data(nodes, d => d.id || (d.id = ++nodeCounter));
+      const nodeEnter = node.enter().append('g')
+        .attr('class', d => "node" + (d.children || d._children ? " node--internal" : " node--leaf") + (d._children ? " _children" : ""))
+        .attr('transform', d => `translate(${source.y0},${source.x0})`)
+        .on('click', (event, d) => { if (d.children) { d._children = d.children; d.children = null; } else if (d._children) { d.children = d._children; d._children = null; } updateTree(d); })
+        .style('cursor', d => (d.children || d._children) ? 'pointer' : 'default');
+
+      nodeEnter.append('circle').attr('r', 1e-6);
+
+      nodeEnter.append('text')
+        .attr('dy', '.35em')
+        .attr('x', d => d.children || d._children ? -14 : 14)
+        .attr('text-anchor', d => d.children || d._children ? 'end' : 'start')
+        .style("fill-opacity", 1e-6)
+        .call(wrapText, 380);
+
+      const nodeUpdate = nodeEnter.merge(node);
+      nodeUpdate.transition().duration(duration)
+        .attr('transform', d => `translate(${d.y},${d.x})`)
+        .attr('class', d => "node" + (d.children ? " node--internal" : " node--leaf") + (d._children ? " node--internal _children" : ""));
+
+      nodeUpdate.select('circle').attr('r', 8.5)
+        .style('fill', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            if (d._children) return palette.collapsedFill;
+            if (d.children) return palette.fill;
+            return "#fff";
+        })
+        .style('stroke', d => {
+            let palette;
+            if (d.depth === 0) {
+                palette = levelSpecificPalettes[0];
+            } else if (d.depth === 1) {
+                palette = phaseColors[d.data.originalStageName] || phaseColors.Default;
+            } else {
+                palette = levelSpecificPalettes[d.depth] || levelSpecificPalettes.default;
+            }
+            return palette.stroke;
+        });
+      nodeUpdate.select('text').style("fill-opacity", 1).call(wrapText, 380);
+
+      const nodeExit = node.exit().transition().duration(duration).attr('transform', d => `translate(${source.y},${source.x})`).remove();
+      nodeExit.select('circle').attr('r', 1e-6);
+      nodeExit.select('text').style('fill-opacity', 1e-6);
+
+      const link = g.selectAll('path.link').data(links, d => d.id);
+      const linkEnter = link.enter().insert('path', "g").attr('class', 'link').attr('d', d => { const o = { x: source.x0, y: source.y0 }; return diagonal(o, o); });
+
+      linkEnter.merge(link).transition().duration(duration).attr('d', d => diagonal(d, d.parent))
+        .style('stroke', d => {
+            const sourceNode = d.parent;
+            if (!sourceNode) return phaseColors.Default.stroke;
+            const l1AncestorName = sourceNode.data.originalStageName;
+            const colorPalette = phaseColors[l1AncestorName] || phaseColors.Default;
+            return colorPalette.stroke;
+        });
+      link.exit().transition().duration(duration).attr('d', d => { const o = { x: source.x, y: source.y }; return diagonal(o, o); }).remove();
+      nodes.forEach(d => { d.x0 = d.x; d.y0 = d.y; });
+    }
+
+    function diagonal(s, d) { return `M ${s.y} ${s.x} C ${(s.y + d.y) / 2} ${s.x}, ${(s.y + d.y) / 2} ${d.x}, ${d.y} ${d.x}`; }
+
+    function wrapText(textElements, maxWidth) {
+        const textPartColors = {
+            name: '#343a40',
+            count: '#0056b3'
+        };
+        const countRegex = /(\s\(Total Count: \d+\))$/;
+
+        textElements.each(function () {
+            const textD3 = d3.select(this);
+            const originalNodeText = textD3.datum().data.name;
+            const x = parseFloat(textD3.attr("x") || 0);
+            const initialDy = textD3.attr("dy");
+            const textAnchor = textD3.attr("text-anchor");
+            const lineHeight = 1.1;
+
+            textD3.text(null);
+
+            let namePart = originalNodeText;
+            let countPartText = "";
+
+            const countMatch = originalNodeText.match(countRegex);
+            if (countMatch && originalNodeText.endsWith(countMatch[0])) {
+                namePart = originalNodeText.substring(0, originalNodeText.length - countMatch[0].length).trim();
+                countPartText = countMatch[0].trim();
+            }
+
+            const tokens = [];
+            namePart.split(/\s+/).filter(Boolean).forEach(word => {
+                tokens.push({ text: word, type: 'name' });
+            });
+            if (countPartText) {
+                tokens.push({ text: countPartText, type: 'count' });
+            }
+
+            if (tokens.length === 0 && originalNodeText) {
+                tokens.push({ text: originalNodeText, type: 'name' });
+            }
+
+            let currentTspan = textD3.append("tspan").attr("x", x).attr("dy", initialDy);
+            if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+
+            let lineTokens = [];
+
+            for (let i = 0; i < tokens.length; i++) {
+                const tokenObj = tokens[i];
+
+                lineTokens.push(tokenObj);
+                currentTspan.text(lineTokens.map(t => t.text).join(" "));
+
+                if (currentTspan.node().getComputedTextLength() > maxWidth && lineTokens.length > 1) {
+                    lineTokens.pop();
+
+                    currentTspan.text(null);
+                    lineTokens.forEach((prevToken, idx) => {
+                        currentTspan.append("tspan")
+                            .text((idx > 0 ? " " : "") + prevToken.text)
+                            .style("fill", textPartColors[prevToken.type] || textPartColors.name)
+                            .style("font-weight", prevToken.type === 'count' ? "bold" : "normal");
+                    });
+
+                    lineTokens = [tokenObj];
+                    currentTspan = textD3.append("tspan").attr("x", x).attr("dy", lineHeight + "em");
+                    if (textAnchor === "end") currentTspan.attr("text-anchor", "end");
+                }
+            }
+
+            currentTspan.text(null);
+            lineTokens.forEach((token, idx) => {
+                currentTspan.append("tspan")
+                    .text((idx > 0 ? " " : "") + token.text)
+                    .style("fill", textPartColors[token.type] || textPartColors.name)
+                    .style("font-weight", token.type === 'count' ? "bold" : "normal");
+            });
+
+            if (textD3.selectAll("tspan > tspan").empty() && textD3.select("tspan").text().length === 0 && originalNodeText) {
+                let t = textD3.select("tspan");
+                let displayText = originalNodeText;
+                t.text(displayText).style("fill", textPartColors.name);
+                if (t.node() && t.node().getComputedTextLength() > maxWidth && displayText.length > 20) {
+                    let estimatedChars = Math.floor(maxWidth / (t.node().getComputedTextLength()/displayText.length) );
+                    displayText = displayText.substring(0, Math.max(0, estimatedChars - 3)) + "...";
+                    t.text(displayText);
+                }
+            }
+        });
+    }
+  </script>
+</body>
+</html>
