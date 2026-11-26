@@ -20,6 +20,7 @@ export const STORAGE_KEYS = {
   TRANSLATION: 'qtrans',
   VSIZE: 'qvsize',
   SHOW_TRANS: 'qshowtrans',
+  VERSE_HIGHLIGHT: 'qverse_highlight_v1',
   ADMIN_PIN: 'quran_admin_pin',
   ADMIN_SESSION: 'quran_admin_session',
   TEACHER_MODE: 'quran_teacher_mode_v1',

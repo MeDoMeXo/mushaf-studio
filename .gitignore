@@ -25,3 +25,4 @@ scripts/.reciter-health.json
 public/audio-cache/
 tsconfig.tsbuildinfo
 __pycache__/
+tool-results/

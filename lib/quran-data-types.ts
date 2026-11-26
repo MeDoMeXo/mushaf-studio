@@ -83,6 +83,8 @@ export type AmbientEffect =
   | 'rain'
   | 'snow';
 export type TextSourceMode = 'uthmani' | 'translation' | 'both';
+/** Verse text layout on the studio canvas: wrapped lines (default) or one auto-shrunk line. */
+export type VerseLineMode = 'wrap' | 'single';
 export type LabelPosition = 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'hidden';
 export type ColorLutId = 'none' | 'golden' | 'cinema' | 'emerald' | 'sepia' | 'midnight';
 export type AyahNumberStyle = IslamicAyahMedallionStyle;
@@ -117,6 +119,10 @@ export interface StudioState {
   align: 'center' | 'right' | 'left';
   shadow: boolean;
   glow: boolean;
+  /** Verse layout: wrapped lines (default) or a single auto-fitted line. */
+  verseLineMode?: VerseLineMode;
+  /** Hide verse text entirely (audio + background + ornaments only) for voice-only videos. */
+  hideVerses?: boolean;
   goldFrame: boolean;
   corners: boolean;
   frameStyle: IslamicFrameStyle;

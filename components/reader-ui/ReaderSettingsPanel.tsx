@@ -7,9 +7,9 @@
  */
 import React from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { Headphones, Languages } from 'lucide-react';
-import { RECITERS, TRANSLATIONS, type ReciterOption } from '@/lib/quran-data';
-import { toArabicDigits } from '@/lib/quran-utils';
+import { Headphones, Languages, Palette } from 'lucide-react';
+import { TRANSLATIONS, type ReciterOption } from '@/lib/quran-data';
+import { VERSE_HIGHLIGHT_COLORS } from '@/lib/verse-highlight';
 import { StudioSlider, StudioSwitch } from '../studio-ui/StudioControls';
 
 export interface ReaderSettingsPanelProps {
@@ -19,6 +19,11 @@ export interface ReaderSettingsPanelProps {
   fontSizeRem: number;
   autoFollowVerse: boolean;
   activeReciter: ReciterOption;
+  /** Active highlight color id for the recited verse (تظليل الآية المتلوة). */
+  highlightColorId: string;
+  onHighlightColorChange: (colorId: string) => void;
+  /** Arabic-digit reciter count label (built-ins + active customs). */
+  reciterCount: string;
   onTranslationChange: (id: number) => void;
   onShowTransToggle: (checked: boolean) => void;
   onFontSizeChange: (val: number) => void;
@@ -33,6 +38,9 @@ export function ReaderSettingsPanel({
   fontSizeRem,
   autoFollowVerse,
   activeReciter,
+  highlightColorId,
+  onHighlightColorChange,
+  reciterCount,
   onTranslationChange,
   onShowTransToggle,
   onFontSizeChange,
@@ -102,10 +110,43 @@ export function ReaderSettingsPanel({
               />
             </div>
 
+            <div className="md:col-span-2">
+              <p className="mb-2 flex items-center gap-1.5 text-xs font-bold text-[var(--ink-muted)]">
+                <Palette className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
+                <span>لون تظليل الآية المتلوة أثناء التلاوة</span>
+              </p>
+              <div
+                role="radiogroup"
+                aria-label="اختيار لون تظليل الآية المتلوة"
+                className="flex flex-wrap items-center gap-2"
+              >
+                {VERSE_HIGHLIGHT_COLORS.map((color) => {
+                  const selected = color.id === highlightColorId;
+                  return (
+                    <button
+                      key={color.id}
+                      type="button"
+                      role="radio"
+                      aria-checked={selected}
+                      aria-label={`لون التظليل: ${color.label}`}
+                      title={color.label}
+                      onClick={() => onHighlightColorChange(color.id)}
+                      className={`h-8 w-8 rounded-full border-2 transition-transform focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--brand-gold)] ${
+                        selected
+                          ? 'scale-110 border-[var(--ink-primary)] shadow-md'
+                          : 'border-[var(--border-hairline)] hover:scale-105'
+                      }`}
+                      style={{ backgroundColor: color.hex }}
+                    />
+                  );
+                })}
+              </div>
+            </div>
+
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-[var(--border-hairline)] pt-4 md:col-span-2">
               <div className="min-w-0">
                 <p className="text-xs font-bold text-[var(--ink-muted)]">
-                  القارئ المرتبط بتلاوة السورة ({toArabicDigits(RECITERS.length)} مصحفاً مرتلاً عالمياً)
+                  القارئ المرتبط بتلاوة السورة ({reciterCount} مصحفاً مرتلاً متزامناً آية بآية)
                 </p>
                 <p className="mt-1 text-sm font-semibold text-[var(--ink-primary)]">
                   {activeReciter.name}{' '}

@@ -4,12 +4,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { motion } from 'motion/react';
 import { Headphones, Play, Search, Sparkles, Star, X } from 'lucide-react';
-import { RECITERS, type QulChapter } from '@/lib/quran-data';
+import { type QulChapter } from '@/lib/quran-data';
 import { fetchChapters, fetchChapterVerses } from '@/lib/qul-client';
 import { filterChapters, toArabicDigits } from '@/lib/quran-utils';
 import {
   filterAndSortReciters,
-  getActiveReciters,
+  getStudioActiveReciters,
   RECITER_FILTER_TABS,
   type ReciterFilterTab,
 } from '@/lib/reciter-filter';
@@ -71,7 +71,9 @@ export function QuranIndexView() {
   const favoriteSet = useMemo(() => new Set(favoriteReciters), [favoriteReciters]);
 
   const activeReciters = useMemo(() => {
-    return getActiveReciters(config.customReciters, config.disabledReciters);
+    // Verse-synced only: the strip plays Al-Fatihah verse-by-verse, so
+    // whole-surah customs (no read id) must not be selectable here.
+    return getStudioActiveReciters(config.customReciters, config.disabledReciters);
   }, [config.customReciters, config.disabledReciters]);
 
   const filteredReciters = useMemo(

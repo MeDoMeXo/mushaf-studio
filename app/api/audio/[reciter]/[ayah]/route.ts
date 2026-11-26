@@ -1,23 +1,32 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { RECITERS } from '@/lib/quran-data';
 import { getUpstreamAudioUrl } from '@/lib/quran-utils';
+import { parseCustomReciterSpec, resolveReciterFromSpec } from '@/lib/custom-reciter-spec';
 import { isCacheableAudioPayload, readCachedAudio, writeCachedAudio } from '@/lib/server-audio-cache';
 import { getOrSliceVerseAudio } from '@/lib/mp3quran-timing';
 
 export const runtime = 'nodejs';
 
-function resolveParams(reciter: string, ayah: string) {
-  const validReciter = RECITERS.find((r) => r.slug === reciter);
+function resolveParams(reciter: string, ayah: string, req: NextRequest) {
   const ayahNum = Number(ayah);
-  if (
-    !validReciter ||
-    !Number.isInteger(ayahNum) ||
-    ayahNum < 1 ||
-    ayahNum > 6236
-  ) {
+  if (!Number.isInteger(ayahNum) || ayahNum < 1 || ayahNum > 6236) {
     return null;
   }
-  return { reciter: validReciter, ayahNum };
+  // Built-in whitelist first — query specs are ignored for known slugs so a
+  // malicious client cannot redirect a whitelisted reciter to another folder.
+  const validReciter = RECITERS.find((r) => r.slug === reciter);
+  if (validReciter) {
+    return { reciter: validReciter, ayahNum, customList: undefined };
+  }
+  // Custom reciter: strictly-validated wire spec (folder / server+readId).
+  const spec = parseCustomReciterSpec((key) => req.nextUrl.searchParams.get(key));
+  if (spec) {
+    const custom = resolveReciterFromSpec(reciter, spec);
+    if (custom) {
+      return { reciter: custom, ayahNum, customList: [custom] };
+    }
+  }
+  return null;
 }
 
 export async function GET(
@@ -25,7 +34,7 @@ export async function GET(
   context: { params: Promise<{ reciter: string; ayah: string }> }
 ) {
   const { reciter, ayah } = await context.params;
-  const resolved = resolveParams(reciter, ayah);
+  const resolved = resolveParams(reciter, ayah, req);
   if (!resolved) {
     return NextResponse.json(
       { error: 'Invalid reciter or verse identifier' },
@@ -33,7 +42,11 @@ export async function GET(
     );
   }
 
-  const upstreamUrl = getUpstreamAudioUrl(resolved.reciter.slug, resolved.ayahNum);
+  const upstreamUrl = getUpstreamAudioUrl(
+    resolved.reciter.slug,
+    resolved.ayahNum,
+    resolved.customList
+  );
   const upstreamHeaders: Record<string, string> = {};
   const rangeHeader = req.headers.get('range');
   if (rangeHeader) {

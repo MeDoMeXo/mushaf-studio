@@ -5,14 +5,19 @@ import {
   encodeAudioBatchFrames,
   type AudioBatchFrame,
 } from '@/lib/audio-batch-codec';
-import { RECITERS } from '@/lib/quran-data';
+import { RECITERS, type ReciterOption } from '@/lib/quran-data';
 import { getUpstreamAudioUrl } from '@/lib/quran-utils';
+import { isValidEveryayahFolder } from '@/lib/custom-reciter-spec';
 
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-async function fetchSingleVerseBytes(reciterSlug: string, verseId: number): Promise<Uint8Array> {
-  const url = getUpstreamAudioUrl(reciterSlug, verseId);
+async function fetchSingleVerseBytes(
+  reciterSlug: string,
+  verseId: number,
+  customList?: readonly ReciterOption[]
+): Promise<Uint8Array> {
+  const url = getUpstreamAudioUrl(reciterSlug, verseId, customList);
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await fetch(url, {
@@ -40,9 +45,42 @@ async function fetchSingleVerseBytes(reciterSlug: string, verseId: number): Prom
  */
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as { reciter?: string; verseIds?: unknown };
+    const body = (await req.json()) as {
+      reciter?: string;
+      verseIds?: unknown;
+      folder?: unknown;
+    };
     const validReciter = RECITERS.find((r) => r.slug === body.reciter);
-    if (!validReciter || !Array.isArray(body.verseIds)) {
+    if (!Array.isArray(body.verseIds)) {
+      return NextResponse.json({ error: 'بيانات طلب التلاوات غير صالحة' }, { status: 400 });
+    }
+
+    // EveryAyah custom reciters: the client sends the validated folder spec.
+    // Built-in slugs ignore the spec (whitelist stays authoritative) and
+    // mp3quran customs are not batchable here (they stream via the
+    // single-verse route with FFmpeg slicing instead).
+    let customList: ReciterOption[] | undefined;
+    if (!validReciter) {
+      const slug = typeof body.reciter === 'string' ? body.reciter : '';
+      const folder = typeof body.folder === 'string' ? body.folder : '';
+      if (
+        /^[a-z0-9][a-z0-9._-]{0,63}$/.test(slug) &&
+        isValidEveryayahFolder(folder)
+      ) {
+        customList = [
+          {
+            slug,
+            name: slug,
+            style: 'murattal',
+            styleLabel: 'مرتل',
+            bitrate: 128,
+            source: 'everyayah',
+            everyayahFolder: folder,
+          },
+        ];
+      }
+    }
+    if (!validReciter && !customList) {
       return NextResponse.json({ error: 'بيانات طلب التلاوات غير صالحة' }, { status: 400 });
     }
 
@@ -55,12 +93,13 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'لا توجد آيات صالحة في الطلب' }, { status: 400 });
     }
 
+    const fetchSlug = validReciter ? validReciter.slug : customList![0].slug;
     const fetched: Uint8Array[] = new Array(verseIds.length).fill(new Uint8Array(0));
     let cursor = 0;
     const workers = Array.from({ length: Math.min(6, verseIds.length) }, async () => {
       while (cursor < verseIds.length) {
         const idx = cursor++;
-        fetched[idx] = await fetchSingleVerseBytes(validReciter.slug, verseIds[idx]);
+        fetched[idx] = await fetchSingleVerseBytes(fetchSlug, verseIds[idx], customList);
       }
     });
     await Promise.all(workers);

@@ -35,6 +35,7 @@ import {
   TEACHER_MODE_DEFAULTS,
   type TeacherModeState,
 } from '@/lib/teacher-mode';
+import { setClientCustomReciters } from '@/lib/custom-reciters-registry';
 import { StudioTooltipProvider } from './studio-ui/StudioControls';
 
 export interface ActiveAudioState {
@@ -199,6 +200,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
   const refreshConfig = useCallback(() => {
     const loaded = loadSiteConfig();
     setConfig(loaded);
+    // Mirror custom reciters into the client registry so pure URL builders
+    // (quran-utils / audio-cache / reciter-filter) resolve custom slugs.
+    setClientCustomReciters(loaded.customReciters);
     const savedTheme =
       typeof window !== 'undefined'
         ? (window.localStorage.getItem(STORAGE_KEYS.THEME) as 'light' | 'dark' | null)
@@ -214,6 +218,9 @@ export function AppProvider({ children }: { children: React.ReactNode }) {
       if (!active) return;
       const loaded = loadSiteConfig();
       setConfig(loaded);
+      // Keep the custom-reciters registry in sync on mount and on config
+      // refresh events (admin changes / cross-tab storage sync).
+      setClientCustomReciters(loaded.customReciters);
       const savedTheme = window.localStorage.getItem(STORAGE_KEYS.THEME) as
         | 'light'
         | 'dark'

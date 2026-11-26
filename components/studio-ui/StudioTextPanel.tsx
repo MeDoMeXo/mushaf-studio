@@ -118,6 +118,46 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
           step={1}
           onChange={(val) => onPatchState({ verticalOffset: val })}
         />
+
+        <div>
+          <p className="mb-1.5 text-xs font-semibold text-[var(--ink-muted)]">
+            توزيع نص الآية
+          </p>
+          <div
+            role="radiogroup"
+            aria-label="توزيع نص الآية"
+            className="grid grid-cols-2 gap-1.5"
+          >
+            {(
+              [
+                { value: 'wrap', label: 'متعدد الأسطر (تلقائي)' },
+                { value: 'single', label: 'سطر واحد' },
+              ] as const
+            ).map((mode) => {
+              const active = (state.verseLineMode || 'wrap') === mode.value;
+              return (
+                <button
+                  key={mode.value}
+                  type="button"
+                  role="radio"
+                  aria-checked={active}
+                  onClick={() => onPatchState({ verseLineMode: mode.value })}
+                  className={`rounded-lg border py-2 text-[11px] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-[var(--brand-gold)] ${
+                    active
+                      ? 'border-[var(--brand-gold)] bg-[var(--brand-gold)]/18 text-[var(--ink-primary)]'
+                      : 'border-[var(--border-hairline)] bg-[var(--surface-subtle)]/50 text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
+                  }`}
+                >
+                  {mode.label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="mt-1.5 text-[10px] leading-relaxed text-[var(--ink-muted)]">
+            في وضع «سطر واحد» تُعرض الآية كاملة على سطر واحد مع تصغير تلقائي للخط
+            حتى تتسع في العرض.
+          </p>
+        </div>
       </div>
 
       <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
@@ -313,6 +353,18 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
         <p className="mb-1.5 text-xs font-bold text-[var(--ink-primary)]">
           المؤثرات وعناصر الشريحة
         </p>
+        <StudioSwitch
+          id="switch-hide-verses"
+          label="إخفاء نص الآيات (فيديو صوتي فقط)"
+          checked={state.hideVerses === true}
+          onCheckedChange={(nextVal) => onPatchState({ hideVerses: nextVal })}
+        />
+        {state.hideVerses && (
+          <p className="mb-2 rounded-lg border border-[var(--brand-gold)]/45 bg-[var(--brand-gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[var(--ink-muted)]">
+            سيظهر الفيديو النهائي بالخلفية والزخارف والتلاوة الصوتية فقط — دون نص
+            الآيات (مناسب للتلاوات الخلفية والأناشيد).
+          </p>
+        )}
         {(
           [
             { key: 'shadow', label: 'ظل ناعم للنص' },

@@ -19,6 +19,7 @@ export interface UseVerseActionsInput {
   setTranslationId: React.Dispatch<React.SetStateAction<number>>;
   setShowTrans: React.Dispatch<React.SetStateAction<boolean>>;
   setFontSizeRem: React.Dispatch<React.SetStateAction<number>>;
+  setHighlightColorId: React.Dispatch<React.SetStateAction<string>>;
   showToast: (msg: string) => void;
 }
 
@@ -29,6 +30,7 @@ export interface UseVerseActionsResult {
   handleTranslationChange: (id: number) => void;
   handleShowTransToggle: (checked: boolean) => void;
   handleFontSizeChange: (val: number) => void;
+  handleHighlightColorChange: (colorId: string) => void;
 }
 
 export function useVerseActions({
@@ -40,6 +42,7 @@ export function useVerseActions({
   setTranslationId,
   setShowTrans,
   setFontSizeRem,
+  setHighlightColorId,
   showToast,
 }: UseVerseActionsInput): UseVerseActionsResult {
   const handleToggleBookmark = useCallback(
@@ -123,6 +126,14 @@ export function useVerseActions({
     [setFontSizeRem]
   );
 
+  const handleHighlightColorChange = useCallback(
+    (colorId: string) => {
+      setHighlightColorId(colorId);
+      window.localStorage.setItem(STORAGE_KEYS.VERSE_HIGHLIGHT, colorId);
+    },
+    [setHighlightColorId]
+  );
+
   return {
     handleToggleBookmark,
     handleCopyVerse,
@@ -130,5 +141,6 @@ export function useVerseActions({
     handleTranslationChange,
     handleShowTransToggle,
     handleFontSizeChange,
+    handleHighlightColorChange,
   };
 }

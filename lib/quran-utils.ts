@@ -14,6 +14,8 @@ import {
   type SiteStats,
   type TranslationOption,
 } from './quran-data';
+import { buildCustomReciterSpecQuery } from './custom-reciter-spec';
+import { getClientCustomReciters } from './custom-reciters-registry';
 
 // Exact Hafs verse counts for all 114 Surahs (sum = 6236)
 export const SURAH_VERSE_COUNTS: readonly number[] = [
@@ -107,16 +109,25 @@ export function filterChapters(
   });
 }
 
+function resolveReciterForUrl(
+  reciterSlug: string,
+  customReciters?: readonly ReciterOption[]
+): ReciterOption {
+  const extras = customReciters && customReciters.length > 0 ? customReciters : getClientCustomReciters();
+  const all = extras && extras.length > 0 ? [...RECITERS, ...extras] : RECITERS;
+  return all.find((r) => r.slug === reciterSlug) ?? RECITERS[0];
+}
+
+function isBuiltInReciterSlug(reciterSlug: string): boolean {
+  return RECITERS.some((r) => r.slug === reciterSlug);
+}
+
 export function getUpstreamAudioUrl(
   reciterSlug: string,
   globalVerseId: number,
   customReciters?: readonly ReciterOption[]
 ): string {
-  const all =
-    customReciters && customReciters.length > 0
-      ? [...RECITERS, ...customReciters]
-      : RECITERS;
-  const reciter = all.find((r) => r.slug === reciterSlug) ?? RECITERS[0];
+  const reciter = resolveReciterForUrl(reciterSlug, customReciters);
   const safeId = Math.max(1, Math.min(6236, Math.floor(globalVerseId || 1)));
   if (reciter.source === 'everyayah' && reciter.everyayahFolder) {
     const { surah, ayah } = globalVerseIdToSurahAyah(safeId);
@@ -137,13 +148,15 @@ export function getReciterAudioUrl(
   globalVerseId: number,
   customReciters?: readonly ReciterOption[]
 ): string {
-  const all =
-    customReciters && customReciters.length > 0
-      ? [...RECITERS, ...customReciters]
-      : RECITERS;
-  const reciter = all.find((r) => r.slug === reciterSlug) ?? RECITERS[0];
+  const reciter = resolveReciterForUrl(reciterSlug, customReciters);
   const safeId = Math.max(1, Math.min(6236, Math.floor(globalVerseId || 1)));
-  return `/api/audio/${reciter.slug}/${safeId}`;
+  const base = `/api/audio/${reciter.slug}/${safeId}`;
+  // Custom reciters are not in the server's static whitelist — append the
+  // strictly-validated wire spec so the proxy can fetch/slice for them.
+  if (!isBuiltInReciterSlug(reciter.slug)) {
+    return base + buildCustomReciterSpecQuery(reciter);
+  }
+  return base;
 }
 
 export function pickVerseOfDay(

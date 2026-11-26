@@ -113,6 +113,7 @@ export function AddReciterModal({
   const [bitrate, setBitrate] = useState<128 | 192 | 64>(128);
   const [source, setSource] = useState<'mp3quran' | 'everyayah'>('mp3quran');
   const [serverUrl, setServerUrl] = useState('');
+  const [readIdInput, setReadIdInput] = useState('');
   const [isManualSlug, setIsManualSlug] = useState(false);
 
   const [isProbing, setIsProbing] = useState(false);
@@ -133,6 +134,17 @@ export function AddReciterModal({
     const cleanUrl = serverUrl.trim();
     const styleLabel =
       STYLE_OPTIONS.find((s) => s.id === style)?.label.split(' ')[0] || 'مرتل';
+    // Optional MP3Quran timing read id — enables server-side FFmpeg verse
+    // slicing so the reciter becomes verse-by-verse synced in Reader & Studio.
+    const parsedReadId = Number(readIdInput.trim());
+    const validReadId =
+      source === 'mp3quran' &&
+      readIdInput.trim() !== '' &&
+      Number.isInteger(parsedReadId) &&
+      parsedReadId >= 1 &&
+      parsedReadId <= 99999
+        ? parsedReadId
+        : undefined;
 
     return {
       slug: cleanSlug,
@@ -143,6 +155,7 @@ export function AddReciterModal({
       bitrate,
       source,
       mp3quranServer: source === 'mp3quran' ? cleanUrl : undefined,
+      mp3quranReadId: validReadId,
       everyayahFolder: source === 'everyayah' ? cleanUrl : undefined,
       popular: true,
     };
@@ -414,6 +427,28 @@ export function AddReciterModal({
                 : 'اسم المجلد في everyayah.com/data/ حيث توجد ملفات 001001.mp3.'}
             </p>
           </div>
+
+          {source === 'mp3quran' && (
+            <div>
+              <label className="block text-xs font-semibold text-[var(--ink-muted)]">
+                معرّف التلاوة للتوقيتات (Read ID) — اختياري
+              </label>
+              <input
+                type="number"
+                min={1}
+                max={99999}
+                value={readIdInput}
+                onChange={(e) => setReadIdInput(e.target.value)}
+                placeholder="مثال: 1194"
+                className="mt-1 h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--ink-primary)] focus:border-[var(--brand-gold)] focus:outline-none"
+              />
+              <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-muted)]">
+                عند إدخاله يُقطّع الخادم كل آية بدقة من ملف السورة الكاملة (FFmpeg)
+                فيعمل القارئ بالمزامنة آية بآية في القارئ والاستوديو. بدونه تُشغّل
+                السورة كاملة كملف واحد ولا يظهر القارئ في القارئ والاستوديو.
+              </p>
+            </div>
+          )}
 
           {/* Pre-save Live Probe Test Bar */}
           <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)] p-3">

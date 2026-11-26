@@ -8,6 +8,7 @@ import {
   getUpstreamAudioUrl,
   stripArabicDiacritics,
 } from './quran-utils';
+import { getClientCustomReciters } from './custom-reciters-registry';
 
 export type ReciterFilterTab = 'all' | 'popular' | 'favorites' | ReciterStyle;
 
@@ -26,21 +27,28 @@ export function resolveReciterOption(
   customReciters?: readonly ReciterOption[]
 ): ReciterOption {
   if (!slug) return RECITERS[0];
-  const all =
+  const extras =
     customReciters && customReciters.length > 0
-      ? [...RECITERS, ...customReciters]
-      : RECITERS;
+      ? customReciters
+      : getClientCustomReciters();
+  const all = extras && extras.length > 0 ? [...RECITERS, ...extras] : RECITERS;
   return all.find((r) => r.slug === slug) ?? RECITERS[0];
 }
 
 /**
  * Checks whether a reciter supports native verse-by-verse synchronization.
- * Only reciters from EveryAyah and Islamic Network are natively verse-by-verse.
- * Reciters from full-surah sources (such as Mansour Al-Salimi and other MP3Quran reciters)
- * do not pause verse-by-verse at the end of each ayah and are excluded from Studio.
+ * EveryAyah and Islamic Network reciters are natively verse-by-verse, and
+ * MP3Quran reciters with a timing read id are verse-sliced server-side by
+ * FFmpeg (lib/mp3quran-timing). Whole-surah MP3Quran sources without a read
+ * id do not pause at the end of each ayah and are excluded from Reader/Studio.
  */
 export function isReciterVerseSynced(reciter: ReciterOption): boolean {
-  return reciter.source === 'everyayah' || reciter.source === 'islamic';
+  if (reciter.source === 'everyayah' || reciter.source === 'islamic') return true;
+  return (
+    reciter.source === 'mp3quran' &&
+    typeof reciter.mp3quranReadId === 'number' &&
+    Boolean(reciter.mp3quranServer)
+  );
 }
 
 /**
@@ -146,18 +154,28 @@ export function filterAndSortReciters(
 /**
  * Resolves the optimal playback audio URL for real-time verse recitation in the Quran Reader.
  * EveryAyah supports CORS directly from the CDN (zero proxy hops & zero rate-limit impact),
- * while Islamic Network streams through the same-origin proxy route.
+ * Islamic Network streams through the same-origin proxy route, and MP3Quran reciters
+ * with a timing read id stream through the proxy too (server-side FFmpeg verse slicing
+ * with the durable on-disk cache — direct CDN would return whole-surah files).
  */
 export function getReaderPlaybackAudioUrl(
   reciterSlug: string,
-  globalVerseId: number
+  globalVerseId: number,
+  customReciters?: readonly ReciterOption[]
 ): string {
-  const reciter = resolveReciterOption(reciterSlug);
+  const reciter = resolveReciterOption(reciterSlug, customReciters);
+  if (
+    reciter.source === 'mp3quran' &&
+    typeof reciter.mp3quranReadId === 'number' &&
+    reciter.mp3quranServer
+  ) {
+    return getReciterAudioUrl(reciter.slug, globalVerseId, customReciters);
+  }
   if (
     (reciter.source === 'everyayah' && reciter.everyayahFolder) ||
     (reciter.source === 'mp3quran' && reciter.mp3quranServer)
   ) {
-    return getUpstreamAudioUrl(reciter.slug, globalVerseId);
+    return getUpstreamAudioUrl(reciter.slug, globalVerseId, customReciters);
   }
-  return getReciterAudioUrl(reciter.slug, globalVerseId);
+  return getReciterAudioUrl(reciter.slug, globalVerseId, customReciters);
 }

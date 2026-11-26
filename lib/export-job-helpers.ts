@@ -7,6 +7,7 @@ import { promises as fs } from 'fs';
 import path from 'path';
 import { promisify } from 'util';
 import { getUpstreamAudioUrl } from '@/lib/quran-utils';
+import { resolveReciterFromSpec, type CustomReciterSpec } from '@/lib/custom-reciter-spec';
 import { parseFfmpegTimeSeconds } from '@/lib/video-export';
 import { readCachedAudio, writeCachedAudio } from '@/lib/server-audio-cache';
 import { resolveReciterOption } from '@/lib/reciter-filter';
@@ -113,7 +114,8 @@ export async function probeOutputVideo(filePath: string): Promise<OutputVideoPro
 export async function downloadVerseAudio(
   reciterSlug: string,
   verseId: number,
-  destPath: string
+  destPath: string,
+  customSpec?: CustomReciterSpec
 ): Promise<void> {
   const cached = await readCachedAudio(reciterSlug, verseId);
   if (cached && cached.byteLength >= 128) {
@@ -121,8 +123,15 @@ export async function downloadVerseAudio(
     return;
   }
 
+  // Custom reciters: reconstruct the option from the server-validated wire
+  // spec so proxy-style slicing and upstream URL building work for them too.
+  const customOption = customSpec
+    ? (resolveReciterFromSpec(reciterSlug, customSpec) ?? undefined)
+    : undefined;
+  const customList = customOption ? [customOption] : undefined;
+
   // MP3Quran reciters with verse timing: slice verse into exact timing segment
-  const reciter = resolveReciterOption(reciterSlug);
+  const reciter = customOption ?? resolveReciterOption(reciterSlug);
   if (reciter.source === 'mp3quran' && reciter.mp3quranReadId) {
     const sliced = await getOrSliceVerseAudio(reciter, verseId);
     if (sliced && sliced.byteLength >= 128) {
@@ -131,7 +140,7 @@ export async function downloadVerseAudio(
     }
   }
 
-  const url = getUpstreamAudioUrl(reciterSlug, verseId);
+  const url = getUpstreamAudioUrl(reciterSlug, verseId, customList);
   let lastErr: unknown = null;
   for (let attempt = 0; attempt < 3; attempt++) {
     try {

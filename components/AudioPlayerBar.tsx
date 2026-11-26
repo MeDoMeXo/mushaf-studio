@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import * as SliderPrimitive from '@radix-ui/react-slider';
 import { AnimatePresence, motion } from 'motion/react';
 import {
@@ -15,7 +15,7 @@ import {
   X,
 } from 'lucide-react';
 import { formatAudioTime, toArabicDigits } from '@/lib/quran-utils';
-import { resolveReciterOption } from '@/lib/reciter-filter';
+import { getStudioActiveReciters, resolveReciterOption } from '@/lib/reciter-filter';
 import { useApp } from './AppProvider';
 import { ReciterPickerModal } from './ReciterPickerModal';
 import { StudioTooltip } from './studio-ui/StudioControls';
@@ -23,6 +23,7 @@ import { StudioTooltip } from './studio-ui/StudioControls';
 export function AudioPlayerBar() {
   const {
     audioState,
+    config,
     activeSurahContext,
     favoriteReciters,
     toggleFavoriteReciter,
@@ -39,6 +40,12 @@ export function AudioPlayerBar() {
   } = useApp();
 
   const activeReciter = resolveReciterOption(audioState.reciter);
+  // Verse-by-verse list for the global picker: built-ins + validated customs,
+  // minus admin-disabled slugs (whole-surah customs excluded by design).
+  const pickerReciters = useMemo(
+    () => getStudioActiveReciters(config?.customReciters, config?.disabledReciters),
+    [config?.customReciters, config?.disabledReciters]
+  );
   const currentAyah = audioState.currentVerseKey
     ? audioState.currentVerseKey.split(':')[1]
     : '1';
@@ -228,6 +235,7 @@ export function AudioPlayerBar() {
         onClose={() => setReciterPickerOpen(false)}
         selectedReciterSlug={audioState.reciter}
         favoriteReciters={favoriteReciters}
+        reciters={pickerReciters}
         onSelectReciter={setReciter}
         onToggleFavorite={toggleFavoriteReciter}
         activeSurahName={

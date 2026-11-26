@@ -33,6 +33,8 @@ interface ReciterPickerModalProps {
   onClose: () => void;
   selectedReciterSlug: string;
   favoriteReciters: string[];
+  /** Active verse-by-verse reciters (built-ins + customs, minus disabled). */
+  reciters: ReciterOption[];
   onSelectReciter: (slug: string) => void;
   onToggleFavorite: (slug: string) => void;
   onPlayWithReciter?: (slug: string) => void;
@@ -44,6 +46,7 @@ export function ReciterPickerModal({
   onClose,
   selectedReciterSlug,
   favoriteReciters,
+  reciters,
   onSelectReciter,
   onToggleFavorite,
   onPlayWithReciter,
@@ -54,20 +57,20 @@ export function ReciterPickerModal({
   const searchInputRef = useRef<HTMLInputElement | null>(null);
 
   const selectedReciter = useMemo(
-    () => resolveReciterOption(selectedReciterSlug),
-    [selectedReciterSlug]
+    () => resolveReciterOption(selectedReciterSlug, reciters),
+    [selectedReciterSlug, reciters]
   );
 
   const favoriteSet = useMemo(() => new Set(favoriteReciters), [favoriteReciters]);
 
   const filteredReciters = useMemo(
     () =>
-      filterAndSortReciters(RECITERS, {
+      filterAndSortReciters(reciters, {
         query,
         tab,
         favoriteSlugs: favoriteReciters,
       }),
-    [query, tab, favoriteReciters]
+    [query, tab, favoriteReciters, reciters]
   );
 
   const handleChoose = (reciter: ReciterOption) => {
@@ -104,7 +107,7 @@ export function ReciterPickerModal({
                   اختيار القارئ والمصحف المرتل
                 </DialogPrimitive.Title>
                 <p className="mt-0.5 truncate text-xs text-[var(--ink-muted)]">
-                  {toArabicDigits(RECITERS.length)} قارئاً عالمياً · النشط:{' '}
+                  {toArabicDigits(reciters.length)} قارئاً متاحاً للمزامنة آية بآية · النشط:{' '}
                   <span className="font-semibold text-[var(--brand-emerald)] dark:text-[#E6C75A]">
                     {selectedReciter.name}
                   </span>
@@ -331,7 +334,7 @@ export function ReciterPickerModal({
               يُحفظ اختيارك تلقائياً ويُربط مباشرة بجميع آيات السورة أثناء التلاوة.
             </span>
             <span className="shrink-0 font-semibold text-[var(--ink-primary)] tabular-nums">
-              {toArabicDigits(filteredReciters.length)} / {toArabicDigits(RECITERS.length)}
+              {toArabicDigits(filteredReciters.length)} / {toArabicDigits(reciters.length)}
             </span>
           </div>
         </DialogPrimitive.Content>

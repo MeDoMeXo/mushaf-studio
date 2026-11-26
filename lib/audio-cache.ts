@@ -6,6 +6,7 @@ import {
 } from './audio-batch-codec';
 import { RECITERS } from './quran-data';
 import { getReciterAudioUrl, getUpstreamAudioUrl } from './quran-utils';
+import { getClientCustomReciters } from './custom-reciters-registry';
 
 export const AUDIO_CACHE_NAME = 'mushaf-studio-audio-v2';
 export const MAX_MEMORY_AUDIO_ENTRIES = 360;
@@ -152,7 +153,10 @@ export async function putCachedVerseAudioBlob(
 }
 
 function supportsDirectBrowserCors(reciterSlug: string): boolean {
-  const found = RECITERS.find((r) => r.slug === reciterSlug);
+  const extras = getClientCustomReciters();
+  const found =
+    RECITERS.find((r) => r.slug === reciterSlug) ??
+    extras.find((r) => r.slug === reciterSlug);
   // EveryAyah CDN sends Access-Control-Allow-Origin: * so browser can fetch directly with 0 Cloud Run proxy requests
   return found?.source === 'everyayah';
 }
@@ -184,6 +188,15 @@ async function fetchBatchFromServer(
   const okIds: number[] = [];
   const failedIds: number[] = [];
 
+  // EveryAyah custom reciters need their folder spec in the request body so
+  // the server proxy can resolve the upstream URL for a non-whitelisted slug.
+  const isBuiltIn = RECITERS.some((r) => r.slug === reciterSlug);
+  const customFolder = isBuiltIn
+    ? undefined
+    : getClientCustomReciters().find(
+        (r) => r.slug === reciterSlug && r.source === 'everyayah' && r.everyayahFolder
+      )?.everyayahFolder;
+
   let res: Response | null = null;
   for (let attempt = 0; attempt < 5; attempt++) {
     if (signal?.aborted) {
@@ -193,7 +206,11 @@ async function fetchBatchFromServer(
       const candidate = await fetch('/api/audio/batch', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reciter: reciterSlug, verseIds }),
+        body: JSON.stringify(
+          customFolder
+            ? { reciter: reciterSlug, verseIds, folder: customFolder }
+            : { reciter: reciterSlug, verseIds }
+        ),
         signal,
       });
       if (candidate.ok) {

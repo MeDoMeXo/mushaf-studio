@@ -86,9 +86,39 @@ export function renderExportBackdropCanvas(
 }
 
 /**
+ * Pre-renders the semi-transparent overlay layers (color LUT, geometric
+ * pattern, darkening overlay, vignette, Islamic frame, corner rosettes,
+ * metadata banners and watermark) onto a transparent canvas for FFmpeg
+ * video-background compositing — this is what restores the ornament frame
+ * (البرواز) and grading layers over animated bg-library/uploaded videos,
+ * matching the live preview layer stack exactly.
+ */
+export function renderVideoOverlayCanvas(
+  state: StudioState,
+  surahName: string,
+  reciterName: string
+): HTMLCanvasElement | null {
+  if (typeof document === 'undefined') return null;
+  const cv = document.createElement('canvas');
+  cv.width = state.width;
+  cv.height = state.height;
+  const ctx = cv.getContext('2d');
+  if (!ctx) return null;
+  ctx.clearRect(0, 0, state.width, state.height);
+  // Ambient is intentionally excluded — the server composites the ANIMATED
+  // ambient frame sequence between the bg video and this overlay (a baked
+  // frame would freeze the particles at timeSec=0).
+  drawBackdropLayers(ctx, { ...state, ambient: 'none' }, null, null, 0, true);
+  drawMetadataLabels(ctx, state, surahName, '', reciterName);
+  drawWatermarkLayer(ctx, state);
+  return cv;
+}
+
+/**
  * Pre-renders the semi-transparent overlay layers (color LUT, darkening overlay,
  * vignette, gold frame, corner rosettes, and watermark) onto a transparent canvas
  * for FFmpeg video-background compositing.
+ * @deprecated Use renderVideoOverlayCanvas (adds pattern + metadata labels).
  */
 export function renderTransparentOverlayBackdropCanvas(
   state: StudioState
@@ -204,8 +234,9 @@ function drawBackdropLayers(
 
   const ornaments = resolveOrnamentConfig(state);
 
-  // 1c) Authentic Islamic Geometric Background Pattern (drawn softly before vignette)
-  if (!transparentBackdrop && ornaments.patternStyle !== 'none' && ornaments.patternOpacity > 0) {
+  // 1c) Authentic Islamic Geometric Background Pattern (drawn softly before vignette;
+  // also drawn in transparent overlay mode so bg-video exports keep the pattern)
+  if (ornaments.patternStyle !== 'none' && ornaments.patternOpacity > 0) {
     drawIslamicPatternLayer(
       ctx,
       w,
@@ -334,11 +365,14 @@ export function drawStudioFrame(
     ctx.clearRect(0, 0, w, h);
     if (state.coverMode) {
       drawUnifiedCoverTypography(ctx, state, surahName, reciterName);
-    } else {
+    } else if (!state.hideVerses) {
       drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum);
       if (state.showProgressDots && totalVerses > 1 && totalVerses <= 24) {
         drawProgressDots(ctx, state, activeVerseIndex, totalVerses);
       }
+    } else if (state.showProgressDots && totalVerses > 1 && totalVerses <= 24) {
+      // hideVerses: audio-only video — keep just the progress dots
+      drawProgressDots(ctx, state, activeVerseIndex, totalVerses);
     }
     return;
   }
@@ -357,25 +391,29 @@ export function drawStudioFrame(
     drawUnifiedCoverTypography(ctx, state, surahName, reciterName);
   } else {
     // 7) Main Quranic / translation text + Islamic Ayah Medallion
-    ctx.save();
-    const progress = Math.max(0, Math.min(1, payload.transitionProgress ?? fadeAlpha));
-    const transType = payload.transitionType ?? 'fade';
+    // (skipped entirely in hideVerses mode — voice-only video with background
+    // and ornaments, no verse text on any slide)
+    if (!state.hideVerses) {
+      ctx.save();
+      const progress = Math.max(0, Math.min(1, payload.transitionProgress ?? fadeAlpha));
+      const transType = payload.transitionType ?? 'fade';
 
-    if (transType === 'slideup' && progress < 1) {
-      const slideOffsetY = (1 - progress) * (h * 0.035);
-      ctx.translate(0, slideOffsetY);
-    } else if ((transType === 'zoomin' || transType === 'zoom') && progress < 1) {
-      const scale = 0.94 + 0.06 * progress;
-      ctx.translate(w / 2, h / 2);
-      ctx.scale(scale, scale);
-      ctx.translate(-w / 2, -h / 2);
-    } else if (transType === 'fadeblack' && progress < 1) {
-      ctx.globalAlpha = Math.max(0, Math.min(1, Math.pow(progress, 1.4)));
+      if (transType === 'slideup' && progress < 1) {
+        const slideOffsetY = (1 - progress) * (h * 0.035);
+        ctx.translate(0, slideOffsetY);
+      } else if ((transType === 'zoomin' || transType === 'zoom') && progress < 1) {
+        const scale = 0.94 + 0.06 * progress;
+        ctx.translate(w / 2, h / 2);
+        ctx.scale(scale, scale);
+        ctx.translate(-w / 2, -h / 2);
+      } else if (transType === 'fadeblack' && progress < 1) {
+        ctx.globalAlpha = Math.max(0, Math.min(1, Math.pow(progress, 1.4)));
+      }
+
+      ctx.globalAlpha = Math.max(0, Math.min(1, fadeAlpha));
+      drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum);
+      ctx.restore();
     }
-
-    ctx.globalAlpha = Math.max(0, Math.min(1, fadeAlpha));
-    drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum);
-    ctx.restore();
 
     // 8) Independent Surah & Ayah Label + Reciter Name Label
     drawMetadataLabels(ctx, state, surahName, ayahLabel, reciterName);

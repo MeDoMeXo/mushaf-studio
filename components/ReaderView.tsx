@@ -6,33 +6,27 @@ import { useSearchParams } from 'next/navigation';
 import { AnimatePresence, motion } from 'motion/react';
 import {
   ArrowRight,
-  Bookmark,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  Copy,
   Headphones,
   Languages,
-  Loader2,
   Pause,
   Play,
   SlidersHorizontal,
-  Sparkles,
 } from 'lucide-react';
-import {
-  RECITERS,
-  TRANSLATIONS,
-  type QulChapter,
-  type QulVerse,
-} from '@/lib/quran-data';
+import { type QulChapter, type QulVerse } from '@/lib/quran-data';
 import { fetchChapters, fetchChapterVerses } from '@/lib/qul-client';
 import {
   getTranslationDirection,
   resolveTranslationOption,
-  stripHtmlTags,
   toArabicDigits,
 } from '@/lib/quran-utils';
-import { resolveReciterOption } from '@/lib/reciter-filter';
+import { resolveReciterOption, getStudioActiveReciters } from '@/lib/reciter-filter';
+import {
+  DEFAULT_VERSE_HIGHLIGHT_COLOR_ID,
+  resolveVerseHighlightColor,
+} from '@/lib/verse-highlight';
 import {
   bumpStat,
   loadBookmarks,
@@ -42,6 +36,7 @@ import {
   type BookmarkItem,
 } from '@/lib/storage';
 import { ReaderSettingsPanel } from './reader-ui/ReaderSettingsPanel';
+import { VerseCard } from './reader-ui/VerseCard';
 import { useVerseActions } from '@/hooks/use-verse-actions';
 import { useApp } from './AppProvider';
 import {
@@ -77,6 +72,9 @@ export function ReaderView({ surahId }: ReaderViewProps) {
   const [showTrans, setShowTrans] = useState<boolean>(config.defaultShowTrans);
   const [fontSizeRem, setFontSizeRem] = useState<number>(config.defaultVsize);
   const [autoFollowVerse, setAutoFollowVerse] = useState<boolean>(true);
+  const [highlightColorId, setHighlightColorId] = useState<string>(
+    DEFAULT_VERSE_HIGHLIGHT_COLOR_ID
+  );
   const [jumpInput, setJumpInput] = useState('');
   const [bookmarks, setBookmarks] = useState<BookmarkItem[]>([]);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -84,6 +82,19 @@ export function ReaderView({ surahId }: ReaderViewProps) {
   const activeReciter = useMemo(
     () => resolveReciterOption(audioState.reciter),
     [audioState.reciter]
+  );
+
+  // Recited-verse highlight (تظليل الآية المتلوة) — user-controllable color.
+  const highlightColor = useMemo(
+    () => resolveVerseHighlightColor(highlightColorId),
+    [highlightColorId]
+  );
+  const verseCountLabel = useMemo(
+    () =>
+      toArabicDigits(
+        getStudioActiveReciters(config.customReciters, config.disabledReciters).length
+      ),
+    [config.customReciters, config.disabledReciters]
   );
 
   const activeTranslation = useMemo(
@@ -108,6 +119,10 @@ export function ReaderView({ surahId }: ReaderViewProps) {
       const savedSize = Number(window.localStorage.getItem(STORAGE_KEYS.VSIZE));
       if (Number.isFinite(savedSize) && savedSize >= 1.2 && savedSize <= 3) {
         setFontSizeRem(savedSize);
+      }
+      const savedHighlight = window.localStorage.getItem(STORAGE_KEYS.VERSE_HIGHLIGHT);
+      if (savedHighlight) {
+        setHighlightColorId(savedHighlight);
       }
       setBookmarks(loadBookmarks());
     });
@@ -213,6 +228,7 @@ export function ReaderView({ surahId }: ReaderViewProps) {
     handleTranslationChange,
     handleShowTransToggle,
     handleFontSizeChange,
+    handleHighlightColorChange,
   } = useVerseActions({
     surahId,
     surahName: chapter?.name_arabic ?? `سورة ${surahId}`,
@@ -222,6 +238,7 @@ export function ReaderView({ surahId }: ReaderViewProps) {
     setTranslationId,
     setShowTrans,
     setFontSizeRem,
+    setHighlightColorId,
     showToast,
   });
 
@@ -264,7 +281,7 @@ export function ReaderView({ surahId }: ReaderViewProps) {
             </button>
           </form>
 
-          <StudioTooltip content="اختيار القارئ من قائمة ٣٨ مصحفاً مرتلاً">
+          <StudioTooltip content={`اختيار القارئ من قائمة ${verseCountLabel} مصحفاً مرتلاً ومتزامناً آية بآية`}>
             <button
               type="button"
               data-testid="reader-reciter-btn"
@@ -340,6 +357,9 @@ export function ReaderView({ surahId }: ReaderViewProps) {
         fontSizeRem={fontSizeRem}
         autoFollowVerse={autoFollowVerse}
         activeReciter={activeReciter}
+        highlightColorId={highlightColorId}
+        onHighlightColorChange={handleHighlightColorChange}
+        reciterCount={verseCountLabel}
         onTranslationChange={handleTranslationChange}
         onShowTransToggle={handleShowTransToggle}
         onFontSizeChange={handleFontSizeChange}
@@ -395,149 +415,39 @@ export function ReaderView({ surahId }: ReaderViewProps) {
           ))
         ) : (
           verses.map((verse) => {
-            const ayahNum = Number(verse.verse_key.split(':')[1] || 1);
             const isPlayingThis =
               audioState.visible &&
               audioState.currentVerseKey === verse.verse_key;
-            const isBookmarked = bookmarkedKeys.has(verse.verse_key);
-            const rawTranslation = verse.translations?.[0]?.text ?? '';
-            const cleanTranslation = stripHtmlTags(rawTranslation);
-            const translationLabel =
-              verse.translations?.[0]?.name ?? activeTranslation.name;
 
             return (
-              <article
+              <VerseCard
                 key={verse.verse_key}
-                id={`verse-${surahId}-${ayahNum}`}
-                className={`rounded-2xl border bg-[var(--surface-card)] p-5 transition-colors sm:p-6 ${
-                  isPlayingThis
-                    ? 'border-[var(--brand-gold)] ring-2 ring-[var(--brand-gold)]/25'
-                    : 'border-[var(--border-hairline)] hover:border-[var(--brand-gold)]/70'
-                }`}
-              >
-                <div className="flex items-start gap-4">
-                  <span
-                    aria-label={`الآية رقم ${ayahNum}`}
-                    className="grid h-10 w-10 shrink-0 place-items-center rounded-xl border border-[var(--brand-gold)]/45 bg-[var(--surface-subtle)] text-xs font-bold text-[var(--brand-emerald)] tabular-nums dark:text-[#E6C75A]"
-                  >
-                    {toArabicDigits(ayahNum)}
-                  </span>
-
-                  <p
-                    className="font-quran flex-1 leading-[2.35] text-[var(--ink-primary)]"
-                    style={{ fontSize: `${fontSizeRem}rem` }}
-                  >
-                    {verse.text_uthmani}
-                  </p>
-                </div>
-
-                {showTrans && cleanTranslation && (
-                  <div
-                    dir={translationDir}
-                    className={`mt-4 border-t border-dashed border-[var(--border-hairline)] pt-3.5 ${
-                      translationDir === 'rtl' ? 'text-right' : 'text-left'
-                    }`}
-                  >
-                    <p className="text-[11px] font-semibold text-[var(--brand-gold)]">
-                      {translationLabel}
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-[var(--ink-muted)]">
-                      {cleanTranslation}
-                    </p>
-                  </div>
-                )}
-
-                <div className="mt-4 flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-hairline)] pt-3.5">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <button
-                      type="button"
-                      onClick={() => {
-                        if (isPlayingThis) {
-                          togglePlayPause();
-                        } else {
-                          playSurahVerses(
-                            verses,
-                            surahId,
-                            chapter?.name_arabic ?? `سورة ${surahId}`,
-                            verse.verse_key
-                          );
-                        }
-                      }}
-                      className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors ${
-                        isPlayingThis
-                          ? 'bg-[var(--brand-emerald)] text-[#FAF7F0]'
-                          : 'bg-[var(--surface-subtle)] text-[var(--ink-primary)] hover:bg-[var(--brand-emerald)] hover:text-[#FAF7F0]'
-                      }`}
-                    >
-                      {isPlayingThis && audioState.buffering ? (
-                        <>
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" />
-                          <span>جاري التحميل...</span>
-                        </>
-                      ) : isPlayingThis && audioState.playing ? (
-                        <>
-                          <Pause className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span>إيقاف مؤقت</span>
-                        </>
-                      ) : (
-                        <>
-                          <Play className="h-3.5 w-3.5" aria-hidden="true" />
-                          <span>{isPlayingThis ? 'متابعة التلاوة' : 'تلاوة'}</span>
-                        </>
-                      )}
-                    </button>
-
-                    <StudioTooltip content="فتح الآية مباشرة في استوديو التصميم">
-                      <Link
-                        href={`/studio?surah=${surahId}&from=${ayahNum}&to=${ayahNum}&translation=${translationId}`}
-                        className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[var(--surface-subtle)] px-3 text-xs font-semibold text-[var(--ink-primary)] transition-colors hover:bg-[var(--brand-gold)] hover:text-[#1F1705]"
-                      >
-                        <Sparkles className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>صمّم في الاستوديو</span>
-                      </Link>
-                    </StudioTooltip>
-
-                    <StudioTooltip content="نسخ النص العثماني مع اسم السورة">
-                      <button
-                        type="button"
-                        onClick={() => handleCopyVerse(verse)}
-                        className="inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg bg-[var(--surface-subtle)] px-3 text-xs font-semibold text-[var(--ink-primary)] transition-colors hover:bg-[var(--border-hairline)]"
-                      >
-                        <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                        <span>نسخ</span>
-                      </button>
-                    </StudioTooltip>
-
-                    <StudioTooltip content={isBookmarked ? 'إزالة من المحفوظات' : 'حفظ الآية'}>
-                      <button
-                        type="button"
-                        onClick={() => handleToggleBookmark(verse)}
-                        aria-pressed={isBookmarked}
-                        className={`inline-flex h-8 items-center gap-1.5 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors ${
-                          isBookmarked
-                            ? 'bg-[var(--brand-gold)]/20 text-[var(--brand-emerald)] dark:text-[#E6C75A]'
-                            : 'bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
-                        }`}
-                      >
-                        <Bookmark
-                          className={`h-3.5 w-3.5 ${isBookmarked ? 'fill-current' : ''}`}
-                          aria-hidden="true"
-                        />
-                        <span>{isBookmarked ? 'محفوظة' : 'حفظ'}</span>
-                      </button>
-                    </StudioTooltip>
-                  </div>
-
-                  {isPlayingThis && (
-                    <span
-                      data-testid="active-verse-reciter-label"
-                      className="text-xs font-semibold text-[var(--brand-emerald)] dark:text-[#E6C75A]"
-                    >
-                      {audioState.playing ? 'تتلى الآن بصوت' : 'متوقفة بصوت'} {activeReciter.name}
-                    </span>
-                  )}
-                </div>
-              </article>
+                verse={verse}
+                surahId={surahId}
+                surahName={chapter?.name_arabic ?? `سورة ${surahId}`}
+                translationId={translationId}
+                fontSizeRem={fontSizeRem}
+                showTrans={showTrans}
+                translationDir={translationDir}
+                translationFallbackName={activeTranslation.name}
+                isPlayingThis={isPlayingThis}
+                isPlayingAudio={audioState.playing}
+                isBuffering={audioState.buffering}
+                isBookmarked={bookmarkedKeys.has(verse.verse_key)}
+                activeReciter={activeReciter}
+                highlightColor={highlightColor}
+                onPlayVerse={(v) =>
+                  playSurahVerses(
+                    verses,
+                    surahId,
+                    chapter?.name_arabic ?? `سورة ${surahId}`,
+                    v.verse_key
+                  )
+                }
+                onTogglePause={togglePlayPause}
+                onCopyVerse={handleCopyVerse}
+                onToggleBookmark={handleToggleBookmark}
+              />
             );
           })
         )}

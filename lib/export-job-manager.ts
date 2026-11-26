@@ -7,6 +7,11 @@ import { getBuiltinBackground, isBuiltinBackgroundId } from './background-librar
 import { RECITERS } from '@/lib/quran-data';
 import { toArabicDigits } from '@/lib/quran-utils';
 import {
+  isValidEveryayahFolder,
+  isValidMp3quranReadId,
+  isValidMp3quranServer,
+} from '@/lib/custom-reciter-spec';
+import {
   DEFAULT_VIDEO_EXPORT_SETTINGS,
   MAX_EXPORT_SLIDES,
   MAX_EXPORT_VERSES,
@@ -33,6 +38,12 @@ export interface ExportJobMeta {
   toAyah: number;
   reciter: string;
   reciterName?: string;
+  /** Custom-reciter wire spec (EveryAyah folder) — validated at session creation. */
+  reciterFolder?: string;
+  /** Custom-reciter wire spec (MP3Quran server base URL) — validated at session creation. */
+  reciterServer?: string;
+  /** Custom-reciter wire spec (MP3Quran timing read id for verse slicing). */
+  reciterReadId?: number;
   verseIds: number[];
   /** Optional index-aligned verse texts (Uthmani) for synchronized SRT output. */
   verseTexts?: string[];
@@ -214,7 +225,36 @@ export async function createExportSession(
         .map((t) => String(typeof t === 'string' ? t : '').slice(0, 500))
     : undefined;
 
-  const matchedReciter = RECITERS.find((r) => r.slug === rawMeta.reciter) ?? RECITERS[0];
+  const requestedReciterSlug = typeof rawMeta.reciter === 'string' ? rawMeta.reciter : '';
+  const matchedReciter = RECITERS.find((r) => r.slug === requestedReciterSlug);
+  // Custom-reciter wire spec: built-ins ignore it entirely (whitelist stays
+  // authoritative); custom slugs only keep server-validated values.
+  const isBuiltInReciter = Boolean(matchedReciter);
+  const rawFolder = isBuiltInReciter ? undefined : rawMeta.reciterFolder;
+  const rawServer = isBuiltInReciter ? undefined : rawMeta.reciterServer;
+  const rawReadId = isBuiltInReciter ? undefined : rawMeta.reciterReadId;
+  const validFolder =
+    typeof rawFolder === 'string' && isValidEveryayahFolder(rawFolder)
+      ? rawFolder
+      : undefined;
+  const validServer =
+    typeof rawServer === 'string' && isValidMp3quranServer(rawServer)
+      ? rawServer
+      : undefined;
+  const validReadId =
+    typeof rawReadId === 'number' && isValidMp3quranReadId(rawReadId)
+      ? rawReadId
+      : undefined;
+  // A custom slug is accepted only when it carries a server-validated spec
+  // (folder or server URL) — otherwise the job falls back to the first
+  // built-in reciter so audio download can never target an unresolved slug.
+  const hasValidCustomSpec = Boolean(validFolder || validServer);
+  const validCustomSlugForm = /^[a-z0-9][a-z0-9._-]{0,63}$/.test(requestedReciterSlug);
+  const finalReciterSlug = matchedReciter
+    ? matchedReciter.slug
+    : hasValidCustomSpec && validCustomSlugForm
+      ? requestedReciterSlug
+      : RECITERS[0].slug;
   const meta: ExportJobMeta = {
     surahId: Math.max(1, Math.min(114, Math.floor(Number(rawMeta.surahId || 1)))),
     surahName:
@@ -223,11 +263,14 @@ export async function createExportSession(
         : undefined,
     fromAyah: Math.max(1, Math.floor(Number(rawMeta.fromAyah || 1))),
     toAyah: Math.max(1, Math.floor(Number(rawMeta.toAyah || 1))),
-    reciter: matchedReciter.slug,
+    reciter: finalReciterSlug,
     reciterName:
       typeof rawMeta.reciterName === 'string' && rawMeta.reciterName.trim()
         ? rawMeta.reciterName.trim().slice(0, 80)
-        : matchedReciter.name,
+        : matchedReciter?.name ?? RECITERS[0].name,
+    reciterFolder: validFolder,
+    reciterServer: validServer,
+    reciterReadId: validReadId,
     verseIds,
     verseTexts,
     baseWidth: Math.max(160, Math.floor(Number(rawMeta.baseWidth || 1080))),
@@ -316,7 +359,8 @@ export async function saveUploadedSlideBatch(
   slides: { index: number; ext: 'png' | 'jpg'; buffer: Buffer }[],
   audios: { index: number; buffer: Buffer }[] = [],
   backdropBuffer?: Buffer,
-  ambientFrames: { index: number; buffer: Buffer }[] = []
+  ambientFrames: { index: number; buffer: Buffer }[] = [],
+  overlayBuffer?: Buffer
 ): Promise<{ uploadedSlides: number; uploadedAudios: number }> {
   const dir = getJobDir(jobId);
   const status = await readJobStatus(jobId);
@@ -327,6 +371,11 @@ export async function saveUploadedSlideBatch(
   await Promise.all([
     ...(backdropBuffer && backdropBuffer.byteLength > 0
       ? [fs.writeFile(path.join(dir, 'backdrop.png'), backdropBuffer)]
+      : []),
+    // Ornament/grading overlay for bg-video exports (transparent PNG carrying
+    // the Islamic frame, pattern, LUT, vignette, banners and watermark).
+    ...(overlayBuffer && overlayBuffer.byteLength > 0
+      ? [fs.writeFile(path.join(dir, 'overlay.png'), overlayBuffer)]
       : []),
     // Animated ambient layer frames (stars/gold-dust particle sequence or single aurora frame)
     ...ambientFrames

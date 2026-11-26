@@ -185,7 +185,11 @@ export async function prepareExportAudio(
         }
 
         if (!alreadyFromCache) {
-          await downloadVerseAudio(meta.reciter, vid, mp3Path);
+          await downloadVerseAudio(meta.reciter, vid, mp3Path, {
+            folder: meta.reciterFolder,
+            server: meta.reciterServer,
+            readId: meta.reciterReadId,
+          });
         }
 
         const info = await probeAudioInfo(mp3Path);

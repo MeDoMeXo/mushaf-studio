@@ -6,14 +6,17 @@
  * changes are reported through the progress callbacks the modal passes in.
  */
 import type { QulVerse, StudioState } from '@/lib/quran-data';
+import { RECITERS } from '@/lib/quran-data';
 import { isBuiltinBackgroundId } from '@/lib/background-library';
 import { toArabicDigits } from '@/lib/quran-utils';
+import { resolveReciterOption } from '@/lib/reciter-filter';
+import { buildCustomReciterSpec } from '@/lib/custom-reciter-spec';
 import {
   drawStudioFrame,
   renderAmbientFrames,
   renderExportBackdropCanvas,
   renderStaticBackdropCanvas,
-  renderTransparentOverlayBackdropCanvas,
+  renderVideoOverlayCanvas,
 } from '@/lib/studio-renderer';
 import {
   getCachedVerseAudioBlob,
@@ -21,23 +24,18 @@ import {
 } from '@/lib/audio-cache';
 import {
   abortableSleep,
-  fetchVerifiedVideoBlob,
+  extractErrorMessage,
   fetchWithRateLimitRetry,
-  triggerDownload,
-  verifyAndDownload,
 } from '@/lib/export-network';
 import {
   BG_VIDEO_CHUNK_BYTES,
   BLOB_DOWNLOAD_MAX_BYTES,
   chunkIndices,
   EXPORT_SLIDE_BATCH_SIZE,
-  getPollIntervalMs,
-  getSlideImageEncoding,
   MAX_EXPORT_VERSES,
   resolveAmbientFrameSpecs,
   shouldRenderAnimatedAmbient,
   XFADE_MAX_SLIDES,
-  type ExportJobStatus,
   type VideoExportFormat,
   type VideoExportSettings,
 } from '@/lib/video-export';
@@ -46,7 +44,7 @@ import {
   INTRO_COVER_DURATION_SEC,
   resolveIntroCoverSlideCount,
 } from '@/lib/surah-cover';
-import { buildArabicExportFilename } from '@/lib/video-share';
+import { waitForExportCompletion } from './export-pipeline-poll';
 
 export interface ExportPipelineInput {
   studioState: StudioState;
@@ -81,16 +79,6 @@ export interface ExportPipelineCallbacks {
     localBlobUrl: string | null;
     localBlob: Blob | null;
   }) => void;
-}
-
-async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
-  try {
-    const json = (await res.json()) as { error?: string };
-    if (json.error) return json.error;
-  } catch {
-    // non-JSON proxy response
-  }
-  return `${fallback} (رمز ${res.status})`;
 }
 
 /**
@@ -138,6 +126,14 @@ export async function runExportPipeline(
   const includeIntroCover = exportSettings.includeIntroCover !== false;
   const totalSlides = resolveIntroCoverSlideCount(selectedVerses.length, includeIntroCover);
 
+  // Custom reciters are not in the server's static whitelist — send the
+  // validated wire spec so the export job can download/slice their verses.
+  const resolvedReciter = resolveReciterOption(studioState.reciter);
+  const isCustomReciter = !RECITERS.some((r) => r.slug === resolvedReciter.slug);
+  const reciterSpec = isCustomReciter
+    ? (buildCustomReciterSpec(resolvedReciter) ?? undefined)
+    : undefined;
+
   // Ensure selected Arabic font weight is loaded
   try {
     await document.fonts.load(
@@ -159,6 +155,9 @@ export async function runExportPipeline(
     toAyah: studioState.toAyah,
     reciter: studioState.reciter,
     reciterName,
+    reciterFolder: reciterSpec?.folder,
+    reciterServer: reciterSpec?.server,
+    reciterReadId: reciterSpec?.readId,
     verseIds: selectedVerses.map((v) => v.id),
     verseTexts: buildIntroAlignedVerseTexts(rawVerseTexts, includeIntroCover),
     slideCount: totalSlides,
@@ -311,6 +310,19 @@ export async function runExportPipeline(
     ? await new Promise<Blob | null>((res) => backdropCanvas.toBlob(res, 'image/png'))
     : null;
 
+  // Ornament overlay for animated video backgrounds: the bg-video FFmpeg path
+  // composites only [bg video] → [ambient] → [verse slides], which used to lose
+  // the Islamic frame (البرواز), pattern, LUT, vignette, banners and watermark
+  // entirely (preview/export parity break). This transparent PNG — carrying all
+  // of those layers — is uploaded once and composited between the ambient layer
+  // and the verse slides server-side.
+  const overlayCanvas = hasBgVideo
+    ? renderVideoOverlayCanvas(renderState, surahName, reciterName)
+    : null;
+  const overlayBlob = overlayCanvas
+    ? await new Promise<Blob | null>((res) => overlayCanvas.toBlob(res, 'image/png'))
+    : null;
+
   const uploadStartPct = hasBgVideo ? 12 : 4;
   const uploadSpanPct = hasBgVideo ? 22 : 30;
 
@@ -330,6 +342,9 @@ export async function runExportPipeline(
     const batchForm = new FormData();
     if (bIdx === 0 && backdropBlob) {
       batchForm.append('backdrop', backdropBlob, 'backdrop.png');
+    }
+    if (bIdx === 0 && overlayBlob) {
+      batchForm.append('overlay', overlayBlob, 'overlay.png');
     }
     if (bIdx === 0 && ambientFrames.length) {
       for (let f = 0; f < ambientFrames.length; f++) {
@@ -444,142 +459,20 @@ export async function runExportPipeline(
     throw new Error(await extractErrorMessage(startRes, 'تعذّر بدء ترميز الفيديو'));
   }
 
-  // 4) Poll real-time server progress with adaptive interval & patient 429 backoff (never abort on 429!)
-  const basePollMs = getPollIntervalMs(totalSlides);
-  let nextPollDelayMs = basePollMs;
-  let consecutivePollErrors = 0;
-  let rateLimitHits = 0;
-
-  while (true) {
-    if (signal.aborted) {
-      throw new DOMException('Export aborted', 'AbortError');
-    }
-    await abortableSleep(nextPollDelayMs, signal);
-
-    let pollRes: Response;
-    try {
-      pollRes = await fetch(
-        `/api/studio/export/session?id=${encodeURIComponent(jobId)}`,
-        {
-          method: 'GET',
-          cache: 'no-store',
-          signal,
-        }
-      );
-    } catch (pollErr) {
-      if (pollErr instanceof DOMException && pollErr.name === 'AbortError') throw pollErr;
-      consecutivePollErrors++;
-      if (consecutivePollErrors >= 8) {
-        throw new Error('انقطع الاتصال بالخادم أثناء متابعة التصدير — أعد المحاولة');
-      }
-      nextPollDelayMs = computeBackoff(consecutivePollErrors);
-      continue;
-    }
-
-    if (pollRes.status === 429 || isRetryableStatus(pollRes.status)) {
-      // Server is still rendering in the background; back off patiently instead of failing!
-      rateLimitHits++;
-      nextPollDelayMs = Math.max(basePollMs, computeBackoffWithHeader(rateLimitHits, pollRes.headers.get('retry-after')));
-      cb.onStageLabel('المعالجة مستمرة على الخادم — جاري انتظار تحديث الحالة...');
-      continue;
-    }
-
-    if (!pollRes.ok) {
-      consecutivePollErrors++;
-      if (pollRes.status === 404 || consecutivePollErrors >= 5) {
-        throw new Error(await extractErrorMessage(pollRes, 'تعذّر متابعة حالة التصدير'));
-      }
-      nextPollDelayMs = computeBackoff(consecutivePollErrors);
-      continue;
-    }
-
-    consecutivePollErrors = 0;
-    rateLimitHits = 0;
-    nextPollDelayMs = basePollMs;
-
-    const { status: jobStatus } = (await pollRes.json()) as { status: ExportJobStatus };
-    cb.onProgress(jobStatus.progressPct);
-    if (jobStatus.stageLabel) {
-      cb.onStageLabel(jobStatus.stageLabel);
-    }
-
-    if (jobStatus.stage === 'error') {
-      throw new Error(jobStatus.error || 'تعذّر معالجة وتصدير الفيديو');
-    }
-
-    if (jobStatus.stage === 'done' && jobStatus.result) {
-      const streamUrl = `/api/studio/export/download?id=${encodeURIComponent(jobId)}`;
-      const downloadUrl = `${streamUrl}&download=1`;
-      const outputFormat: VideoExportFormat =
-        jobStatus.result.format === 'webm' ? 'webm' : 'mp4';
-      const filename =
-        jobStatus.result.displayFilename ||
-        buildArabicExportFilename({
-          surahName,
-          fromAyah: studioState.fromAyah,
-          toAyah: studioState.toAyah,
-          reciterName,
-          format: outputFormat,
-        });
-
-      let localBlobUrl: string | null = null;
-      let localBlob: Blob | null = null;
-      if (jobStatus.result.sizeBytes <= BLOB_DOWNLOAD_MAX_BYTES) {
-        cb.onProgress(99);
-        cb.onStageLabel('جاري تحميل الملف النهائي والتحقق من سلامة التشغيل...');
-        const verified = await fetchVerifiedVideoBlob(
-          streamUrl,
-          outputFormat,
-          signal
-        );
-        localBlobUrl = verified?.url ?? null;
-        localBlob = verified?.blob ?? null;
-      }
-
-      cb.onExportSuccess({
-        filename,
-        format: outputFormat,
-        streamUrl,
-        downloadUrl,
-        srtUrl: selectedVerses.some((v) => (v.text_uthmani ?? '').trim())
-          ? `${streamUrl}&kind=srt`
-          : null,
-        sizeMb: (jobStatus.result.sizeBytes / (1024 * 1024)).toFixed(2),
-        durationSec: jobStatus.result.durationSec.toFixed(1),
-        renderSec: (jobStatus.result.renderMs / 1000).toFixed(1),
-        dimensions: jobStatus.result.dimensions,
-        isLocalBlob: Boolean(localBlobUrl),
-        localBlobUrl,
-        localBlob,
-      });
-
-      if (localBlobUrl) {
-        triggerDownload(localBlobUrl, filename);
-      } else {
-        void verifyAndDownload(streamUrl, downloadUrl, filename, outputFormat, {
-          localBlobUrl: null,
-          onErrorToast: cb.onErrorToast,
-        });
-      }
-      return;
-    }
-  }
-}
-
-// Thin wrappers keep the retry-policy imports in one place (audio-batch-codec).
-import {
-  computeRateLimitBackoffMs,
-  isRetryableHttpStatus,
-} from '@/lib/audio-batch-codec';
-
-function computeBackoff(attempt: number): number {
-  return computeRateLimitBackoffMs(attempt, null);
-}
-
-function computeBackoffWithHeader(attempt: number, retryAfter: string | null): number {
-  return computeRateLimitBackoffMs(attempt, retryAfter);
-}
-
-function isRetryableStatus(status: number): boolean {
-  return isRetryableHttpStatus(status);
+  // 4) Poll real-time server progress + report result + trigger download
+  // (adaptive interval, patient 429 backoff, verified blob download).
+  await waitForExportCompletion(
+    {
+      jobId,
+      signal,
+      totalSlides,
+      surahName,
+      fromAyah: studioState.fromAyah,
+      toAyah: studioState.toAyah,
+      reciterName,
+      hasVerseTexts: selectedVerses.some((v) => (v.text_uthmani ?? '').trim()),
+      blobDownloadMaxBytes: BLOB_DOWNLOAD_MAX_BYTES,
+    },
+    cb
+  );
 }

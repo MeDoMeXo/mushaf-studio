@@ -122,6 +122,7 @@ export async function PUT(req: NextRequest) {
     const audioBatch: { index: number; buffer: Buffer }[] = [];
     const ambientFrames: { index: number; buffer: Buffer }[] = [];
     let backdropBuffer: Buffer | undefined;
+    let overlayBuffer: Buffer | undefined;
 
     for (const [key, val] of formData.entries()) {
       if (!(val instanceof File)) continue;
@@ -130,6 +131,24 @@ export async function PUT(req: NextRequest) {
           return NextResponse.json({ error: 'حجم خلفية الفيديو يتجاوز الحد المسموح' }, { status: 413 });
         }
         backdropBuffer = Buffer.from(await val.arrayBuffer());
+        continue;
+      }
+      if (key === 'overlay') {
+        // Ornament/grading overlay PNG for bg-video exports (frame restoration).
+        if (val.size > MAX_UPLOADED_SLIDE_BYTES) {
+          return NextResponse.json(
+            { error: 'حجم طبقة البرواز يتجاوز الحد المسموح' },
+            { status: 413 }
+          );
+        }
+        const head = new Uint8Array(await val.slice(0, 12).arrayBuffer());
+        if (!isValidUploadedMediaHeader(head, 'png')) {
+          return NextResponse.json(
+            { error: 'صيغة طبقة البرواز غير صالحة — يُسمح بصور PNG فقط' },
+            { status: 415 }
+          );
+        }
+        overlayBuffer = Buffer.from(await val.arrayBuffer());
         continue;
       }
       // Animated ambient particle/aurora frames (transparent PNGs, tiny ~4-8KB each)
@@ -196,11 +215,11 @@ export async function PUT(req: NextRequest) {
       }
     }
 
-    if (!batch.length && !audioBatch.length && !backdropBuffer && !ambientFrames.length) {
+    if (!batch.length && !audioBatch.length && !backdropBuffer && !ambientFrames.length && !overlayBuffer) {
       return NextResponse.json({ error: 'لم يتم إرفاق شرائح في هذه الدفعة' }, { status: 400 });
     }
 
-    const res = await saveUploadedSlideBatch(jobId, batch, audioBatch, backdropBuffer, ambientFrames);
+    const res = await saveUploadedSlideBatch(jobId, batch, audioBatch, backdropBuffer, ambientFrames, overlayBuffer);
     return NextResponse.json(res, { status: 200 });
   } catch (err) {
     console.error(`[studio/export/session:PUT:${jobId}] failed:`, err);

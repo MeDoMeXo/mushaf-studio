@@ -170,3 +170,14 @@ export async function verifyAndDownload(
     return false;
   }
 }
+
+/** Extracts a JSON error message from a failed response, with an Arabic fallback. */
+export async function extractErrorMessage(res: Response, fallback: string): Promise<string> {
+  try {
+    const json = (await res.json()) as { error?: string };
+    if (json.error) return json.error;
+  } catch {
+    // non-JSON proxy response
+  }
+  return `${fallback} (رمز ${res.status})`;
+}

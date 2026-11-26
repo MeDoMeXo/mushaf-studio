@@ -42,10 +42,27 @@ export function drawMainText(
 
   let arLines: string[] = [];
   let trLines: string[] = [];
+  // Effective Arabic font size — the requested size in wrap mode; in
+  // single-line mode long verses auto-shrink to fit the text column width
+  // (floor: 30% of the requested size so extreme surahs stay readable).
+  let arFontSize = primaryFontSize;
 
   if (showArabic && arabicText) {
     ctx.font = `${weight} ${primaryFontSize}px ${primaryFontStack}`;
-    arLines = wrapWordsToLines(arabicText, maxW, (ln) => ctx.measureText(ln).width);
+    if ((state.verseLineMode || 'wrap') === 'single') {
+      const fullWidth = ctx.measureText(arabicText).width;
+      if (fullWidth > maxW && fullWidth > 0) {
+        const fit = maxW / fullWidth;
+        arFontSize = Math.max(
+          Math.round(primaryFontSize * 0.3),
+          Math.floor(primaryFontSize * fit)
+        );
+      }
+      ctx.font = `${weight} ${arFontSize}px ${primaryFontStack}`;
+      arLines = [arabicText];
+    } else {
+      arLines = wrapWordsToLines(arabicText, maxW, (ln) => ctx.measureText(ln).width);
+    }
   }
 
   const transFontSize = Math.max(
@@ -60,16 +77,16 @@ export function drawMainText(
     trLines = wrapWordsToLines(translationText, maxW * 0.88, (ln) => ctx.measureText(ln).width);
   }
 
-  const arLineHeight = primaryFontSize * state.lineHeight;
+  const arLineHeight = arFontSize * state.lineHeight;
   const trLineHeight = transFontSize * 1.55;
-  const medallionRadius = Math.max(16, Math.round(primaryFontSize * 0.43));
+  const medallionRadius = Math.max(16, Math.round(arFontSize * 0.43));
   const medallionPad = Math.round(medallionRadius * 0.55);
 
   // Measure whether the Islamic ayah medallion fits inline at the end (left edge in RTL) of the last Arabic line
   let medallionInline = false;
   let lastArLineWidth = 0;
   if (showMedallion && arLines.length > 0) {
-    ctx.font = `${weight} ${primaryFontSize}px ${primaryFontStack}`;
+    ctx.font = `${weight} ${arFontSize}px ${primaryFontStack}`;
     lastArLineWidth = ctx.measureText(arLines[arLines.length - 1]).width;
     const neededExtra = medallionRadius * 2 + medallionPad;
     medallionInline = lastArLineWidth + neededExtra <= maxW * 1.04;
@@ -110,7 +127,7 @@ export function drawMainText(
   let lastArLineY = y;
 
   if (arLines.length > 0) {
-    ctx.font = `${weight} ${primaryFontSize}px ${primaryFontStack}`;
+    ctx.font = `${weight} ${arFontSize}px ${primaryFontStack}`;
     ctx.fillStyle = state.textColor;
     ctx.direction = 'rtl';
     y += arLineHeight / 2;
@@ -119,10 +136,10 @@ export function drawMainText(
     const needsSyntheticBold = state.fontFamily === 'Amiri Quran' && weight >= 600;
     const strokeWidth =
       weight >= 800
-        ? primaryFontSize * 0.036
+        ? arFontSize * 0.036
         : weight >= 700
-          ? primaryFontSize * 0.025
-          : primaryFontSize * 0.015;
+          ? arFontSize * 0.025
+          : arFontSize * 0.015;
 
     for (let idx = 0; idx < arLines.length; idx++) {
       const line = arLines[idx];

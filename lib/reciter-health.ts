@@ -1,7 +1,7 @@
 /**
  * Reciter health check — HEAD-request probe of every reciter's CDN audio.
  *
- * The RECITERS list (38 reciters) is maintained by hand; a folder rename or
+ * The RECITERS list (49 reciters) is maintained by hand; a folder rename or
  * bitrate change on the upstream CDNs (cdn.islamic.network / everyayah.com)
  * breaks a reciter silently until a user hits a 502. This module resolves
  * each reciter's upstream URL for a sample verse (Al-Fatiha 1:1) and issues a

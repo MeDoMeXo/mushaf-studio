@@ -48,6 +48,8 @@ export function buildInitialStudioState(
     align: 'center',
     shadow: true,
     glow: false,
+    verseLineMode: 'wrap',
+    hideVerses: false,
     goldFrame: true,
     corners: true,
     frameStyle: 'mushaf',
