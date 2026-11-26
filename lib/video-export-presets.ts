@@ -62,6 +62,12 @@ export interface ExportQualityPreset {
 
 export const EXPORT_QUALITY_PRESETS: ExportQualityPreset[] = [
   {
+    id: 'youtube_wide',
+    label: 'يوتيوب عريض 16:9 (عالية الجودة)',
+    description: 'أوضح خط للآيات على الشاشة الكاملة — اضبط الأبعاد على «YouTube 16:9».',
+    patch: { format: 'mp4', resolution: '1080p', fps: 30, quality: 'high', audioBitrate: 320 },
+  },
+  {
     id: 'reels_1080',
     label: 'Reels / Shorts عالي (1080p · 30fps)',
     description: 'مثالي لإنستغرام وتيك توك ويوتيوب شورتس.',

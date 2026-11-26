@@ -7,7 +7,7 @@
 import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { toArabicDigits } from '@/lib/quran-utils';
-import { buildSrtFromTimeline } from '@/lib/srt-subtitles';
+import { buildExportSrtBodies } from './export-srt-emit';
 import {
   buildFfmpegConcatSlidesManifest,
   getConcatSlideFadeSec,
@@ -415,48 +415,24 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
     const renderMs = Date.now() - renderStarted;
 
-    // Roadmap item 5: emit a synchronized SRT subtitle track alongside the
+    // Roadmap item 5: emit synchronized SRT subtitle tracks alongside the
     // video, derived from the exact normalized durations the concat manifest
     // was built from — subtitles can never drift from the rendered timeline.
+    // Arabic (Uthmani) + English translation track share the same cue grid.
     if (Array.isArray(meta.verseTexts) && meta.verseTexts.some((t) => t && t.trim())) {
       try {
-        // Karaoke: word slides of one verse merge into a single SRT cue — the
-        // verse text rides its first word slide and spans the whole verse.
-        let srtDurations = normalizedDurs;
-        let srtTexts = meta.verseTexts;
-        if (isKaraoke) {
-          const introOffset = meta.includeIntroCover ? 1 : 0;
-          const restDur = normalizedDurs.slice(introOffset);
-          const restTexts = (meta.verseTexts ?? []).slice(introOffset);
-          const mDurs: number[] = [];
-          const mTexts: string[] = [];
-          let accDur = 0;
-          let accText = '';
-          for (let i = 0; i < restDur.length; i++) {
-            const t = (restTexts[i] ?? '').trim();
-            if (t && accText) {
-              mDurs.push(accDur);
-              mTexts.push(accText);
-              accDur = 0;
-              accText = '';
-            }
-            if (t && !accText) accText = t;
-            accDur += restDur[i];
-          }
-          if (accText) {
-            mDurs.push(accDur);
-            mTexts.push(accText);
-          }
-          srtDurations = introOffset
-            ? [normalizedDurs[0], ...mDurs]
-            : mDurs;
-          srtTexts = introOffset
-            ? ['', ...mTexts]
-            : mTexts;
+        const { srtAr, srtEn } = buildExportSrtBodies({
+          normalizedDurs,
+          verseTexts: meta.verseTexts ?? [],
+          verseTranslations: meta.verseTranslations,
+          isKaraoke,
+          includeIntroCover: meta.includeIntroCover !== false,
+        });
+        if (srtAr) {
+          await fs.writeFile(path.join(getJobDir(jobId), 'output.srt'), srtAr, 'utf8');
         }
-        const srtBody = buildSrtFromTimeline(srtDurations, srtTexts);
-        if (srtBody) {
-          await fs.writeFile(path.join(getJobDir(jobId), 'output.srt'), srtBody, 'utf8');
+        if (srtEn) {
+          await fs.writeFile(path.join(getJobDir(jobId), 'output_en.srt'), srtEn, 'utf8');
         }
       } catch (err) {
         console.warn(`[studio/export/job:${jobId}] SRT generation skipped:`, err);

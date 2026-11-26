@@ -15,7 +15,7 @@ import {
 import { type AudioCacheProgress } from '@/lib/audio-cache';
 import { runExportPipeline } from '@/lib/export-pipeline';
 import { buildKaraokeExportPlan } from '@/lib/export-karaoke-plan';
-import type { QulVerse, StudioState } from '@/lib/quran-data';
+import type { AspectPresetId, QulVerse, StudioState } from '@/lib/quran-data';
 import { resolveTranslationOption, toArabicDigits } from '@/lib/quran-utils';
 import { ExportCompletedCard, type ExportCompletedMeta } from './studio-ui/ExportCompletedCard';
 import { ExportSettingsSections } from './studio-ui/ExportSettingsSections';
@@ -36,6 +36,10 @@ interface StudioExportModalProps {
   onUpdateExportSettings: (patch: Partial<VideoExportSettings>) => void;
   selectedVerses: QulVerse[];
   surahName: string;
+  /** English chapter name (QUL name_simple) for the YouTube publish kit. */
+  surahNameEn?: string | null;
+  /** True when the selected range covers the whole surah. */
+  isFullSurah?: boolean;
   reciterName: string;
   getBgImageEl: () => HTMLImageElement | null;
   bgVideoFile: File | null;
@@ -44,6 +48,7 @@ interface StudioExportModalProps {
   customAudioName: string;
   audioCache: AudioCacheProgress;
   onOpenFullscreen?: () => void;
+  onAspectSelect?: (aspect: AspectPresetId) => void;
   onExportSuccess: (filename: string) => void;
   onErrorToast: (msg: string) => void;
 }
@@ -58,6 +63,8 @@ export function StudioExportModal({
   onUpdateExportSettings,
   selectedVerses,
   surahName,
+  surahNameEn,
+  isFullSurah,
   reciterName,
   getBgImageEl,
   bgVideoFile,
@@ -66,6 +73,7 @@ export function StudioExportModal({
   customAudioName,
   audioCache,
   onOpenFullscreen,
+  onAspectSelect,
   onExportSuccess,
   onErrorToast,
 }: StudioExportModalProps) {
@@ -478,6 +486,15 @@ export function StudioExportModal({
                   exportedMeta={exportedMeta}
                   exportedBlob={exportedBlob}
                   surahName={surahName}
+                  surahNameEn={surahNameEn}
+                  isFullSurah={isFullSurah}
+                  translationName={
+                    studioState.textSource !== 'uthmani' ? activeTranslation.name : null
+                  }
+                  selectedVerses={selectedVerses}
+                  studioState={studioState}
+                  targetDims={targetDims}
+                  getBgImageEl={getBgImageEl}
                   fromAyah={studioState.fromAyah}
                   toAyah={studioState.toAyah}
                   reciterName={reciterName}
@@ -493,6 +510,7 @@ export function StudioExportModal({
                 surahName={surahName}
                 reciterName={reciterName}
                 getBgImageEl={getBgImageEl}
+                onAspectSelect={onAspectSelect}
                 onOpenFullscreen={() => {
                   onClose();
                   onOpenFullscreen?.();

@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { Captions, Check, CheckCircle2, Copy, Download, Share2, Upload } from 'lucide-react';
+import { Captions, Check, CheckCircle2, Copy, Download, Image as ImageIcon, Loader2, Share2, Upload } from 'lucide-react';
 import type { VideoExportFormat } from '@/lib/video-export';
 import { verifyAndDownload } from '@/lib/export-network';
 import {
@@ -12,6 +12,12 @@ import {
   shareExportedVideoFile,
   YOUTUBE_UPLOAD_URL,
 } from '@/lib/video-share';
+import {
+  downloadExportThumbnail,
+  renderExportThumbnail,
+} from '@/lib/export-thumbnail';
+import type { QulVerse, StudioState } from '@/lib/quran-data';
+import { YouTubePublishKit } from './YouTubePublishKit';
 
 export interface ExportCompletedMeta {
   filename: string;
@@ -19,6 +25,7 @@ export interface ExportCompletedMeta {
   streamUrl: string;
   downloadUrl: string;
   srtUrl: string | null;
+  srtEnUrl: string | null;
   sizeMb: string;
   durationSec: string;
   renderSec: string;
@@ -31,6 +38,13 @@ interface ExportCompletedCardProps {
   exportedMeta: ExportCompletedMeta;
   exportedBlob: Blob | null;
   surahName: string;
+  surahNameEn?: string | null;
+  isFullSurah?: boolean;
+  translationName?: string | null;
+  selectedVerses: QulVerse[];
+  studioState: StudioState;
+  targetDims: { width: number; height: number };
+  getBgImageEl: () => HTMLImageElement | null;
   fromAyah: number;
   toAyah: number;
   reciterName: string;
@@ -42,6 +56,13 @@ export function ExportCompletedCard({
   exportedMeta,
   exportedBlob,
   surahName,
+  surahNameEn,
+  isFullSurah,
+  translationName,
+  selectedVerses,
+  studioState,
+  targetDims,
+  getBgImageEl,
   fromAyah,
   toAyah,
   reciterName,
@@ -50,6 +71,8 @@ export function ExportCompletedCard({
   const [videoPreviewError, setVideoPreviewError] = useState<string | null>(null);
   const [shareBusy, setShareBusy] = useState(false);
   const [copiedKind, setCopiedKind] = useState<'title' | 'desc' | null>(null);
+  const [thumbBusy, setThumbBusy] = useState(false);
+  const [thumbFeedback, setThumbFeedback] = useState<string | null>(null);
   const [shareFeedback, setShareFeedback] = useState<{
     tone: 'success' | 'info' | 'error';
     text: string;
@@ -132,9 +155,37 @@ export function ExportCompletedCard({
     copyText(formatShareCaptionForClipboard(shareMeta), 'desc');
     setShareFeedback({
       tone: 'info',
-      text: `تم فتح نافذة رفع يوتيوب ونسخ الوصف للحافظة. اسحب ملف (${exportedMeta.filename}) من التنزيلات وأفلته في النافذة — سيظهر العنوان تلقائياً بالعربية، ولا يمكن لأي موقع رفع الملف داخل يوتيوب آلياً بدون ربط حساب.`,
+      text: `تم فتح نافذة رفع يوتيوب ونسخ الوصف للحافظة. اسحب ملف (${exportedMeta.filename}) من التنزيلات وأفلته في النافذة — ثم الصق العنوان والوصف والتاغات من «حزمة النشر» أدناه.`,
     });
   };
+
+  const handleDownloadThumbnail = async () => {
+    if (thumbBusy) return;
+    setThumbBusy(true);
+    setThumbFeedback(null);
+    try {
+      const result = await renderExportThumbnail({
+        studioState,
+        targetDims,
+        surahName,
+        reciterName,
+        getBgImageEl,
+      });
+      if (result && downloadExportThumbnail(result)) {
+        setThumbFeedback(
+          `تم تنزيل صورة المصغرة (${result.filename}) بأبعاد ${targetDims.width}×${targetDims.height} — جاهزة للرفع في خانة Thumbnail بـ YouTube Studio.`
+        );
+      } else {
+        setThumbFeedback(
+          'تعذّر توليد صورة المصغرة في هذا المتصفح — استخدم تصدير PNG من الاستوديو كبديل.'
+        );
+      }
+    } finally {
+      setThumbBusy(false);
+    }
+  };
+
+  const hasSrt = Boolean(exportedMeta.srtUrl);
 
   return (
     <div className="space-y-3 rounded-xl border border-emerald-600/35 bg-emerald-600/8 p-4">
@@ -188,7 +239,7 @@ export function ExportCompletedCard({
           onClick={() => void handleNativeShare()}
           className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--brand-gold)] bg-[var(--brand-gold)]/18 px-4 py-2.5 text-sm font-bold text-[var(--ink-primary)] transition-colors hover:bg-[var(--brand-gold)]/28 disabled:opacity-50"
         >
-          <Share2 className="h-4 w-4 shrink-0 text-[var(--brand-emerald)] dark:text-[#E6C75A]" aria-hidden="true" />
+          <Share2 className="h-4 w-4 shrink-0" aria-hidden="true" />
           <span>{isMobile ? 'مشاركة مباشرة (YouTube · Instagram)' : 'مشاركة النظام (Instagram · WhatsApp)'}</span>
         </button>
       </div>
@@ -225,7 +276,8 @@ export function ExportCompletedCard({
         </p>
       </div>
 
-      <div className={`grid grid-cols-1 gap-2 ${exportedMeta.srtUrl ? 'sm:grid-cols-2' : ''}`}>
+      {/* Upload-ready assets: YouTube upload page + AR/EN subtitles + thumbnail */}
+      <div className={`grid grid-cols-1 gap-2 ${hasSrt ? 'sm:grid-cols-2' : ''}`}>
         <a
           href={YOUTUBE_UPLOAD_URL}
           target="_blank"
@@ -238,17 +290,69 @@ export function ExportCompletedCard({
           <span>فتح صفحة رفع YouTube (نسخ الوصف)</span>
         </a>
 
+        <button
+          type="button"
+          disabled={thumbBusy}
+          data-testid="download-thumbnail-btn"
+          onClick={() => void handleDownloadThumbnail()}
+          className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--brand-gold)]/60 bg-[var(--surface-card)] px-4 py-2 text-xs font-bold text-[var(--ink-primary)] transition-colors hover:border-[var(--brand-gold)] disabled:opacity-50"
+        >
+          {thumbBusy ? (
+            <Loader2 className="h-4 w-4 shrink-0 animate-spin" aria-hidden="true" />
+          ) : (
+            <ImageIcon className="h-4 w-4 shrink-0" aria-hidden="true" />
+          )}
+          <span>تنزيل صورة المصغرة (Thumbnail)</span>
+        </button>
+
         {exportedMeta.srtUrl && (
           <a
             href={exportedMeta.srtUrl}
             download={exportedMeta.filename.replace(/\.(mp4|webm)$/i, '.srt')}
+            data-testid="download-srt-ar-link"
             className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--brand-gold)]/60 bg-[var(--surface-card)] px-4 py-2 text-xs font-bold text-[var(--ink-primary)] transition-colors hover:border-[var(--brand-gold)]"
           >
             <Captions className="h-4 w-4 shrink-0" aria-hidden="true" />
-            <span>تنزيل الترجمة المتزامنة (SRT)</span>
+            <span>ترجمة متزامنة عربية (SRT)</span>
+          </a>
+        )}
+
+        {exportedMeta.srtEnUrl && (
+          <a
+            href={exportedMeta.srtEnUrl}
+            download={exportedMeta.filename.replace(/\.(mp4|webm)$/i, '.en.srt')}
+            data-testid="download-srt-en-link"
+            className="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-[var(--brand-gold)]/60 bg-[var(--surface-card)] px-4 py-2 text-xs font-bold text-[var(--ink-primary)] transition-colors hover:border-[var(--brand-gold)]"
+          >
+            <Captions className="h-4 w-4 shrink-0" aria-hidden="true" />
+            <span>English Subtitles (SRT)</span>
           </a>
         )}
       </div>
+
+      {thumbFeedback && (
+        <p
+          role="status"
+          className="rounded-lg border border-emerald-600/40 bg-emerald-600/10 px-3 py-2 text-xs font-semibold text-emerald-900 dark:text-emerald-200"
+        >
+          {thumbFeedback}
+        </p>
+      )}
+
+      {/* Full YouTube metadata pack: bilingual titles/descriptions/tags + chapters */}
+      <YouTubePublishKit
+        surahNameAr={surahName}
+        surahNameEn={surahNameEn}
+        fromAyah={fromAyah}
+        toAyah={toAyah}
+        verseCount={selectedVerses.length}
+        isFullSurah={isFullSurah}
+        reciterName={reciterName}
+        translationName={translationName}
+        selectedVerses={selectedVerses}
+        srtUrl={exportedMeta.srtUrl}
+        durationSec={exportedMeta.durationSec}
+      />
 
       {shareFeedback && (
         <p

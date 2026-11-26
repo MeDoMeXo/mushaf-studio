@@ -549,7 +549,13 @@ export function StudioView() {
           onUpdateExportSettings={updateExportSettings}
           selectedVerses={selectedVerses}
           surahName={currentChapter?.name_arabic ?? 'الفاتحة'}
+          surahNameEn={currentChapter?.name_simple ?? null}
+          isFullSurah={
+            state.fromAyah === 1 &&
+            state.toAyah === (currentChapter?.verses_count ?? state.toAyah)
+          }
           reciterName={activeReciterObj.name}
+          onAspectSelect={handleAspectSelect}
           getBgImageEl={() => bgImgElRef.current}
           bgVideoFile={bgVideoFile}
           bgVideoName={bgVideoName}

@@ -39,9 +39,11 @@ export function getCrfForQuality(
   quality: VideoQualityTier
 ): number {
   if (format === 'mp4') {
-    return quality === 'high' ? 20 : quality === 'compact' ? 28 : 24;
+    // Crisper Arabic calligraphy: lower CRF = higher fidelity. 'high' targets
+    // visually lossless glyph edges for readable verses on YouTube fullscreen.
+    return quality === 'high' ? 18 : quality === 'compact' ? 27 : 22;
   }
-  return quality === 'high' ? 24 : quality === 'compact' ? 36 : 30;
+  return quality === 'high' ? 22 : quality === 'compact' ? 34 : 28;
 }
 
 export interface VideoBitrateBounds {
@@ -51,7 +53,9 @@ export interface VideoBitrateBounds {
 
 /**
  * Returns resolution- and quality-tiered bitrate bounds (-maxrate and -bufsize)
- * to keep exported Quran videos compact without sacrificing crisp typography.
+ * so exported Quran videos stay compact WITHOUT sacrificing crisp typography:
+ * the caps are raised for the 'high' tier because thin calligraphic strokes
+ * and diacritics are the first thing x264 rate-control smears at low rates.
  */
 export function resolveVideoBitrateBounds(
   resolution: VideoResolutionTier,
@@ -61,45 +65,46 @@ export function resolveVideoBitrateBounds(
   if (hasBgVideo) {
     if (resolution === '1080p') {
       return quality === 'high'
-        ? { maxrate: '3500k', bufsize: '7000k' }
+        ? { maxrate: '5000k', bufsize: '10000k' }
         : quality === 'compact'
           ? { maxrate: '1800k', bufsize: '3600k' }
-          : { maxrate: '2600k', bufsize: '5200k' };
+          : { maxrate: '3400k', bufsize: '6800k' };
     }
     if (resolution === '720p') {
       return quality === 'high'
-        ? { maxrate: '2000k', bufsize: '4000k' }
+        ? { maxrate: '2800k', bufsize: '5600k' }
         : quality === 'compact'
           ? { maxrate: '1100k', bufsize: '2200k' }
-          : { maxrate: '1500k', bufsize: '3000k' };
+          : { maxrate: '2000k', bufsize: '4000k' };
     }
     return quality === 'high'
-      ? { maxrate: '1100k', bufsize: '2200k' }
+      ? { maxrate: '1600k', bufsize: '3200k' }
       : quality === 'compact'
         ? { maxrate: '600k', bufsize: '1200k' }
-        : { maxrate: '850k', bufsize: '1700k' };
+        : { maxrate: '1100k', bufsize: '2200k' };
   }
 
-  // Static slides without video backgrounds: bounded rates save 65-80% file size on long surahs
+  // Static slides without video backgrounds: bounded rates save 50-75% file
+  // size on long surahs while the 'high' tier keeps full glyph fidelity.
   if (resolution === '1080p') {
     return quality === 'high'
-      ? { maxrate: '1500k', bufsize: '3000k' }
+      ? { maxrate: '2400k', bufsize: '4800k' }
       : quality === 'compact'
         ? { maxrate: '650k', bufsize: '1300k' }
-        : { maxrate: '1000k', bufsize: '2000k' };
+        : { maxrate: '1400k', bufsize: '2800k' };
   }
   if (resolution === '720p') {
     return quality === 'high'
-      ? { maxrate: '900k', bufsize: '1800k' }
+      ? { maxrate: '1500k', bufsize: '3000k' }
       : quality === 'compact'
         ? { maxrate: '450k', bufsize: '900k' }
-        : { maxrate: '650k', bufsize: '1300k' };
+        : { maxrate: '950k', bufsize: '1900k' };
   }
   return quality === 'high'
-    ? { maxrate: '550k', bufsize: '1100k' }
+    ? { maxrate: '900k', bufsize: '1800k' }
     : quality === 'compact'
       ? { maxrate: '280k', bufsize: '560k' }
-      : { maxrate: '400k', bufsize: '800k' };
+      : { maxrate: '600k', bufsize: '1200k' };
 }
 
 /**
@@ -202,7 +207,7 @@ export function estimateExportSizeMb(params: {
   const fpsFactor = params.fps / 30;
   // Static/gentle-transition Quranic slides compress very efficiently with x264
   const baseVideoKbps =
-    params.quality === 'high' ? 1400 : params.quality === 'compact' ? 500 : 900;
+    params.quality === 'high' ? 1900 : params.quality === 'compact' ? 500 : 1100;
   const totalKbps = baseVideoKbps * Math.max(0.25, pixelFactor) * Math.sqrt(fpsFactor) + params.audioBitrateKbps;
   const mb = (totalKbps * safeDur) / 8 / 1024;
   return Math.max(0.2, Number(mb.toFixed(1)));
@@ -383,20 +388,23 @@ export function buildVideoBackgroundFilterGraph(params: {
 }
 
 /**
- * Selects optimal slide image encoding so each batch stays well below Cloud Run's 32MB request cap.
+ * Selects optimal slide image encoding so each batch stays well below request caps.
+ * PNG (lossless glyph edges) stays the default up to 80 slides; longer word-
+ * tracking exports switch to high-quality JPEG to keep total upload size sane
+ * — 0.94 JPEG keeps Arabic diacritics visually crisp at 1080p.
  */
 export function getSlideImageEncoding(slideCount: number): {
   mime: 'image/png' | 'image/jpeg';
   ext: 'png' | 'jpg';
   quality?: number;
 } {
-  if (slideCount <= 30) {
+  if (slideCount <= 80) {
     return { mime: 'image/png', ext: 'png' };
   }
-  if (slideCount <= 80) {
-    return { mime: 'image/jpeg', ext: 'jpg', quality: 0.9 };
+  if (slideCount <= 200) {
+    return { mime: 'image/jpeg', ext: 'jpg', quality: 0.94 };
   }
-  return { mime: 'image/jpeg', ext: 'jpg', quality: 0.84 };
+  return { mime: 'image/jpeg', ext: 'jpg', quality: 0.9 };
 }
 
 export function chunkIndices(

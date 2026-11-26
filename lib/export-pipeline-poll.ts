@@ -33,6 +33,8 @@ export interface ExportPollContext {
   reciterName: string;
   /** Whether any selected verse carries Uthmani text (SRT availability). */
   hasVerseTexts: boolean;
+  /** Whether any selected verse carries a translation (English SRT availability). */
+  hasVerseTranslations: boolean;
   /** Max blob size (bytes) eligible for local verified download. */
   blobDownloadMaxBytes: number;
 }
@@ -156,6 +158,7 @@ export async function waitForExportCompletion(
         streamUrl,
         downloadUrl,
         srtUrl: ctx.hasVerseTexts ? `${streamUrl}&kind=srt` : null,
+        srtEnUrl: ctx.hasVerseTranslations ? `${streamUrl}&kind=srt&lang=en` : null,
         sizeMb: (jobStatus.result.sizeBytes / (1024 * 1024)).toFixed(2),
         durationSec: jobStatus.result.durationSec.toFixed(1),
         renderSec: (jobStatus.result.renderMs / 1000).toFixed(1),

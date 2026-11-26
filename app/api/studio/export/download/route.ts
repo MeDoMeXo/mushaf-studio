@@ -31,13 +31,19 @@ export async function GET(req: NextRequest) {
   const jobDir = getJobDir(jobId);
 
   if (kind === 'srt') {
-    const srtPath = path.join(jobDir, 'output.srt');
+    // lang=en streams the translation track (output_en.srt); default is the
+    // Arabic Uthmani track. Both share the same timeline grid.
+    const lang = req.nextUrl.searchParams.get('lang');
+    const srtPath = path.join(
+      jobDir,
+      lang === 'en' ? 'output_en.srt' : 'output.srt'
+    );
     try {
       const srtBody = await fs.readFile(srtPath, 'utf8');
       const baseAscii = buildSrtDownloadFilename(status.result.filename);
       const displaySrt = (status.result.displayFilename || baseAscii).replace(
         /\.(mp4|webm|srt)$/i,
-        '.srt'
+        lang === 'en' ? '.en.srt' : '.srt'
       );
       return new NextResponse(srtBody, {
         status: 200,

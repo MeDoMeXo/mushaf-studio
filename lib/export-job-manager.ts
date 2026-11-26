@@ -57,6 +57,8 @@ export interface ExportJobMeta {
   verseIds: number[];
   /** Optional index-aligned verse texts (Uthmani) for synchronized SRT output. */
   verseTexts?: string[];
+  /** Optional index-aligned verse translations for the English SRT track. */
+  verseTranslations?: string[];
   /** Karaoke word/segment timeline — per-slide entries whose durations split the verse audio. */
   wordTimeline?: KaraokeWordTimelineEntry[];
   baseWidth: number;
@@ -269,6 +271,13 @@ export async function createExportSession(
         .map((t) => String(typeof t === 'string' ? t : '').slice(0, 500))
     : undefined;
 
+  // English SRT track source — same alignment discipline as verseTexts.
+  const verseTranslations = Array.isArray(rawMeta.verseTranslations)
+    ? rawMeta.verseTranslations
+        .slice(0, slideCount)
+        .map((t) => String(typeof t === 'string' ? t : '').slice(0, 900))
+    : undefined;
+
   const requestedReciterSlug = typeof rawMeta.reciter === 'string' ? rawMeta.reciter : '';
   const matchedReciter = RECITERS.find((r) => r.slug === requestedReciterSlug);
   // Custom-reciter wire spec: built-ins ignore it entirely (whitelist stays
@@ -317,6 +326,7 @@ export async function createExportSession(
     reciterReadId: validReadId,
     verseIds,
     verseTexts,
+    verseTranslations,
     wordTimeline: wordTimeline && wordTimeline.length ? wordTimeline : undefined,
     baseWidth: Math.max(160, Math.floor(Number(rawMeta.baseWidth || 1080))),
     baseHeight: Math.max(160, Math.floor(Number(rawMeta.baseHeight || 1920))),

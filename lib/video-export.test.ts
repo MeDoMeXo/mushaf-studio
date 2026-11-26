@@ -44,30 +44,37 @@ test('resolveExportDimensions produces even dimensions preserving aspect ratio',
 });
 
 test('getCrfForQuality maps mp4 and webm quality tiers properly', () => {
-  assert.equal(getCrfForQuality('mp4', 'high'), 20);
-  assert.equal(getCrfForQuality('mp4', 'balanced'), 24);
-  assert.equal(getCrfForQuality('mp4', 'compact'), 28);
+  // 2026-11-26: 'high' targets visually lossless calligraphy (CRF 18) for
+  // readable verses on YouTube fullscreen; tiers stay strictly decreasing.
+  assert.equal(getCrfForQuality('mp4', 'high'), 18);
+  assert.equal(getCrfForQuality('mp4', 'balanced'), 22);
+  assert.equal(getCrfForQuality('mp4', 'compact'), 27);
   assert.ok(getCrfForQuality('webm', 'high') < getCrfForQuality('webm', 'compact'));
 });
 
 test('resolveVideoBitrateBounds sets bounded rates for static slides and video backgrounds', () => {
-  // Static slides: strict capping to prevent bloated x264 exports
+  // Static slides: raised 'high' caps keep thin diacritic strokes crisp while
+  // long-surah exports stay far below unbounded single-pass rates.
   const slide1080Balanced = resolveVideoBitrateBounds('1080p', 'balanced', false);
-  assert.equal(slide1080Balanced.maxrate, '1000k');
-  assert.equal(slide1080Balanced.bufsize, '2000k');
+  assert.equal(slide1080Balanced.maxrate, '1400k');
+  assert.equal(slide1080Balanced.bufsize, '2800k');
+
+  const slide1080High = resolveVideoBitrateBounds('1080p', 'high', false);
+  assert.equal(slide1080High.maxrate, '2400k');
+  assert.equal(slide1080High.bufsize, '4800k');
 
   const slide720Compact = resolveVideoBitrateBounds('720p', 'compact', false);
   assert.equal(slide720Compact.maxrate, '450k');
   assert.equal(slide720Compact.bufsize, '900k');
 
   const slide480High = resolveVideoBitrateBounds('480p', 'high', false);
-  assert.equal(slide480High.maxrate, '550k');
-  assert.equal(slide480High.bufsize, '1100k');
+  assert.equal(slide480High.maxrate, '900k');
+  assert.equal(slide480High.bufsize, '1800k');
 
   // Video backgrounds: higher ceilings to preserve camera motion and grain
   const video1080High = resolveVideoBitrateBounds('1080p', 'high', true);
-  assert.equal(video1080High.maxrate, '3500k');
-  assert.equal(video1080High.bufsize, '7000k');
+  assert.equal(video1080High.maxrate, '5000k');
+  assert.equal(video1080High.bufsize, '10000k');
 });
 
 test('calculateTransitionProgress computes normalized progress for playback and manual transitions', () => {
@@ -186,11 +193,16 @@ test('200-verse chunking, static-slide FPS optimization, image encoding tiers, a
   assert.equal(getEffectiveExportFps(60, 200, 'fade'), 15);
   assert.equal(getEffectiveExportFps(30, 286, 'fade'), 15);
 
+  // 2026-11-26: PNG (lossless glyph edges) up to 80 slides, then high-quality
+  // JPEG tiers for long word-tracking exports.
   assert.equal(getSlideImageEncoding(10).mime, 'image/png');
-  assert.equal(getSlideImageEncoding(40).mime, 'image/jpeg');
-  assert.equal(getSlideImageEncoding(40).quality, 0.9);
+  assert.equal(getSlideImageEncoding(80).mime, 'image/png');
+  assert.equal(getSlideImageEncoding(120).mime, 'image/jpeg');
+  assert.equal(getSlideImageEncoding(120).quality, 0.94);
   assert.equal(getSlideImageEncoding(200).mime, 'image/jpeg');
-  assert.equal(getSlideImageEncoding(200).quality, 0.84);
+  assert.equal(getSlideImageEncoding(200).quality, 0.94);
+  assert.equal(getSlideImageEncoding(400).mime, 'image/jpeg');
+  assert.equal(getSlideImageEncoding(400).quality, 0.9);
 
   assert.equal(EXPORT_SLIDE_BATCH_SIZE, 20);
   assert.equal(getPollIntervalMs(10), 2000);

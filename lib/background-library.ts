@@ -1,7 +1,7 @@
 /**
- * Built-in animated background library — 10 curated looping clips served
+ * Built-in animated background library — 9 curated looping clips served
  * from public/assets/bg-library/: 5 procedural Islamic patterns (generated
- * in-repo by scripts/generate-islamic-backgrounds.py) + 5 licensed nature
+ * in-repo by scripts/generate-islamic-backgrounds.py) + 4 licensed nature
  * clips (Mixkit License, fetched by scripts/fetch-nature-backgrounds.sh).
  *
  * The registry is the single source of truth shared by the studio UI (the

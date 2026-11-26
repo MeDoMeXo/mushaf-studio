@@ -29,6 +29,7 @@ export function sanitizeSrtText(text: string): string {
   return text
     .replace(/[\r\n]+/g, ' ') // cues are single blocks; newlines break block layout
     .replace(/--> /g, '— ') // a literal "-->" inside text corrupts the cue header
+    .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, '') // drop footnote markers with their content (same as the canvas renderer)
     .replace(/<[^>]*>/g, '') // strip HTML-ish tags (QUL translations may carry them)
     .replace(/\s+/g, ' ')
     .trim()

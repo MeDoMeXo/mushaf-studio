@@ -5,7 +5,7 @@
  * Extracted from StudioExportModal (600-line rule): pure props-in sections.
  */
 import React from 'react';
-import { Sliders, Volume2 } from 'lucide-react';
+import { Monitor, Sliders, Smartphone, Square, Volume2 } from 'lucide-react';
 import {
   AUDIO_EFFECT_PRESETS,
   AMBIENT_SOUND_PRESETS,
@@ -15,7 +15,7 @@ import {
   type VideoQualityTier,
   type VideoResolutionTier,
 } from '@/lib/video-export';
-import type { QulVerse, StudioState } from '@/lib/quran-data';
+import type { AspectPresetId, QulVerse, StudioState } from '@/lib/quran-data';
 import { StudioSlider, StudioSwitch } from './StudioControls';
 import { TransitionPreviewCard } from './TransitionPreviewCard';
 
@@ -27,6 +27,8 @@ export interface ExportSettingsSectionsProps {
   surahName?: string;
   reciterName?: string;
   getBgImageEl?: () => HTMLImageElement | null;
+  /** Switches the design's aspect (frame + safe margins re-flow instantly). */
+  onAspectSelect?: (aspect: AspectPresetId) => void;
   onOpenFullscreen?: () => void;
 }
 
@@ -38,6 +40,7 @@ export function ExportSettingsSections({
   surahName,
   reciterName,
   getBgImageEl,
+  onAspectSelect,
   onOpenFullscreen,
 }: ExportSettingsSectionsProps) {
   return (
@@ -52,6 +55,44 @@ export function ExportSettingsSections({
         </div>
 
         <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2">
+          {/* Target Platform / Aspect — the Islamic frame re-flows for each */}
+          {studioState && onAspectSelect && (
+            <div className="sm:col-span-2">
+              <p className="text-xs font-bold text-[var(--ink-muted)]">
+                منصة النشر والأبعاد (البرواز وهوامش النص تتحوّل فوراً)
+              </p>
+              <div className="mt-1.5 grid grid-cols-3 gap-1.5">
+                {(
+                  [
+                    { id: '16:9', label: 'يوتيوب عريض', sub: '1920×1080', icon: Monitor },
+                    { id: '9:16', label: 'Shorts / Reels', sub: '1080×1920', icon: Smartphone },
+                    { id: '1:1', label: 'مربع', sub: '1080×1080', icon: Square },
+                  ] as const
+                ).map((opt) => {
+                  const active = studioState.aspect === opt.id;
+                  const Icon = opt.icon;
+                  return (
+                    <button
+                      key={opt.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => onAspectSelect(opt.id as AspectPresetId)}
+                      className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-center transition-colors ${
+                        active
+                          ? 'border-[var(--brand-gold)] bg-[var(--brand-gold)]/15 text-[var(--ink-primary)]'
+                          : 'border-[var(--border-hairline)] bg-[var(--surface-subtle)] text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
+                      }`}
+                    >
+                      <Icon className="h-4 w-4" aria-hidden="true" />
+                      <span className="block text-[11px] font-bold leading-tight">{opt.label}</span>
+                      <span className="block text-[10px] opacity-75 tabular-nums">{opt.sub}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Format */}
           <div>
             <p className="text-xs font-bold text-[var(--ink-muted)]">صيغة الملف</p>

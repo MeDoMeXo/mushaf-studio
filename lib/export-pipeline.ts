@@ -32,6 +32,7 @@ import {
   BLOB_DOWNLOAD_MAX_BYTES,
   chunkIndices,
   EXPORT_SLIDE_BATCH_SIZE,
+  getSlideImageEncoding,
   MAX_EXPORT_VERSES,
   resolveAmbientFrameSpecs,
   shouldRenderAnimatedAmbient,
@@ -46,6 +47,27 @@ import {
 } from '@/lib/surah-cover';
 import { waitForExportCompletion } from './export-pipeline-poll';
 import { buildKaraokeExportPlan } from './export-karaoke-plan';
+
+/**
+ * Aligns verse translations onto the karaoke slide timeline exactly the way
+ * KaraokeExportPlan.alignVerseTexts places verse texts: the full translation
+ * rides the verse's first word slide and every later word slide gets ''.
+ */
+function alignTranslationsToTimeline(
+  translations: string[],
+  timeline: { verseIdx: number }[],
+  includeIntroCover: boolean
+): string[] {
+  const aligned: string[] = new Array(timeline.length).fill('');
+  let lastVerse = -1;
+  timeline.forEach((entry, i) => {
+    if (entry.verseIdx !== lastVerse) {
+      lastVerse = entry.verseIdx;
+      aligned[i] = translations[entry.verseIdx] ?? '';
+    }
+  });
+  return includeIntroCover ? ['', ...aligned] : aligned;
+}
 
 export interface ExportPipelineInput {
   studioState: StudioState;
@@ -72,6 +94,7 @@ export interface ExportPipelineCallbacks {
     streamUrl: string;
     downloadUrl: string;
     srtUrl: string | null;
+    srtEnUrl: string | null;
     sizeMb: string;
     durationSec: string;
     renderSec: string;
@@ -155,6 +178,16 @@ export async function runExportPipeline(
   // verseTexts travel alongside verseIds so the server can emit a
   // synchronized SRT subtitle track (empty string on slide_0 advances offset by 2.5s).
   const rawVerseTexts = selectedVerses.map((v) => v.text_uthmani ?? '');
+  // Translations ride the same alignment discipline so the server can emit a
+  // second (English) SRT track locked to the identical timeline.
+  const rawVerseTranslations = selectedVerses.map(
+    (v) => v.translations?.[0]?.text ?? ''
+  );
+  const verseTranslationsAligned = rawVerseTranslations.some((t) => t && t.trim())
+    ? timeline
+      ? alignTranslationsToTimeline(rawVerseTranslations, timeline, includeIntroCover)
+      : buildIntroAlignedVerseTexts(rawVerseTranslations, includeIntroCover)
+    : undefined;
   const meta = {
     ...exportSettings,
     surahId: studioState.surah,
@@ -170,6 +203,8 @@ export async function runExportPipeline(
     verseTexts: timeline
       ? karaokePlan!.alignedVerseTexts
       : buildIntroAlignedVerseTexts(rawVerseTexts, includeIntroCover),
+    // English SRT source — aligned slide-by-slide like verseTexts above.
+    verseTranslations: verseTranslationsAligned,
     // Karaoke timeline — the server splits each verse's real audio duration
     // across these word/segment weights so slides stay audio-locked.
     wordTimeline: timeline ?? undefined,
@@ -278,7 +313,9 @@ export async function runExportPipeline(
     height: targetDims.height,
   };
 
-  const imgEnc = { mime: 'image/png' as const, ext: 'png' as const };
+  // Slide image encoding: lossless PNG for ≤80 slides (crisp glyphs),
+  // high-quality JPEG beyond to keep long word-tracking exports uploadable.
+  const imgEnc = getSlideImageEncoding(totalSlides);
   const batches = chunkIndices(totalSlides, EXPORT_SLIDE_BATCH_SIZE);
 
   // Animated ambient layer: client renders the particle/aurora frames and the
@@ -436,10 +473,10 @@ export async function runExportPipeline(
       }
 
       const blob = await new Promise<Blob | null>((resolve) =>
-        offscreen.toBlob(resolve, 'image/png')
+        offscreen.toBlob(resolve, imgEnc.mime, imgEnc.quality)
       );
       if (!blob) throw new Error(`فشل تجهيز الشريحة ${sIdx + 1}`);
-      batchForm.append(`slide_${sIdx}`, blob, `slide_${sIdx}.png`);
+      batchForm.append(`slide_${sIdx}`, blob, `slide_${sIdx}.${imgEnc.ext}`);
 
       if ((sIdx + 1) % 6 === 0) {
         await new Promise<void>((r) => setTimeout(r, 0));
@@ -511,6 +548,9 @@ export async function runExportPipeline(
       toAyah: studioState.toAyah,
       reciterName,
       hasVerseTexts: selectedVerses.some((v) => (v.text_uthmani ?? '').trim()),
+      hasVerseTranslations: selectedVerses.some((v) =>
+        (v.translations?.[0]?.text ?? '').trim()
+      ),
       blobDownloadMaxBytes: BLOB_DOWNLOAD_MAX_BYTES,
     },
     cb
