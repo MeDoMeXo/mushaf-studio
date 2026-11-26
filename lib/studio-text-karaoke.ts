@@ -11,7 +11,8 @@ import {
   resolveTranslationOption,
 } from './quran-utils';
 import { isLightColor } from './studio-renderer-shared';
-import type { AyahSegment, AyahWordTiming } from './verse-words';
+import type { AyahDisplayUnit, AyahSegment, AyahWordTiming } from './verse-words';
+import { buildDisplayUnits, joinTimingTexts } from './verse-words';
 
 /** Rounded-rect helper with manual fallback for older canvas implementations. */
 export function fillRoundedRect(
@@ -69,7 +70,9 @@ export function computeSafeTextColumn(
 
 /**
  * Wraps recitation tokens (not raw text) into lines of word timings so the
- * karaoke renderer can address every word individually.
+ * karaoke renderer can address every word individually. Disjointed-letter
+ * groups (فواتح السور) are kept ATOMIC — the letters never wrap across lines
+ * because the writing (الرسم) is drawn as one joined unit.
  */
 export function wrapTimingsToLines(
   timings: AyahWordTiming[],
@@ -78,18 +81,22 @@ export function wrapTimingsToLines(
 ): AyahWordTiming[][] {
   if (!timings.length) return [];
   const spaceW = measure(' ');
+  const units: AyahDisplayUnit[] = buildDisplayUnits(timings);
   const lines: AyahWordTiming[][] = [];
   let current: AyahWordTiming[] = [];
   let currentW = 0;
-  for (const tok of timings) {
-    const wordW = measure(tok.text);
-    const addW = current.length ? spaceW + wordW : wordW;
+  for (const unit of units) {
+    const slice = timings.slice(unit.fromToken, unit.toToken + 1);
+    // Measure the unit as it is DRAWN: a group's joined token, not the sum
+    // of its letters — this is the width the renderer will actually paint.
+    const unitW = measure(joinTimingTexts(slice));
+    const addW = current.length ? spaceW + unitW : unitW;
     if (current.length && currentW + addW > maxWidth) {
       lines.push(current);
-      current = [tok];
-      currentW = wordW;
+      current = slice;
+      currentW = unitW;
     } else {
-      current.push(tok);
+      current.push(...slice);
       currentW += addW;
     }
   }
@@ -186,7 +193,8 @@ export interface TranslationBlockParams {
   hasArabic: boolean;
   scaleFactor: number;
   ornamentColor: string;
-  cairoFontStack: string;
+  /** حلقة خط الترجمة المحسوبة من الحالة (translationFontFamily) لدى المُستدعي. */
+  translationFontStack: string;
 }
 
 /**
@@ -218,7 +226,7 @@ export function drawTranslationBlock(
   }
 
   cursor += gapBetween + trLineHeight / 2;
-  ctx.font = `500 ${transFontSize}px ${p.cairoFontStack}`;
+  ctx.font = `500 ${transFontSize}px ${p.translationFontStack}`;
   ctx.textAlign = state.align;
   ctx.fillStyle = isLightColor(state.textColor)
     ? 'rgba(244, 241, 232, 0.90)'

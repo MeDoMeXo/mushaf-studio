@@ -388,23 +388,22 @@ export function buildVideoBackgroundFilterGraph(params: {
 }
 
 /**
- * Selects optimal slide image encoding so each batch stays well below request caps.
- * PNG (lossless glyph edges) stays the default up to 80 slides; longer word-
- * tracking exports switch to high-quality JPEG to keep total upload size sane
- * — 0.94 JPEG keeps Arabic diacritics visually crisp at 1080p.
+ * Slide image encoding for export sessions. The slides are TRANSPARENT
+ * text-only cards (overlayOnly) that FFmpeg composites over backdrop.png —
+ * JPEG has NO alpha channel, so encoding a transparent slide as JPEG
+ * flattens it onto pure black; the opaque black card then covers the entire
+ * backdrop (gradients, LUT, pattern, ambient, vignette, Islamic frame,
+ * banners, watermark) and the exported video degenerates to "black
+ * background + ayah text only" (the exact bug this guards against).
+ * Lossless PNG is therefore ALWAYS used: a mostly-transparent text card
+ * compresses extremely well, so even 600 word-tracking slides stay well
+ * inside the upload caps (see MAX_UPLOADED_SLIDE_BYTES).
  */
-export function getSlideImageEncoding(slideCount: number): {
-  mime: 'image/png' | 'image/jpeg';
-  ext: 'png' | 'jpg';
-  quality?: number;
+export function getSlideImageEncoding(): {
+  mime: 'image/png';
+  ext: 'png';
 } {
-  if (slideCount <= 80) {
-    return { mime: 'image/png', ext: 'png' };
-  }
-  if (slideCount <= 200) {
-    return { mime: 'image/jpeg', ext: 'jpg', quality: 0.94 };
-  }
-  return { mime: 'image/jpeg', ext: 'jpg', quality: 0.9 };
+  return { mime: 'image/png', ext: 'png' };
 }
 
 export function chunkIndices(

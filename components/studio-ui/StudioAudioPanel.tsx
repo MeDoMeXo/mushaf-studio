@@ -31,6 +31,7 @@ import {
 } from '@/lib/video-export';
 import { StudioSlider } from './StudioControls';
 import { StudioTabPanel } from './StudioTabs';
+import { StudioInspectorSection } from './StudioInspectorSection';
 
 export interface StudioAudioPanelProps {
   state: StudioState;
@@ -59,6 +60,7 @@ export function StudioAudioPanel({
 }: StudioAudioPanelProps) {
   return (
     <StudioTabPanel value="audio" className="space-y-4 focus:outline-none">
+      <StudioInspectorSection id="aud-dsp" title="الهندسة الصوتية والمؤثرات المحيطية">
       <div>
         <div className="flex items-center justify-between">
           <p className="text-xs font-bold text-[var(--ink-primary)]">
@@ -96,7 +98,9 @@ export function StudioAudioPanel({
           })}
         </div>
       </div>
+      </StudioInspectorSection>
 
+      <StudioInspectorSection id="aud-ambient" title="مؤثرات طبيعية هادئة">
       <div className="border-t border-[var(--border-hairline)] pt-4">
         <p className="text-xs font-bold text-[var(--ink-primary)]">
           مؤثرات طبيعية هادئة (بدون موسيقى)
@@ -137,7 +141,9 @@ export function StudioAudioPanel({
           </div>
         )}
       </div>
+      </StudioInspectorSection>
 
+      <StudioInspectorSection id="aud-transitions" title="الانتقالات وفاصل الآيات">
       <div className="space-y-3.5 border-t border-[var(--border-hairline)] pt-4">
         <div>
           <label
@@ -166,7 +172,7 @@ export function StudioAudioPanel({
 
         <StudioSlider
           id="st-verse-gap"
-          label="وقفة صمت بين الآيات"
+          label="وقفة صمت بين الآيات (الفيديو المُصدَّر)"
           valueDisplay={`${exportSettings.verseGapSec.toFixed(2)} ث`}
           value={exportSettings.verseGapSec}
           min={0}
@@ -174,6 +180,25 @@ export function StudioAudioPanel({
           step={0.05}
           onChange={(val) => onUpdateExportSettings({ verseGapSec: val })}
         />
+
+        {/* فاصل معاينة الاستوديو: مؤقّت صمت بين الآيات أثناء التشغيل داخل
+            الاستوديو — مستقل عن فاصل الفيديو المُصدَّر وقابل للإلغاء فوراً */}
+        <div>
+          <StudioSlider
+            id="st-playback-gap"
+            label="فاصل بين الآيات (ث)"
+            valueDisplay={`${(state.playbackGapSec ?? 0).toFixed(1)} ث`}
+            value={state.playbackGapSec ?? 0}
+            min={0}
+            max={5}
+            step={0.1}
+            onChange={(val) => onPatchState({ playbackGapSec: val })}
+          />
+          <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-muted)]">
+            وقفة صمت اختيارية بين الآيات أثناء تشغيل المعاينة في الاستوديو — تُلغى
+            فور أي إيقاف أو تنقّل يدوي، ولا تؤثر على الفيديو المُصدَّر.
+          </p>
+        </div>
 
         <button
           type="button"
@@ -187,6 +212,7 @@ export function StudioAudioPanel({
           <span>فتح إعدادات الدقة وتصدير الفيديو</span>
         </button>
       </div>
+      </StudioInspectorSection>
 
       {/* Radix UI Accordion: Cinematic LUTs & Video Export Presets */}
       <AccordionPrimitive.Root
@@ -194,6 +220,7 @@ export function StudioAudioPanel({
         className="mt-5 divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)]"
       >
         {/* Accordion 1: Cinematic LUTs & Transitions */}
+      <StudioInspectorSection id="aud-cinematic" title="فلاتر الألوان السينمائية">
         <AccordionPrimitive.Item value="cinematic">
           <AccordionPrimitive.Header>
             <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between py-3 text-right text-xs font-bold text-[var(--ink-primary)] transition-colors hover:text-[var(--brand-emerald)] dark:hover:text-[#E6C75A]">
@@ -304,8 +331,10 @@ export function StudioAudioPanel({
             </div>
           </AccordionPrimitive.Content>
         </AccordionPrimitive.Item>
+      </StudioInspectorSection>
 
         {/* Accordion 2: Video Quality & Export Preset */}
+      <StudioInspectorSection id="aud-quality" title="جودة الفيديو وإعدادات التصدير">
         <AccordionPrimitive.Item value="quality">
           <AccordionPrimitive.Header>
             <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between py-3 text-right text-xs font-bold text-[var(--ink-primary)] transition-colors hover:text-[var(--brand-emerald)] dark:hover:text-[#E6C75A]">
@@ -456,6 +485,7 @@ export function StudioAudioPanel({
             </button>
           </AccordionPrimitive.Content>
         </AccordionPrimitive.Item>
+      </StudioInspectorSection>
       </AccordionPrimitive.Root>
     </StudioTabPanel>
   );

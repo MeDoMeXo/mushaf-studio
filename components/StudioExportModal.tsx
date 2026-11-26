@@ -6,7 +6,6 @@ import {
   CheckCircle2,
   Film,
   Loader2,
-  Maximize2,
   Minimize2,
   Sparkles,
   Square,
@@ -18,6 +17,8 @@ import { buildKaraokeExportPlan } from '@/lib/export-karaoke-plan';
 import type { AspectPresetId, QulVerse, StudioState } from '@/lib/quran-data';
 import { resolveTranslationOption, toArabicDigits } from '@/lib/quran-utils';
 import { ExportCompletedCard, type ExportCompletedMeta } from './studio-ui/ExportCompletedCard';
+import { ExportMinimizedChip } from './studio-ui/ExportMinimizedChip';
+import { ExportSummaryStrip } from './studio-ui/ExportSummaryStrip';
 import { ExportSettingsSections } from './studio-ui/ExportSettingsSections';
 import { estimateVideoExportDurationSec } from '@/lib/surah-cover';
 import {
@@ -193,38 +194,103 @@ export function StudioExportModal({
     setStageLabel('تهيئة جلسة التصدير وتجهيز الخطوط...');
 
     try {
-      await runExportPipeline(
-        {
-          studioState,
-          exportSettings,
-          selectedVerses,
-          surahName,
-          reciterName,
-          customAudioFile,
-          bgVideoFile,
-          getBgImageEl,
-          targetDims,
-          signal: controller.signal,
-        },
-        {
-          onJobCreated: (id) => { activeJobIdRef.current = id; },
-          onStage: setStage,
-          onProgress: setProgressPct,
-          onStageLabel: setStageLabel,
-          onErrorToast,
-          onExportSuccess: ({ localBlobUrl, localBlob, ...meta }) => {
-            setExportedUrl(localBlobUrl ?? meta.streamUrl);
-            setExportedBlob(localBlob ?? null);
-            setExportedMeta(meta);
-            setProgressPct(100);
-            setStage('done');
-            setStageLabel('اكتمل تصدير الفيديو بنجاح');
-            abortCtrlRef.current = null;
-            activeJobIdRef.current = null;
-            onExportSuccess(meta.filename);
+      // التصدير المتتابع: آية بآية — لكل آية نطاق مفرد وملف فيديو مستقل
+      // يُنزَّل فور اكتماله؛ الترتيب متسلسل (ننتظر كل تصدير قبل التالي)
+      // والإلغاء بنفس إشارة الزر «إيقاف التصدير».
+      const wantsSequential =
+        exportSettings.sequentialAyahExport === true &&
+        selectedVerses.length > 1 &&
+        !customAudioFile;
+
+      // تشغيل واحد لخط أنابيب التصدير — يُستخدم للوضع العادي وضمن حلقة الآيات
+      const runSingleExport = async (
+        versesForRun: QulVerse[],
+        stateForRun: StudioState,
+        seq: { index: number; total: number } | null
+      ): Promise<void> => {
+        await runExportPipeline(
+          {
+            studioState: stateForRun,
+            exportSettings,
+            selectedVerses: versesForRun,
+            surahName,
+            reciterName,
+            customAudioFile,
+            bgVideoFile,
+            getBgImageEl,
+            targetDims,
+            signal: controller.signal,
           },
+          {
+            onJobCreated: (id) => { activeJobIdRef.current = id; },
+            onStage: setStage,
+            onProgress: (pct) => {
+              // في الوضع المتتابع تُقسّم نسبة التقدّم الكلية عبر جميع الآيات
+              setProgressPct(
+                seq
+                  ? Math.min(99, Math.round(((seq.index - 1 + pct / 100) / seq.total) * 100))
+                  : pct
+              );
+            },
+            onStageLabel: (label) => {
+              setStageLabel(
+                seq
+                  ? `تصدير الآية ${toArabicDigits(seq.index)} من ${toArabicDigits(seq.total)} — ${label}`
+                  : label
+              );
+            },
+            onErrorToast,
+            onExportSuccess: ({ localBlobUrl, localBlob, ...meta }) => {
+              // كل نتيجة تُنزَّل ملفاً مستقلاً (التنزيل داخل خط الأنابيب نفسه)؛
+              // نُبطل رابط النقطة السابقة كي لا تتراكم عناوين blob بين الآيات.
+              setExportedUrl((prevUrl) => {
+                const nextUrl = localBlobUrl ?? meta.streamUrl;
+                if (prevUrl && prevUrl.startsWith('blob:') && prevUrl !== nextUrl) {
+                  URL.revokeObjectURL(prevUrl);
+                }
+                return nextUrl;
+              });
+              setExportedBlob(localBlob ?? null);
+              setExportedMeta(meta);
+              if (!seq) {
+                setProgressPct(100);
+                setStage('done');
+                setStageLabel('اكتمل تصدير الفيديو بنجاح');
+                abortCtrlRef.current = null;
+                activeJobIdRef.current = null;
+              }
+              onExportSuccess(meta.filename);
+            },
+          }
+        );
+      };
+
+      if (wantsSequential) {
+        const total = selectedVerses.length;
+        for (let i = 0; i < total; i++) {
+          if (controller.signal.aborted) {
+            throw new DOMException('Export aborted', 'AbortError');
+          }
+          const verse = selectedVerses[i];
+          const ayahNum =
+            Number(verse.verse_key.split(':')[1]) ||
+            verse.verse_number ||
+            studioState.fromAyah + i;
+          // نطاق مفرد لكل تشغيل: fromAyah/toAyah يشيران إلى هذه الآية فقط
+          await runSingleExport(
+            [verse],
+            { ...studioState, fromAyah: ayahNum, toAyah: ayahNum },
+            { index: i + 1, total }
+          );
         }
-      );
+        setProgressPct(100);
+        setStage('done');
+        setStageLabel('اكتمل تصدير جميع الآيات المتتابعة بنجاح');
+        abortCtrlRef.current = null;
+        activeJobIdRef.current = null;
+      } else {
+        await runSingleExport(selectedVerses, studioState, null);
+      }
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') {
         return;
@@ -241,37 +307,16 @@ export function StudioExportModal({
 
   if (!open) return null;
 
-  // Floating background export chip when minimized
+  // Floating background export chip when minimized (مستخرجة وحدة مستقلة — قاعدة ٦٠٠ سطر)
   if (minimized) {
     return (
-      <div
-        role="status"
-        aria-live="polite"
-        className="fixed bottom-5 left-5 z-50 flex items-center gap-3 rounded-2xl border border-[var(--brand-gold)]/60 bg-[var(--surface-card)] px-4 py-3 shadow-2xl"
-      >
-        {isBusy ? (
-          <Loader2 className="h-5 w-5 animate-spin text-[var(--brand-gold)]" aria-hidden="true" />
-        ) : (
-          <CheckCircle2 className="h-5 w-5 text-[var(--brand-emerald)] dark:text-[#E6C75A]" aria-hidden="true" />
-        )}
-        <div className="min-w-[150px]">
-          <p className="text-xs font-bold text-[var(--ink-primary)]">
-            {isBusy ? `جاري التصدير (${progressPct}%)` : 'اكتمل تصدير الفيديو'}
-          </p>
-          <p className="truncate text-[11px] text-[var(--ink-muted)]">
-            {isBusy ? EXPORT_DHIKR_LIST[dhikrIdx] : exportedMeta?.filename}
-          </p>
-        </div>
-        <button
-          type="button"
-          onClick={() => setMinimized(false)}
-          aria-label="إظهار نافذة التصدير"
-          className="inline-flex items-center gap-1 rounded-lg bg-[var(--brand-gold)] px-2.5 py-1.5 text-xs font-bold text-[#1F1705]"
-        >
-          <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
-          <span>عرض</span>
-        </button>
-      </div>
+      <ExportMinimizedChip
+        isBusy={isBusy}
+        progressPct={progressPct}
+        dhikrIdx={dhikrIdx}
+        exportedFilename={exportedMeta?.filename}
+        onRestore={() => setMinimized(false)}
+      />
     );
   }
 
@@ -386,41 +431,17 @@ export function StudioExportModal({
             </div>
           ) : (
             <>
-              {/* Summary Strip */}
-              <div className="grid grid-cols-2 gap-2.5 rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)]/75 p-3 sm:grid-cols-4">
-                <div>
-                  <p className="text-[11px] text-[var(--ink-muted)]">عدد الشرائح</p>
-                  <p className="text-sm font-bold text-[var(--ink-primary)] tabular-nums">
-                    {karaokeSlideCount > 0
-                      ? `${toArabicDigits(karaokeSlideCount)} شريحة تتبّع`
-                      : `${toArabicDigits(selectedVerses.length)} آيات`}
-                    {karaokeSlideCount === 0 && exportSettings.includeIntroCover !== false ? ' + غلاف' : ''}
-                  </p>
-                  {karaokeSlideCount > 0 && (
-                    <p className="mt-0.5 text-[10px] text-[var(--brand-emerald)] dark:text-[#E6C75A]">
-                      تتبّع كلمة-بكلمة متزامن مع التلاوة
-                    </p>
-                  )}
-                </div>
-                <div>
-                  <p className="text-[11px] text-[var(--ink-muted)]">الأبعاد النهائية</p>
-                  <p className="text-sm font-bold text-[var(--ink-primary)] tabular-nums">
-                    {targetDims.width}×{targetDims.height}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-[var(--ink-muted)]">الصوت المستخدم</p>
-                  <p className="truncate text-sm font-bold text-[var(--brand-emerald)] dark:text-[#E6C75A]">
-                    {customAudioFile ? customAudioName : reciterName.split(' ').slice(0, 2).join(' ')}
-                  </p>
-                </div>
-                <div>
-                  <p className="text-[11px] text-[var(--ink-muted)]">الحجم التقريبي</p>
-                  <p dir="ltr" className="text-right text-sm font-bold text-[var(--ink-primary)] tabular-nums">
-                    ~{estimatedSizeMb} MB
-                  </p>
-                </div>
-              </div>
+              {/* Summary Strip — مستخرج وحدة مستقلة (قاعدة ٦٠٠ سطر) */}
+              <ExportSummaryStrip
+                verseCount={selectedVerses.length}
+                karaokeSlideCount={karaokeSlideCount}
+                includeIntroCover={exportSettings.includeIntroCover !== false}
+                targetDims={targetDims}
+                customAudioFile={customAudioFile}
+                customAudioName={customAudioName}
+                reciterName={reciterName}
+                estimatedSizeMb={estimatedSizeMb}
+              />
 
               {!customAudioFile && audioCache.total > 0 && (
                 <div
@@ -510,6 +531,7 @@ export function StudioExportModal({
                 surahName={surahName}
                 reciterName={reciterName}
                 getBgImageEl={getBgImageEl}
+                sequentialAllowed={selectedVerses.length > 1 && !customAudioFile}
                 onAspectSelect={onAspectSelect}
                 onOpenFullscreen={() => {
                   onClose();

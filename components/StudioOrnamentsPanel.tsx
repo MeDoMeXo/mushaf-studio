@@ -28,6 +28,7 @@ import {
   type SurahBannerStyle,
 } from '@/lib/islamic-ornaments';
 import { StudioSlider, StudioSwitch } from './studio-ui/StudioControls';
+import { StudioInspectorSection } from './studio-ui/StudioInspectorSection';
 
 interface StudioOrnamentsPanelProps {
   state: StudioState;
@@ -160,6 +161,7 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
   return (
     <div className="space-y-5">
       {/* Quick Harmonizer Header */}
+      <StudioInspectorSection id="orn-harmony" title="التنسيق الزخرفي السريع">
       <div className="flex items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-3">
         <button
           type="button"
@@ -179,8 +181,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           <span>صافي</span>
         </button>
       </div>
+      </StudioInspectorSection>
 
       {/* 1. Islamic Frame Style */}
+      <StudioInspectorSection id="orn-frame" title="الإطار الإسلامي">
       <section aria-labelledby="ornament-frame-heading">
         <div className="mb-2 flex items-center justify-between">
           <h4
@@ -228,8 +232,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           })}
         </div>
       </section>
+      </StudioInspectorSection>
 
       {/* 2. Islamic Geometric Background Pattern */}
+      <StudioInspectorSection id="orn-pattern" title="النقش الهندسي الخلفي">
       <section
         aria-labelledby="ornament-pattern-heading"
         className="border-t border-[var(--border-hairline)] pt-4"
@@ -296,8 +302,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           </div>
         )}
       </section>
+      </StudioInspectorSection>
 
       {/* 3. Corner Illumination Style */}
+      <StudioInspectorSection id="orn-corner" title="زخارف الزوايا">
       <section
         aria-labelledby="ornament-corner-heading"
         className="border-t border-[var(--border-hairline)] pt-4"
@@ -333,8 +341,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           })}
         </div>
       </section>
+      </StudioInspectorSection>
 
       {/* 4. Surah Title Banner Style */}
+      <StudioInspectorSection id="orn-banner" title="خرطوشة اسم السورة">
       <section
         aria-labelledby="ornament-banner-heading"
         className="border-t border-[var(--border-hairline)] pt-4"
@@ -370,8 +380,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           })}
         </div>
       </section>
+      </StudioInspectorSection>
 
       {/* 5. Ayah Medallion Style */}
+      <StudioInspectorSection id="orn-ayah" title="فاصلة رقم الآية">
       <section
         aria-labelledby="ornament-ayah-heading"
         className="border-t border-[var(--border-hairline)] pt-4"
@@ -409,8 +421,10 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           </div>
         )}
       </section>
+      </StudioInspectorSection>
 
       {/* 6. Ornament Metallic Color */}
+      <StudioInspectorSection id="orn-color" title="لون التذهيب والزخارف">
       <section
         aria-labelledby="ornament-color-heading"
         className="border-t border-[var(--border-hairline)] pt-4"
@@ -464,6 +478,7 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
           </label>
         </div>
       </section>
+      </StudioInspectorSection>
     </div>
   );
 }

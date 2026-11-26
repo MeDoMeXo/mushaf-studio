@@ -35,6 +35,8 @@ export interface VideoExportSettings {
   audioFade: boolean;
   verseGapSec: number; // 0..1.5
   includeIntroCover: boolean;
+  /** تصدير متتابع: آية بآية — ملف فيديو مستقل لكل آية في النطاق المحدد (افتراضي معطّل). */
+  sequentialAyahExport?: boolean;
 }
 
 export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
@@ -51,6 +53,7 @@ export const DEFAULT_VIDEO_EXPORT_SETTINGS: VideoExportSettings = {
   audioFade: true,
   verseGapSec: 0.35,
   includeIntroCover: true,
+  sequentialAyahExport: false,
 };
 
 export interface ExportQualityPreset {

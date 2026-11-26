@@ -19,6 +19,8 @@ export interface UseStudioPlaybackInput {
   reciterSlug: string;
   customAudioUrl: string | null;
   exportSettings: VideoExportSettings;
+  /** فاصل صمت بين الآيات أثناء معاينة الاستوديو (ثوانٍ، 0..5) — من StudioState. */
+  playbackGapSec?: number;
   showToast: (msg: string) => void;
 }
 
@@ -46,6 +48,7 @@ export function useStudioPlayback({
   reciterSlug,
   customAudioUrl,
   exportSettings,
+  playbackGapSec = 0,
   showToast,
 }: UseStudioPlaybackInput): UseStudioPlaybackResult {
   const studioAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -54,6 +57,15 @@ export function useStudioPlayback({
   const cachedPlayBlobUrlRef = useRef<string | null>(null);
   const fadeStartRef = useRef<number>(0);
   const loadedTrackKeyRef = useRef<string>('');
+  // مؤقّت فاصل الآيات (وقفة صمت اختيارية قبل الآية التالية) — يُلغى عند أي
+  // تنقّل يدوي/إيقاف حتى لا ينتقل التشغيل بعد تدخّل المستخدم.
+  const gapTimerRef = useRef<number | null>(null);
+  const clearPendingGap = useCallback(() => {
+    if (gapTimerRef.current !== null) {
+      window.clearTimeout(gapTimerRef.current);
+      gapTimerRef.current = null;
+    }
+  }, []);
 
   const [activeIdxInRange, setActiveIdxInRange] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -68,6 +80,9 @@ export function useStudioPlayback({
     (idx: number) => {
       const audio = studioAudioRef.current;
       if (!audio || !selectedVerses.length) return;
+
+      // تشغيل جديد = إلغاء أي فاصل معلّق بين الآيات (تدخّل المستخدم)
+      clearPendingGap();
 
       if (previewAudioRef.current && !previewAudioRef.current.paused) {
         previewAudioRef.current.pause();
@@ -137,6 +152,7 @@ export function useStudioPlayback({
       customAudioUrl,
       reciterSlug,
       showToast,
+      clearPendingGap,
       exportSettings.audioPreset,
       exportSettings.ambientSound,
     ]
@@ -146,6 +162,7 @@ export function useStudioPlayback({
     const audio = studioAudioRef.current;
     if (!audio) return;
     if (isPlaying) {
+      clearPendingGap();
       audio.pause();
       setIsPlaying(false);
       return;
@@ -171,15 +188,16 @@ export function useStudioPlayback({
     } else {
       playVerseAtIndex(activeIdxInRange);
     }
-  }, [isPlaying, customAudioUrl, activeVerse, reciterSlug, activeIdxInRange, playVerseAtIndex]);
+  }, [isPlaying, customAudioUrl, activeVerse, reciterSlug, activeIdxInRange, playVerseAtIndex, clearPendingGap]);
 
   const handleSeekAudio = useCallback((timeSec: number) => {
+    clearPendingGap();
     const audio = studioAudioRef.current;
     if (!audio || !Number.isFinite(audio.duration)) return;
     const clamped = Math.max(0, Math.min(audio.duration, timeSec));
     audio.currentTime = clamped;
     setAudioCurrentTime(clamped);
-  }, []);
+  }, [clearPendingGap]);
 
   // Audio element event wiring (time/ended/pause)
   useEffect(() => {
@@ -192,12 +210,26 @@ export function useStudioPlayback({
     };
     const onEnded = () => {
       if (!customAudioUrl && activeIdxInRange + 1 < selectedVerses.length) {
+        // فاصل صمت اختياري بعد انتهاء الآية وقبل التالية: مؤقّت قابل للإلغاء
+        // عند أي إيقاف/تنقّل يدوي (clearPendingGap أعلاه) — لا يؤثر على ملف
+        // الصوت المخصص الكامل (لا حدود آيات فيه أصلاً).
+        const gapMs = Math.max(0, Math.min(5, playbackGapSec)) * 1000;
+        if (gapMs > 0) {
+          gapTimerRef.current = window.setTimeout(() => {
+            gapTimerRef.current = null;
+            playVerseAtIndex(activeIdxInRange + 1);
+          }, gapMs);
+          return;
+        }
         playVerseAtIndex(activeIdxInRange + 1);
       } else {
         setIsPlaying(false);
       }
     };
-    const onPause = () => setIsPlaying(false);
+    const onPause = () => {
+      clearPendingGap();
+      setIsPlaying(false);
+    };
 
     audio.addEventListener('timeupdate', onTime);
     audio.addEventListener('ended', onEnded);
@@ -207,7 +239,7 @@ export function useStudioPlayback({
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('pause', onPause);
     };
-  }, [activeIdxInRange, selectedVerses.length, customAudioUrl, playVerseAtIndex]);
+  }, [activeIdxInRange, selectedVerses.length, customAudioUrl, playVerseAtIndex, playbackGapSec, clearPendingGap]);
 
   // Keep Web Audio live preview DSP synced
   useEffect(() => {
@@ -243,7 +275,9 @@ export function useStudioPlayback({
   useEffect(() => {
     const pEl = previewAudioRef.current;
     const sEl = studioAudioRef.current;
+    clearPendingGap();
     return () => {
+      clearPendingGap();
       pEl?.pause();
       sEl?.pause();
       dspRef.current?.dispose();
@@ -252,7 +286,7 @@ export function useStudioPlayback({
         cachedPlayBlobUrlRef.current = null;
       }
     };
-  }, []);
+  }, [clearPendingGap]);
 
   // Reciter preview sample playback
   const handlePreviewReciter = useCallback(
@@ -265,6 +299,7 @@ export function useStudioPlayback({
         return;
       }
       if (studioAudioRef.current && !studioAudioRef.current.paused) {
+        clearPendingGap();
         studioAudioRef.current.pause();
         setIsPlaying(false);
       }
@@ -278,7 +313,7 @@ export function useStudioPlayback({
           showToast('تعذّر تشغيل عينة القارئ مؤقتاً');
         });
     },
-    [previewingReciter, showToast]
+    [previewingReciter, showToast, clearPendingGap]
   );
 
   return {

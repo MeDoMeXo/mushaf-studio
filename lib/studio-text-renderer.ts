@@ -10,12 +10,17 @@ import {
 import {
   buildAyahSegments,
   buildAyahWordTimings,
+  buildDisplayUnits,
+  joinTimingTexts,
   segmentIndexForWord,
+  type AyahDisplayUnit,
   type AyahSegment,
   type AyahWordTiming,
+  type DisjointGroupMeta,
 } from './verse-words';
 import { toArabicDigits, wrapWordsToLines } from './quran-utils';
 import { isLightColor, resolveCanvasFontFamily } from './studio-renderer-shared';
+import { createVerseHighlightPainters } from './studio-text-highlight';
 import {
   computeSafeTextColumn,
   computeVerticalBudget,
@@ -47,7 +52,8 @@ export function drawMainText(
   const scaleFactor = Math.min(w, h) / 1080;
   const primaryFontSize = Math.round(state.fontSize * scaleFactor);
   const primaryFontStack = resolveCanvasFontFamily(state.fontFamily);
-  const cairoFontStack = resolveCanvasFontFamily('Cairo');
+  // خط الترجمة أصبح من الحالة (كان القاهرة مُثبّتاً) — نفس آلية الحل، مصدرها المستخدم
+  const translationFontStack = resolveCanvasFontFamily(state.translationFontFamily || 'Cairo');
   const amiriFontStack = resolveCanvasFontFamily('Amiri');
   const ornaments = resolveOrnamentConfig(state);
   const weight = state.fontWeight || 400;
@@ -75,8 +81,24 @@ export function drawMainText(
 
   const setArFont = (size: number) => {
     ctx.font = `${weight} ${Math.max(12, size)}px ${primaryFontStack}`;
+    applyArabicLetterSpacing(letterSpacingPx);
   };
   const measure = (s: string) => ctx.measureText(s).width;
+  const clearArabicLetterSpacing = () => applyArabicLetterSpacing(0);
+
+  // مسافة الحروف للرسم العثماني فقط (ميزة Canvas حديثة): تُطبّق مع كل تعيين
+  // لخط الآية فتبقى القياسات (measureText) والرسم متسقين في المتصفحات الداعمة،
+  // وتُصفَّر قبل أي نص آخر (الترجمة/الفاصلة) كي لا يرثها — والدعم المفقود يتجاهلها.
+  const letterSpacingPx = Math.max(-2, Math.min(8, state.letterSpacing ?? 0));
+  const supportsLetterSpacing = 'letterSpacing' in ctx;
+  const applyArabicLetterSpacing = (px: number) => {
+    if (!supportsLetterSpacing) return;
+    try {
+      (ctx as CanvasRenderingContext2D & { letterSpacing?: string }).letterSpacing = `${px}px`;
+    } catch {
+      // بيئة لا تقبل التعيين (jsdom/اختبارات) — تجاهل بأمان
+    }
+  };
 
   let arLines: AyahWordTiming[][] = [];
   let arFontSize = primaryFontSize;
@@ -103,7 +125,9 @@ export function drawMainText(
   // نفس معاملة احتواء النص العربي).
   const wrapTransAt = (tfs: number): string[] => {
     if (!showTrans || !translationForDisplay) return [];
-    ctx.font = `500 ${Math.max(14, tfs)}px ${cairoFontStack}`;
+    // الترجمة لا ترث مسافة حروف الآية العربية — تصفيرها قبل القياس بخط الترجمة
+    clearArabicLetterSpacing();
+    ctx.font = `500 ${Math.max(14, tfs)}px ${translationFontStack}`;
     return wrapWordsToLines(translationForDisplay, maxW * 0.88, (ln) => ctx.measureText(ln).width);
   };
 
@@ -153,7 +177,14 @@ export function drawMainText(
         setArFont(fs);
         arLines = wrapTimingsToLines(timings, maxW, measure);
         trLines = wrapTransAt(tfs);
-        const widestWord = timings.reduce((m, t) => Math.max(m, measure(t.text)), 0);
+        const widestWord = buildDisplayUnits(timings).reduce(
+          (m, u) =>
+            Math.max(
+              m,
+              measure(joinTimingTexts(timings.slice(u.fromToken, u.toToken + 1)))
+            ),
+          0
+        );
         const medallionR = Math.max(16, Math.round(fs * 0.43));
         const standaloneH =
           showMedallion && arLines.length > 0 ? Math.round(medallionR * 2.55) : 0;
@@ -224,7 +255,7 @@ export function drawMainText(
   if (showMedallion && arLines.length > 0) {
     setArFont(arFontSize);
     lastArLineTokens = arLines[arLines.length - 1];
-    lastArLineWidth = measure(lastArLineTokens.map((t) => t.text).join(' '));
+    lastArLineWidth = measure(joinTimingTexts(lastArLineTokens));
     const neededExtra = medallionRadius * 2 + medallionPad;
     medallionInline = lastArLineWidth + neededExtra <= maxW;
   }
@@ -281,10 +312,40 @@ export function drawMainText(
 
     const spaceW = Math.max(measure(' '), arFontSize * 0.22);
 
+    // The token currently being recited — for disjointed-letter groups the
+    // ACTIVE LETTER (not the whole group) drives the highlight zone, so the
+    // tracing (التتبع) still advances letter-by-letter across the JOINED
+    // writing (الرسم متصل) exactly as the mushaf draws it.
+    const activeTok =
+      activeWordIndex >= 0 && activeWordIndex < timings.length
+        ? timings[activeWordIndex]
+        : null;
+
+    // وحدات الرسم والتظليل مستخرجة حرفياً إلى lib/studio-text-highlight.ts
+    // (قاعدة ٦٠٠ سطر) — نفس الدلالات: المجموعة المتصلة ترسم وحدة واحدة
+    // والتظليل يتقدّم حرفاً بحرف داخل الرسم المتصل.
+    const { letterZones, paintUnit } = createVerseHighlightPainters({
+      ctx,
+      measure,
+      arFontSize,
+      spaceW,
+      highlightStyle,
+      highlightColor,
+      highlightOpacity,
+      textColor: state.textColor,
+      fontFamily: state.fontFamily,
+      weight,
+      needsSyntheticBold,
+      strokeWidth,
+    });
+
     for (let idx = 0; idx < arLines.length; idx++) {
       const lineTokens = arLines[idx];
       const isLastLine = idx === arLines.length - 1;
-      const lineText = lineTokens.map((t) => t.text).join(' ');
+      // Line text/width in DRAWING terms: disjointed groups count as their
+      // joined token (الرسم متصل), so the measured width matches what is
+      // actually painted below.
+      const lineText = joinTimingTexts(lineTokens);
       const lineWidth = measure(lineText);
 
       // RTL word run: right edge anchored per alignment, words flow right → left.
@@ -309,78 +370,30 @@ export function drawMainText(
       ctx.textAlign = 'right';
       let cursorRight = shiftedRight;
 
-      for (const tok of lineTokens) {
-        const wordW = measure(tok.text);
-        const wordLeft = cursorRight - wordW;
-        const isHighlighted = highlightOn && tok.index === activeWordIndex;
-
-        // Highlight shape 1 — soft rounded block behind the word (تظليل)
-        if (isHighlighted && highlightStyle === 'block') {
-          ctx.save();
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.fillStyle = hexToRgba(highlightColor, highlightOpacity);
-          const padX = arFontSize * 0.14;
-          const padY = arFontSize * 0.1;
-          fillRoundedRect(
-            ctx,
-            wordLeft - padX,
-            y - arFontSize * 0.62 - padY * 0.4,
-            wordW + padX * 2,
-            arFontSize * 1.04 + padY,
-            Math.max(4, arFontSize * 0.14)
-          );
-          ctx.restore();
+      // Drawing units: plain words paint alone; disjointed-letter groups
+      // paint as ONE joined fillText (الرسم متصل) with the highlight zone
+      // following the active letter (التتبع حرفاً بحرفاً).
+      const units: AyahDisplayUnit[] = buildDisplayUnits(lineTokens);
+      for (const unit of units) {
+        const slice = lineTokens.slice(unit.fromToken, unit.toToken + 1);
+        const group = unit.toToken > unit.fromToken ? slice[0].disjointGroup! : null;
+        const text = group ? group.text : slice[0].text;
+        const textW = measure(text);
+        let zones: { left: number; width: number }[] | null = null;
+        let activeZone = -1;
+        if (group) {
+          zones = letterZones(group, textW, cursorRight);
+          if (
+            highlightOn &&
+            activeTok?.disjointGroup &&
+            activeTok.disjointGroup.id === group.id
+          ) {
+            activeZone = activeTok.disjointGroup.letterIndex;
+          }
+        } else if (highlightOn && slice[0].index === activeWordIndex) {
+          activeZone = 0;
         }
-
-        // Highlight shape 3 — tinted word glyphs (تلوين) without touching
-        // the main text color of the rest of the verse.
-        ctx.fillStyle = isHighlighted && highlightStyle === 'tint'
-          ? highlightColor
-          : state.textColor;
-
-        if (state.fontFamily === 'Amiri Quran' && weight === 300) {
-          ctx.save();
-          ctx.globalAlpha = ctx.globalAlpha * 0.88;
-          ctx.fillText(tok.text, cursorRight, y);
-          ctx.restore();
-        } else {
-          ctx.fillText(tok.text, cursorRight, y);
-        }
-
-        if (needsSyntheticBold) {
-          ctx.save();
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.strokeStyle = state.textColor;
-          ctx.lineWidth = Math.max(1, strokeWidth);
-          ctx.lineJoin = 'round';
-          ctx.strokeText(tok.text, cursorRight, y);
-          ctx.restore();
-        }
-
-        // Highlight shape 2 — underline bar beneath the word
-        if (isHighlighted && highlightStyle === 'underline') {
-          ctx.save();
-          ctx.shadowColor = 'transparent';
-          ctx.shadowBlur = 0;
-          ctx.shadowOffsetY = 0;
-          ctx.fillStyle = highlightColor;
-          const barH = Math.max(2, arFontSize * 0.055);
-          fillRoundedRect(
-            ctx,
-            wordLeft,
-            y + arFontSize * 0.42,
-            wordW,
-            barH,
-            barH / 2
-          );
-          ctx.restore();
-        }
-
-        cursorRight = wordLeft - spaceW;
+        cursorRight = paintUnit({ text, textW, right: cursorRight, y, zones, activeZone });
       }
 
       if (isLastLine) {
@@ -393,6 +406,8 @@ export function drawMainText(
 
   // Draw Islamic Ayah Number Medallion (inline at RTL end of verse, or centered cleanly below)
   if (showMedallion) {
+    // أرقام الفاصلة بخط الأميري — لا ترث مسافة حروف الآية
+    clearArabicLetterSpacing();
     let mx = w / 2;
     let my = y + standaloneMedallionHeight * 0.52;
 
@@ -427,6 +442,8 @@ export function drawMainText(
   }
 
   if (trLines.length > 0) {
+    // خط الترجمة من الحالة — لا مسافة حروف الآية العربية هنا
+    clearArabicLetterSpacing();
     y = drawTranslationBlock(ctx, {
       state,
       trLines,
@@ -439,10 +456,12 @@ export function drawMainText(
       hasArabic: arLines.length > 0,
       scaleFactor,
       ornamentColor: ornaments.ornamentColor,
-      cairoFontStack,
+      translationFontStack,
     });
   }
 
+  // تصفير نهائي احتياطي: أي نص لاحق على نفس السياق لا يرث المسافة
+  clearArabicLetterSpacing();
   ctx.shadowColor = 'transparent';
   ctx.shadowBlur = 0;
   ctx.shadowOffsetY = 0;

@@ -32,6 +32,7 @@
 | 11 | [`11-unified-ui-ux-design-system.md`](./11-unified-ui-ux-design-system.md) | **نظام التصميم والواجهة الموحّد**: توحيد كامل أركان المشروع بمكتبات Radix UI و Motion و cmdk و Sonner |
 | 12 | [`12-superpowers-agentic-architecture.md`](./12-superpowers-agentic-architecture.md) | **معمارية هندسة البرمجيات المتكاملة (Superpowers + Graphify)**: المهارات الـ 15، تحليل الأثر المعماري، والقواعد الصارمة لمنع العمل بدون المنهجية |
 | 13 | [`13-unified-verse-audio-architecture.md`](./13-unified-verse-audio-architecture.md) | **المعمارية الموحدة للصوتيات القرآنية المجزأة**: توحيد الـ ٣٨ قارئاً على EveryAyah، التزامن التام بين الشرائح والآيات، استبعاد التلاوات المتصلة، وخيار رفع التلاوات الخاصة |
+| 14 | [`14-disjointed-letters-and-export-fixes.md`](./14-disjointed-letters-and-export-fixes.md) | **إصلاحات الحروف المقطعة والتصدير + تطوير لوحة التحكم**: الرسم متصل مع النطق والتلوين حرفاً بحرف (فواتح السور الـ٢٩)، إصلاح عطل «الفيديو الأسود»، وميزات اللوحة الأربع (الأقسام/الروابط/الخطوط/التوقيت/آية بآية) |
 
 ---
 

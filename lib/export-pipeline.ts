@@ -313,9 +313,10 @@ export async function runExportPipeline(
     height: targetDims.height,
   };
 
-  // Slide image encoding: lossless PNG for ≤80 slides (crisp glyphs),
-  // high-quality JPEG beyond to keep long word-tracking exports uploadable.
-  const imgEnc = getSlideImageEncoding(totalSlides);
+  // Slide image encoding: slides are TRANSPARENT text-only cards composited over
+  // backdrop.png by FFmpeg — only lossless PNG keeps the alpha channel alive
+  // (JPEG would flatten every card onto black and bury the whole backdrop).
+  const imgEnc = getSlideImageEncoding();
   const batches = chunkIndices(totalSlides, EXPORT_SLIDE_BATCH_SIZE);
 
   // Animated ambient layer: client renders the particle/aurora frames and the
@@ -473,7 +474,7 @@ export async function runExportPipeline(
       }
 
       const blob = await new Promise<Blob | null>((resolve) =>
-        offscreen.toBlob(resolve, imgEnc.mime, imgEnc.quality)
+        offscreen.toBlob(resolve, imgEnc.mime)
       );
       if (!blob) throw new Error(`فشل تجهيز الشريحة ${sIdx + 1}`);
       batchForm.append(`slide_${sIdx}`, blob, `slide_${sIdx}.${imgEnc.ext}`);

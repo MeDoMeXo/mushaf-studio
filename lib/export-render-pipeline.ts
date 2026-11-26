@@ -116,6 +116,18 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     const overlayPath = path.join(dir, 'overlay.png');
     const hasOverlayFile = hasBgVideoFile ? await hasValidFile(overlayPath) : false;
 
+    // Hard guard (black-video protection): with no animated bg-video file the
+    // verse slides are TRANSPARENT cards that MUST composite over backdrop.png.
+    // When both are absent (lost/failed upload) every branch below would
+    // flatten the transparent slides onto pure black — the exact "black video
+    // with only ayah text" failure mode. Fail loudly instead of shipping a
+    // broken video; the client already retried each upload 6x with backoff.
+    if (!hasBgVideoFile && !hasBackdropFile) {
+      throw new Error(
+        'خلفية الفيديو (backdrop) مفقودة من جلسة التصدير — فشل رفع الخلفية، يرجى إعادة المحاولة'
+      );
+    }
+
     const useFastConcat =
       isKaraoke || shouldUseFastConcatEngine(slidePaths.length, meta.transition);
     const effectiveFps = getEffectiveExportFps(

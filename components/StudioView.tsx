@@ -188,6 +188,8 @@ export function StudioView() {
     reciterSlug: state.reciter,
     customAudioUrl,
     exportSettings,
+    // فاصل الآيات في المعاينة يأتي من StudioState (وليس من إعدادات التصدير)
+    playbackGapSec: state.playbackGapSec ?? 0,
     showToast,
   });
   const {

@@ -34,6 +34,17 @@ export function isLightColor(hex: string): boolean {
   return lum > 130;
 }
 
+/**
+ * Same logical-font resolution as the canvas path but as a CSS font stack for
+ * DOM previews (select options / sample lines): uses the next/font CSS
+ * variable with the family fallback so the preview always renders, SSR-safe.
+ */
+export function resolveDomFontFamily(logicalName: string): string {
+  const entry = FONT_CSS_VAR_MAP[logicalName];
+  if (entry) return `var(${entry.varName}, ${entry.fallback})`;
+  return `"${logicalName}", serif`;
+}
+
 export const FONT_CSS_VAR_MAP: Record<string, { varName: string; fallback: string }> = {
   'Amiri Quran': { varName: '--font-amiri-quran', fallback: '"Amiri Quran", "Amiri", serif' },
   'Scheherazade New': { varName: '--font-scheherazade', fallback: '"Scheherazade New", "Amiri", serif' },

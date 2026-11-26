@@ -117,6 +117,14 @@ export interface StudioState {
   metaFontWeight: 400 | 600 | 700;
   lineHeight: number;
   verticalOffset: number;
+  /** خط الترجمة المستقل — يتحكم بمظهر نص الترجمة أسفل الآية (افتراضي Cairo). */
+  translationFontFamily?: string;
+  /** مسافة إضافية بين حروف الآية العربية (px، ‎-2..8) — تُطبّق على الرسم العثماني فقط. */
+  letterSpacing?: number;
+  /** فاصل صمت اختياري بين الآيات أثناء تشغيل المعاينة في الاستوديو (ثوانٍ، ‎0..5). */
+  playbackGapSec?: number;
+  /** معايرة يدوية لمزامنة تتبع الكلمات مع الصوت (مللي ثانية، ‎-1000..1000). */
+  wordSyncOffsetMs?: number;
   textColor: string;
   align: 'center' | 'right' | 'left';
   shadow: boolean;

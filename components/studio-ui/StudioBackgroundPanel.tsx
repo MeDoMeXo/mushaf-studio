@@ -15,6 +15,7 @@ import {
 } from '@/lib/quran-data';
 import { StudioSlider } from './StudioControls';
 import { StudioTabPanel } from './StudioTabs';
+import { StudioInspectorSection } from './StudioInspectorSection';
 
 export interface StudioBackgroundPanelProps {
   state: StudioState;
@@ -51,7 +52,7 @@ export function StudioBackgroundPanel({
 }: StudioBackgroundPanelProps) {
   return (
     <StudioTabPanel value="background" className="space-y-4 focus:outline-none">
-
+      <StudioInspectorSection id="bg-source" title="نوع الخلفية ومصدرها">
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--surface-subtle)] p-1 sm:grid-cols-4">
         {(
           [
@@ -284,7 +285,9 @@ export function StudioBackgroundPanel({
           )}
         </div>
       )}
+      </StudioInspectorSection>
 
+      <StudioInspectorSection id="bg-ambient" title="حركة الخلفية والمؤثرات">
       <div className="border-t border-[var(--border-hairline)] pt-4">
         <p className="text-xs font-semibold text-[var(--ink-muted)]">
           حركة الخلفية (أثناء التشغيل والفيديو)
@@ -319,7 +322,9 @@ export function StudioBackgroundPanel({
           ))}
         </div>
       </div>
+      </StudioInspectorSection>
 
+      <StudioInspectorSection id="bg-adjust" title="تعتيم وتظليل وضبابية الخلفية">
       <div className="space-y-4 border-t border-[var(--border-hairline)] pt-4">
         <StudioSlider
           id="st-overlay"
@@ -354,6 +359,7 @@ export function StudioBackgroundPanel({
           onChange={(val) => onPatchState({ bgBlur: val })}
         />
       </div>
+      </StudioInspectorSection>
     </StudioTabPanel>
   );
 }

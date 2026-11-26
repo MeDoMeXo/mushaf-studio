@@ -7,6 +7,17 @@
  * cumulative start/end ratios inside the verse timeline, and groups tokens
  * into pronunciation segments for the single-line karaoke layout.
  *
+ * For the disjointed openings (الحروف المقطعة) the engine keeps THREE
+ * dimensions strictly separated:
+ *   - النطق (pronunciation): the opening is spoken letter-by-letter
+ *     («أَلِفْ لَامْ مِيمْ»), so timing weights are per LETTER.
+ *   - الرسم (writing/drawing): the opening stays ONE joined token exactly as
+ *     the mushaf writes it («الٓمٓ», «كهيعص») — never drawn as separated
+ *     letters. The renderer receives the group metadata to draw it as a
+ *     single unit while highlighting still steps letter-by-letter.
+ *   - التلوين والتتبع (highlighting/tracing): follows the pronunciation — the
+ *     highlight zone advances letter-by-letter INSIDE the joined group.
+ *
  * Pure module — no DOM/canvas: callers pass a width-measure callback.
  * Shared by the live canvas renderer (preview), the export slide renderer,
  * and the server-side word-duration distribution.
@@ -26,12 +37,14 @@ const ELONGATION_RE = /[\u0653-\u0655\u06E4-\u06E6]/g;
  * letter: «الم» is spoken «أَلِفْ لَامْ مِيمْ», «كهيعص» as «كَافْ هَا يَا
  * عَيْنْ صَادْ». Text-length weights badly underestimate them (a 3-letter
  * token ≈ ⅓ of its real spoken duration), so the karaoke highlight races
- * ahead of the reciter — reaching later words/ayahs while he is still
- * spelling the opening. The engine therefore:
- *   1. splits an opening token into per-letter tokens (matching the mushaf,
- *      which writes these letters disjointed — hence «مقطعة»), and
+ * ahead of the reciter. The engine therefore:
+ *   1. splits an opening into per-LETTER timing tokens — pronunciation,
+ *      weighting and tracing all stay letter-by-letter, and
  *   2. weights every letter by its SPOKEN NAME duration (ألف، لام، ميم…)
- *      plus the natural inter-letter breathing reciters take.
+ *      plus the natural inter-letter breathing reciters take, while
+ *   3. attaching disjointGroup metadata to those tokens so every renderer
+ *      draws the opening as its ORIGINAL JOINED token («الٓمٓ») — the
+ *      writing (الرسم) is never broken, exactly like the mushaf.
  * ──────────────────────────────────────────────────────────────────────── */
 
 /** The 14 disjointed-letter strings, normalized (alef-wasla → plain alef). */
@@ -123,27 +136,70 @@ export interface AyahWordTiming {
   endRatio: number;
   /** True when the token ends with a waqf/pause mark. */
   hasPause: boolean;
+  /** Joined-writing group for disjointed openings (فواتح السور): the token is
+   * one LETTER for tracing/timing, but the renderer must draw the group as
+   * its original joined token so the writing (الرسم) stays connected. */
+  disjointGroup?: DisjointGroupMeta;
+}
+
+export interface DisjointGroupMeta {
+  /** Unique id within the ayah — shared by every letter token of the group. */
+  id: number;
+  /** Joined writing text (الرسم) — the ORIGINAL token as the mushaf writes it. */
+  text: string;
+  /** This letter's position inside the group (0 = first letter). */
+  letterIndex: number;
+  /** Total letters in the group. */
+  size: number;
+}
+
+export interface AyahTokenMeta {
+  /** Token display text (letters keep their diacritics; pauses merge into the previous token). */
+  text: string;
+  /** Present when this token is a letter of a disjointed opening (فواتح السور). */
+  group?: DisjointGroupMeta;
 }
 
 /**
- * Splits ayah text into display tokens, merging standalone pause marks and
- * expanding disjointed-opening tokens into per-letter tokens so the karaoke
- * tracks each spelled letter («ا» «لٓ» «مٓ») exactly as recited.
+ * Splits ayah text into recitation tokens with disjointed-opening metadata:
+ * each opening («الٓمٓ») expands into per-LETTER tokens for pronunciation,
+ * weighting and tracing — while every letter carries `group` metadata whose
+ * `group.text` is the ORIGINAL joined token, so renderers draw the writing
+ * (الرسم) as one connected unit exactly like the mushaf.
  */
-export function splitAyahTokens(text: string): string[] {
+export function splitAyahTokensDetailed(text: string): AyahTokenMeta[] {
   const raw = (text || '').trim().split(/\s+/).filter(Boolean);
-  const tokens: string[] = [];
+  const tokens: AyahTokenMeta[] = [];
+  let groupId = 0;
   for (const t of raw) {
     const expanded = splitDisjointedToken(t);
     if (expanded) {
-      tokens.push(...expanded);
+      // Letters flow into timing/weight/tracing (النطق حرفاً بحرفاً)…
+      groupId++;
+      expanded.forEach((letter, li) => {
+        tokens.push({
+          text: letter,
+          group: { id: groupId, text: t, letterIndex: li, size: expanded.length },
+        });
+      });
     } else if (STANDALONE_PAUSE_RE.test(t) && tokens.length > 0) {
-      tokens[tokens.length - 1] = `${tokens[tokens.length - 1]} ${t}`;
+      const prev = tokens[tokens.length - 1];
+      prev.text = `${prev.text} ${t}`;
+      if (prev.group) {
+        // The pause mark rides the last letter — keep the JOINED writing text
+        // in sync so the group still renders «الٓمٓ ۝» as one connected unit.
+        prev.group.text = `${prev.group.text} ${t}`;
+      }
     } else {
-      tokens.push(t);
+      tokens.push({ text: t });
     }
   }
   return tokens;
+}
+
+/** Plain-token splitter (timing texts only) — see splitAyahTokensDetailed. */
+export function splitAyahTokens(text: string): string[] {
+  return splitAyahTokensDetailed(text).map((m) => m.text);
 }
 
 /**
@@ -180,22 +236,23 @@ export function spokenTokenWeight(token: string): number {
 
 /** Builds the full word-timing table for one ayah. */
 export function buildAyahWordTimings(text: string): AyahWordTiming[] {
-  const tokens = splitAyahTokens(text);
-  if (!tokens.length) return [];
-  const weights = tokens.map(spokenTokenWeight);
+  const metas = splitAyahTokensDetailed(text);
+  if (!metas.length) return [];
+  const weights = metas.map((m) => spokenTokenWeight(m.text));
   const total = weights.reduce((a, b) => a + b, 0) || 1;
   let cursor = 0;
-  return tokens.map((tok, i) => {
+  return metas.map((m, i) => {
     const startRatio = cursor / total;
     cursor += weights[i];
     const endRatio = Math.min(1, cursor / total);
     return {
       index: i,
-      text: tok,
+      text: m.text,
       weight: weights[i],
       startRatio,
       endRatio,
-      hasPause: TRAILING_PAUSE_RE.test(tok),
+      hasPause: TRAILING_PAUSE_RE.test(m.text),
+      disjointGroup: m.group ? { ...m.group } : undefined,
     };
   });
 }
@@ -216,11 +273,75 @@ export function findActiveWordIndex(
   return r > 0 ? 0 : -1;
 }
 
+export interface AyahDisplayUnit {
+  /** Inclusive token range of the unit (a word, or a whole disjointed group). */
+  fromToken: number;
+  toToken: number;
+}
+
+/** True when tokens[startIdx] begins a fully-present disjointed group. */
+function isCompleteGroupAt(
+  tokens: AyahWordTiming[],
+  startIdx: number,
+  g: DisjointGroupMeta
+): boolean {
+  if (startIdx + g.size > tokens.length) return false;
+  for (let k = 0; k < g.size; k++) {
+    const t = tokens[startIdx + k].disjointGroup;
+    if (!t || t.id !== g.id || t.letterIndex !== k) return false;
+  }
+  return true;
+}
+
+/**
+ * Display units: plain words stay individual units, while the letters of a
+ * disjointed opening fuse into ONE unit — the writing (الرسم) must never
+ * break across lines or segments even though tracing stays letter-by-letter.
+ */
+export function buildDisplayUnits(tokens: AyahWordTiming[]): AyahDisplayUnit[] {
+  const units: AyahDisplayUnit[] = [];
+  let i = 0;
+  while (i < tokens.length) {
+    const g = tokens[i].disjointGroup;
+    if (g && g.letterIndex === 0 && isCompleteGroupAt(tokens, i, g)) {
+      units.push({ fromToken: i, toToken: i + g.size - 1 });
+      i += g.size;
+    } else {
+      // Orphan group letter (defensive — atomic upstream makes this rare):
+      // fall back to a single-token unit instead of dropping the letter.
+      units.push({ fromToken: i, toToken: i });
+      i++;
+    }
+  }
+  return units;
+}
+
+/**
+ * Joins timing tokens into display text with JOINED writing for disjointed
+ * openings — the group renders as its original mushaf token («الٓمٓ») while
+ * plain tokens stay space-separated. Shared by the renderer, the line
+ * wrapper and the segment builder so they all agree on the drawn width.
+ */
+export function joinTimingTexts(tokens: AyahWordTiming[]): string {
+  const parts: string[] = [];
+  for (const u of buildDisplayUnits(tokens)) {
+    parts.push(joinUnitText(tokens, u));
+  }
+  return parts.join(' ');
+}
+
+/** Joined writing text of one display unit. */
+function joinUnitText(tokens: AyahWordTiming[], u: AyahDisplayUnit): string {
+  const g = tokens[u.fromToken].disjointGroup;
+  if (u.toToken > u.fromToken && g) return g.text;
+  return tokens[u.fromToken].text;
+}
+
 export interface AyahSegment {
   /** Inclusive token range. */
   fromWord: number;
   toWord: number;
-  /** Joined display text of the segment. */
+  /** Joined display text of the segment (disjointed groups stay connected). */
   text: string;
   /** Sum of word weights inside the segment. */
   weight: number;
@@ -232,9 +353,11 @@ export interface AyahSegment {
 
 /**
  * Groups ayah words into single-line pronunciation segments: each segment is
- * the widest run of consecutive words that fits `maxWidth` at the current
- * font. Breaks prefer natural waqf (pause) boundaries once the line is at
- * least half full, so segments read like natural recitation phrases.
+ * the widest run of consecutive DISPLAY UNITS (words or whole disjointed
+ * groups — a group is never split, keeping the writing connected) that fits
+ * `maxWidth` at the current font. Breaks prefer natural waqf (pause)
+ * boundaries once the line is at least half full, so segments read like
+ * natural recitation phrases.
  */
 export function buildAyahSegments(
   timings: AyahWordTiming[],
@@ -243,8 +366,9 @@ export function buildAyahSegments(
 ): AyahSegment[] {
   const n = timings.length;
   if (!n) return [];
+  const units = buildDisplayUnits(timings);
   const join = (from: number, to: number) =>
-    timings.slice(from, to + 1).map((w) => w.text).join(' ');
+    joinTimingTexts(timings.slice(from, to + 1));
   const makeSegment = (from: number, to: number): AyahSegment => {
     const weight = timings.slice(from, to + 1).reduce((a, w) => a + w.weight, 0);
     return {
@@ -256,36 +380,41 @@ export function buildAyahSegments(
       endRatio: Math.min(1, timings[to].endRatio),
     };
   };
+  // Pause flag of a unit rides its LAST token (waqf marks trail the word).
+  const unitHasPause = (u: AyahDisplayUnit) => timings[u.toToken].hasPause;
 
   const segments: AyahSegment[] = [];
   let from = 0;
-  while (from < n) {
+  while (from < units.length) {
     // Extend while the run fits on one line.
     let end = from;
-    while (end + 1 < n && measure(join(from, end + 1)) <= maxWidth) {
+    while (
+      end + 1 < units.length &&
+      measure(join(units[from].fromToken, units[end + 1].toToken)) <= maxWidth
+    ) {
       end++;
     }
     if (end === from) {
-      // Single word wider than the line — its own segment (font will shrink).
-      segments.push(makeSegment(from, from));
+      // Single unit wider than the line — its own segment (font will shrink).
+      segments.push(makeSegment(units[from].fromToken, units[from].toToken));
       from++;
       continue;
     }
     // Prefer ending on a pronunciation pause in the latter half of the line
     // when the natural overflow point isn't already a pause boundary.
     let breakAt = end;
-    if (!timings[end].hasPause && end + 1 < n) {
+    if (!unitHasPause(units[end]) && end + 1 < units.length) {
       for (let k = end - 1; k > from; k--) {
         if (
-          timings[k].hasPause &&
-          measure(join(from, k)) >= maxWidth * 0.5
+          unitHasPause(units[k]) &&
+          measure(join(units[from].fromToken, units[k].toToken)) >= maxWidth * 0.5
         ) {
           breakAt = k;
           break;
         }
       }
     }
-    segments.push(makeSegment(from, breakAt));
+    segments.push(makeSegment(units[from].fromToken, units[breakAt].toToken));
     from = breakAt + 1;
   }
   return segments;

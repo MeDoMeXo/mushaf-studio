@@ -154,6 +154,19 @@ export const STUDIO_FONTS = [
   { value: 'Cairo', label: 'القاهرة الحديث' },
 ];
 
+/** عينة معاينة الخطوط القرآنية — آية قصيرة تُرسم بخط كل خيار قبل الاختيار. */
+export const STUDIO_FONT_PREVIEW_SAMPLE = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ';
+
+/**
+ * خطوط الترجمة: محدودة بالخطوط التي تدعم النص اللاتيني فعلياً في layout.tsx
+ * (subsets تشمل latin) — لا ندرج خطوطاً قرآنية بلا حروف لاتينية.
+ */
+export const STUDIO_TRANSLATION_FONTS = [
+  { value: 'Cairo', label: 'القاهرة (حديث ومقروء)' },
+  { value: 'Noto Naskh Arabic', label: 'نسخ عربي معاصر' },
+  { value: 'Amiri', label: 'أميري كلاسيكي' },
+] as const;
+
 export const STUDIO_TEXT_COLORS = [
   '#FAF7F0',
   '#EED178',

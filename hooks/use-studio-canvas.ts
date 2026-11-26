@@ -236,7 +236,13 @@ export function useStudioCanvas({
         (isPlaying || audio.currentTime > 0) &&
         verseText.trim()
       ) {
-        const ratio = Math.max(0, Math.min(1, audio.currentTime / audio.duration));
+        // معايرة مزامنة التتبع (مللي ثانية): إزاحة نسبة تقدّم الصوت بمقدار
+        // فارق المستخدم قبل اختيار الكلمة النشطة — تُقصّ ضمن [0..1] دائماً.
+        const syncOffsetMs = Math.max(-1000, Math.min(1000, Number(state.wordSyncOffsetMs) || 0));
+        const rawRatio = audio.currentTime / audio.duration;
+        const shiftedRatio =
+          syncOffsetMs !== 0 ? rawRatio + syncOffsetMs / (audio.duration * 1000) : rawRatio;
+        const ratio = Math.max(0, Math.min(1, shiftedRatio));
         const wordIdx = findActiveWordIndex(buildAyahWordTimings(verseText), ratio);
         activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
       }

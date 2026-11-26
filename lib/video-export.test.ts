@@ -193,17 +193,13 @@ test('200-verse chunking, static-slide FPS optimization, image encoding tiers, a
   assert.equal(getEffectiveExportFps(60, 200, 'fade'), 15);
   assert.equal(getEffectiveExportFps(30, 286, 'fade'), 15);
 
-  // 2026-11-26: PNG (lossless glyph edges) up to 80 slides, then high-quality
-  // JPEG tiers for long word-tracking exports.
-  assert.equal(getSlideImageEncoding(10).mime, 'image/png');
-  assert.equal(getSlideImageEncoding(80).mime, 'image/png');
-  assert.equal(getSlideImageEncoding(120).mime, 'image/jpeg');
-  assert.equal(getSlideImageEncoding(120).quality, 0.94);
-  assert.equal(getSlideImageEncoding(200).mime, 'image/jpeg');
-  assert.equal(getSlideImageEncoding(200).quality, 0.94);
-  assert.equal(getSlideImageEncoding(400).mime, 'image/jpeg');
-  assert.equal(getSlideImageEncoding(400).quality, 0.9);
-
+  // 2026-11-26 (fix): export slides are TRANSPARENT overlay cards composited
+  // over backdrop.png — JPEG has no alpha channel and would flatten them onto
+  // black (covering the whole backdrop), so PNG is used at EVERY slide count.
+  assert.equal(getSlideImageEncoding().mime, 'image/png');
+  assert.equal(getSlideImageEncoding().ext, 'png');
+  assert.equal('quality' in getSlideImageEncoding(), false);
+  
   assert.equal(EXPORT_SLIDE_BATCH_SIZE, 20);
   assert.equal(getPollIntervalMs(10), 2000);
   assert.equal(getPollIntervalMs(40), 3000);

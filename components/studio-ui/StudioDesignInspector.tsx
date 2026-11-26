@@ -37,6 +37,12 @@ import type { BuiltinBackground } from '@/lib/background-library';
 import { StudioBackgroundPanel } from './StudioBackgroundPanel';
 import { StudioTextPanel } from './StudioTextPanel';
 import {
+  InspectorSectionsProvider,
+  StudioInspectorSection,
+} from './StudioInspectorSection';
+import { StudioInspectorSectionsToolbar } from './StudioInspectorSectionsToolbar';
+import { useInspectorSectionVisibility } from '@/hooks/use-inspector-section-visibility';
+import {
   StudioTabPanel,
   StudioTabsList,
   StudioTabsRoot,
@@ -151,6 +157,10 @@ export function StudioDesignInspector({
     [templateCat]
   );
 
+  // إدارة ظهور الأقسام: تفضيل محلي في المتصفح (localStorage) — الترطيب بعد
+  // التحميل فقط كي لا يكسر SSR ولا يسبب تعارض ترطيب.
+  const sectionVisibility = useInspectorSectionVisibility();
+
   return (
     <aside
       aria-label="التنسيق والقوالب"
@@ -167,7 +177,16 @@ export function StudioDesignInspector({
         </span>
       </div>
 
+      {/* شريط إدارة ظهور الأقسام (كل الأقسام عبر التبويبات الخمسة) */}
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-4 py-1.5">
+        <span className="text-[10px] font-semibold text-[var(--ink-muted)]">
+          ظهور أقسام اللوحة
+        </span>
+        <StudioInspectorSectionsToolbar api={sectionVisibility} />
+      </div>
+
       {/* Hydration-Safe Tabs with Motion Shared Indicator */}
+      <InspectorSectionsProvider api={sectionVisibility}>
       <StudioTabsRoot
         idPrefix="studio-inspector"
         dir="rtl"
@@ -214,6 +233,7 @@ export function StudioDesignInspector({
         <div className="studio-scroll min-h-0 flex-1 overflow-y-auto p-4">
           {/* TAB 1: Templates */}
           <StudioTabPanel value="templates" className="space-y-4 focus:outline-none">
+            <StudioInspectorSection id="tpl-gallery" title="قوالب التصميم الجاهزة">
             <div className="flex flex-wrap gap-1">
               {TEMPLATE_CATEGORIES.map((cat) => (
                 <button
@@ -295,8 +315,10 @@ export function StudioDesignInspector({
                 );
               })}
             </div>
+            </StudioInspectorSection>
 
             {/* Saved Custom Templates */}
+            <StudioInspectorSection id="tpl-custom" title="قوالبي المحفوظة ومشاركتها">
             <div className="border-t border-[var(--border-hairline)] pt-4">
               <div className="flex items-center justify-between">
                 <h3 className="text-xs font-bold text-[var(--ink-primary)]">
@@ -389,6 +411,7 @@ export function StudioDesignInspector({
                 </label>
               </div>
             </div>
+            </StudioInspectorSection>
           </StudioTabPanel>
 
           {/* TAB 2: Islamic Ornaments */}
@@ -432,6 +455,7 @@ export function StudioDesignInspector({
           />
         </div>
       </StudioTabsRoot>
+      </InspectorSectionsProvider>
     </aside>
   );
 }

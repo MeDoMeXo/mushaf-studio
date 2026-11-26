@@ -44,6 +44,11 @@ export function buildInitialStudioState(
     metaFontWeight: 600,
     lineHeight: 1.75,
     verticalOffset: 0,
+    // الخطوط والتوقيت: قيم محايدة افتراضياً حتى لا يتغيّر سلوك الاستوديو القائم
+    translationFontFamily: 'Cairo',
+    letterSpacing: 0,
+    playbackGapSec: 0,
+    wordSyncOffsetMs: 0,
     textColor: cfg.studio.color || '#FAF7F0',
     align: 'center',
     shadow: true,

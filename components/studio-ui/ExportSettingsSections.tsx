@@ -27,6 +27,8 @@ export interface ExportSettingsSectionsProps {
   surahName?: string;
   reciterName?: string;
   getBgImageEl?: () => HTMLImageElement | null;
+  /** تفعيل خيار التصدير المتتابع (آية بآية): يظهر فقط عند نطاق متعدد الآيات وبدون صوت مخصص. */
+  sequentialAllowed?: boolean;
   /** Switches the design's aspect (frame + safe margins re-flow instantly). */
   onAspectSelect?: (aspect: AspectPresetId) => void;
   onOpenFullscreen?: () => void;
@@ -40,6 +42,7 @@ export function ExportSettingsSections({
   surahName,
   reciterName,
   getBgImageEl,
+  sequentialAllowed,
   onAspectSelect,
   onOpenFullscreen,
 }: ExportSettingsSectionsProps) {
@@ -265,6 +268,28 @@ export function ExportSettingsSections({
               }
             />
           </div>
+
+          {/* التصدير المتتابع: يُخفى عند آية واحدة أو صوت مخصص كامل (لا حدود آيات فيه) */}
+          {sequentialAllowed === true && (
+            <div
+              className="sm:col-span-2 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)]/60 px-3 py-2.5"
+              data-testid="export-sequential-ayah-wrapper"
+            >
+              <StudioSwitch
+                id="export-sequential-ayah"
+                data-testid="export-sequential-ayah-switch"
+                label="تصدير متتابع: آية بآية (ملف فيديو مستقل لكل آية)"
+                checked={exportSettings.sequentialAyahExport === true}
+                onCheckedChange={(checked) =>
+                  onUpdateExportSettings({ sequentialAyahExport: checked })
+                }
+              />
+              <p className="mt-1 px-2.5 text-[10px] leading-relaxed text-[var(--ink-muted)]">
+                يُصدَّر كل فيديو على حدة بترتيب الآيات مع تقدّم «الآية س من ص» —
+                قابل للإيقاف كأي تصدير، وعدد الملفات بعدد الآيات المحددة.
+              </p>
+            </div>
+          )}
         </div>
       </div>
 
