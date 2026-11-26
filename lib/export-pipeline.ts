@@ -45,6 +45,7 @@ import {
   resolveIntroCoverSlideCount,
 } from '@/lib/surah-cover';
 import { waitForExportCompletion } from './export-pipeline-poll';
+import { buildKaraokeExportPlan } from './export-karaoke-plan';
 
 export interface ExportPipelineInput {
   studioState: StudioState;
@@ -124,7 +125,14 @@ export async function runExportPipeline(
   // client never uploads it, so bgVideoFile stays null for library picks.
   const hasBgVideo = studioState.bgType === 'video' && (Boolean(bgVideoFile) || Boolean(bgLibraryId));
   const includeIntroCover = exportSettings.includeIntroCover !== false;
-  const totalSlides = resolveIntroCoverSlideCount(selectedVerses.length, includeIntroCover);
+
+  // Karaoke plan — word/segment-granular slides that track the recitation
+  // (null → classic per-verse slides, zero change to existing flows).
+  const karaokePlan = buildKaraokeExportPlan(studioState, selectedVerses, targetDims, includeIntroCover);
+  const timeline = karaokePlan?.entries ?? null;
+  const totalSlides = timeline
+    ? karaokePlan!.totalSlides
+    : resolveIntroCoverSlideCount(selectedVerses.length, includeIntroCover);
 
   // Custom reciters are not in the server's static whitelist — send the
   // validated wire spec so the export job can download/slice their verses.
@@ -159,7 +167,12 @@ export async function runExportPipeline(
     reciterServer: reciterSpec?.server,
     reciterReadId: reciterSpec?.readId,
     verseIds: selectedVerses.map((v) => v.id),
-    verseTexts: buildIntroAlignedVerseTexts(rawVerseTexts, includeIntroCover),
+    verseTexts: timeline
+      ? karaokePlan!.alignedVerseTexts
+      : buildIntroAlignedVerseTexts(rawVerseTexts, includeIntroCover),
+    // Karaoke timeline — the server splits each verse's real audio duration
+    // across these word/segment weights so slides stay audio-locked.
+    wordTimeline: timeline ?? undefined,
     slideCount: totalSlides,
     includeIntroCover,
     introCoverDurationSec: includeIntroCover ? INTRO_COVER_DURATION_SEC : 0,
@@ -356,6 +369,16 @@ export async function runExportPipeline(
       }
     }
     let batchAudioBytes = 0;
+    // First slide index of every verse inside the word timeline — verse audio
+    // blobs attach only there (word slides of one verse share that audio).
+    const verseFirstSlideIdx = new Map<number, number>();
+    if (timeline) {
+      timeline.forEach((entry, i) => {
+        if (!verseFirstSlideIdx.has(entry.verseIdx)) {
+          verseFirstSlideIdx.set(entry.verseIdx, i + (includeIntroCover ? 1 : 0));
+        }
+      });
+    }
 
     for (let sIdx = batch.start; sIdx < batch.end; sIdx++) {
       if (signal.aborted) {
@@ -363,10 +386,21 @@ export async function runExportPipeline(
       }
 
       const isIntroCover = includeIntroCover && sIdx === 0;
-      const vIdx = includeIntroCover ? sIdx - 1 : sIdx;
-      const verse = isIntroCover ? undefined : selectedVerses[vIdx];
+      const timelineEntry = timeline
+        ? timeline[sIdx - (includeIntroCover ? 1 : 0)]
+        : undefined;
+      const vIdx = timelineEntry
+        ? timelineEntry.verseIdx
+        : isIntroCover
+          ? -1
+          : sIdx - (includeIntroCover ? 1 : 0);
+      const verse = timelineEntry
+        ? selectedVerses[timelineEntry.verseIdx]
+        : isIntroCover
+          ? undefined
+          : selectedVerses[vIdx];
       const ayahNum = verse
-        ? verse.verse_key.split(':')[1] || String(studioState.fromAyah + vIdx)
+        ? verse.verse_key.split(':')[1] || String(studioState.fromAyah + Math.max(0, vIdx))
         : undefined;
 
       drawStudioFrame(ctx, {
@@ -381,9 +415,15 @@ export async function runExportPipeline(
         overlayOnly: true,
         activeVerseIndex: Math.max(0, vIdx),
         totalVerses: selectedVerses.length,
+        activeWordIndex: timelineEntry?.wordIdx,
       });
 
-      if (!isIntroCover && verse && usingBrowserAudioCache) {
+      const shouldAttachVerseAudio =
+        !isIntroCover &&
+        verse &&
+        usingBrowserAudioCache &&
+        (timelineEntry === undefined || verseFirstSlideIdx.get(timelineEntry.verseIdx) === sIdx);
+      if (shouldAttachVerseAudio) {
         try {
           const audioBlob = await getCachedVerseAudioBlob(studioState.reciter, verse.id);
           if (audioBlob && shouldAttachAudioToBatch(batchAudioBytes, audioBlob.size)) {

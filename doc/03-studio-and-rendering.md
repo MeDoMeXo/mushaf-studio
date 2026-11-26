@@ -64,6 +64,10 @@
 5. **طبقة التعتيم (`overlay`) والتدرّج الدائري (`vignette`)**: لضمان تباين مريح لقراءة النص القرآني فوق أي صورة أو فيديو.
 6. **الإطار الإسلامي (`drawIslamicFrameLayer`) وزخارف الزوايا (`drawIslamicCornerOrnaments`)**.
 7. **النص القرآني والترجمة المعتمدة وفاصلة رقم الآية (`drawMainText`)**:
+   - **محرك النطق والكاريوكي (`lib/verse-words.ts` + `lib/studio-text-karaoke.ts`)**: تُقسَّم الآية إلى ألفاظ (تُدمج علامات الوقف «ۚ» في الكلمة السابقة)، وتُقدَّر مدة نطق كل لفظ بأوزان (حروف + تشكيل + مدود + وقفات)، وتُبنى منها مقاطع النطق أحادية السطر. المساعدات المشتركة (العمود الآمن المحسوب من الإطار والزوايا `computeSafeTextColumn`، الالتفاف على مستوى الألفاظ `wrapTimingsToLines`، ميزانية الملاءمة الرأسية `computeVerticalBudget`) في وحدة `studio-text-karaoke`.
+   - **وضع «متعدد الأسطر»**: التفاف ألفاظ مع **ملاءمة تلقائية** — يُصغَّر الخط (بحد أدنى ٤٢٪) حتى يستوعب أعرض كلمة العمود الآمن ويبقى البلوك كاملاً بين لافتة السورة وتوقيع القارئ، فلا يتجاوز النص الإطار أبداً.
+   - **وضع «سطر واحد (حسب النطق)»**: لا تصغير للآية كاملة؛ بل تتقدم مقاطع النطق بحجم الخط الكامل مع التلاوة (تتبّع `activeWordIndex` من موضع الصوت الحيّ).
+   - **تظليل الكلمة المتلوة (كاريوكي)**: يُرسم كل لفظ على حدة (RTL من اليمين لليسار) مع ثلاثة أشكال قابلة للتحكم: تظليل خلف الكلمة (مستطيل دائري الزوايا بشفافية قابلة للضبط)، خط أسفل الكلمة، أو تلوين اللفظ — دون تغيير لون النص الأساسي (`wordHighlightStyle/Color/Opacity`).
    - التفاف كلمات ذكي يحترم عرض الإطار (`wrapWordsToLines`).
    - موضع ذكي لفاصلة رقم الآية الإسلامية (`drawIslamicAyahMedallionV2`): توضع في نهاية آخر سطر عربي (على اليسار في اتجاه RTL) إذا اتّسع السطر مع توسيط بصري للسطر الأخير، أو تتوسط أسفل النص تلقائياً إذا كان السطر ممتلئاً.
    - دعم السماكة الاصطناعية لخط `Amiri Quran` عند اختيار وزن `600/700/800` لأنه خط بوزن واحد أصلاً.
@@ -83,11 +87,19 @@
 
 ---
 
+## ٣-ب. تصدير الكاريوكي: شرائح كلمة-بكلمة متزامنة مع الصوت
+
+- **`lib/export-karaoke-plan.ts` (العميل)**: يبني خط زمن الشرائح (كلمة بكلمة عند تفعيل التتبّع، أو مقطعاً بمقطع في وضع السطر الواحد) بنفس رياضيات التخطيط الحية (`computeSafeTextColumn` + نفس الخط المُحجَّم)، ويُرفع في `meta.wordTimeline` مع أوزان النطق (سقف ٦٠٠ شريحة `MAX_WORD_SLIDES` — السور الأطول تعود تلقائياً لشرائح الآيات الكلاسيكية).
+- **`lib/export-audio-prep.ts` (الخادم)**: يوزّع مدة الصوت الحقيقية لكل آية على ألفاظها عبر `distributeWordDurations` (بحد أدنى ٠٫٣٢ ث مع إعادة تطبيع يجعل المجموع مطابقاً تماماً لمدة الآية)، ويُعزى فراغ ما بين الآيات إلى آخر شريحة كلمة في الآية.
+- **`lib/export-render-pipeline.ts`**: خطوط الكاريوكي تُرمَّز بمحرك الدمج بقطع صلبة (الـ Crossfade بين الكلمات يظهر كوميض) وبمدة دنيا ٠٫٢ ث، وتُدمج شرائح كلمات الآية في سطر SRT واحد يمتد على كامل مدة الآية.
+
+---
+
 ## ٤. بنية حالة الاستوديو (`StudioState`)
 
 تشمل جميع الحقول المعرّفة في `lib/quran-data.ts`:
 - **التلاوة والترجمة**: `surah`, `fromAyah`, `toAyah`, `textSource`, `translationId`, `reciter`
 - **الخلفية**: `bgType`, `bgIdx`, `bgColor`, `bgImage`, `bgVideoSpeed`, `bgBlur`, `colorLut`, `ambient`, `overlay`, `vignette`
-- **الخطوط والنص**: `fontFamily`, `fontSize`, `fontWeight`, `metaFontWeight`, `lineHeight`, `verticalOffset`, `textColor`, `align`, `shadow`, `glow`
+- **الخطوط والنص**: `fontFamily`, `fontSize`, `fontWeight`, `metaFontWeight`, `lineHeight`, `verticalOffset`, `textColor`, `align`, `shadow`, `glow`, `verseLineMode` (متعدد الأسطر/سطر واحد حسب النطق), `wordHighlight` + `wordHighlightStyle` + `wordHighlightColor` + `wordHighlightOpacity` (تتبّع الكلمة المتلوة)
 - **الزخارف الإسلامية**: `frameStyle`, `cornerStyle`, `patternStyle`, `patternOpacity`, `surahBannerStyle`, `ornamentColor`, `activeTemplateId`, `showAyahNumber`, `ayahNumberStyle` (مع إبقاء `goldFrame` و `corners` متزامنَين للتوافق الرجعي مع القوالب المحفوظة سابقاً)
 - **العناصر والأبعاد**: `showFooter`, `showReciterFooter`, `surahPosition`, `surahOffsetY`, `reciterPosition`, `reciterOffsetY`, `showProgressDots`, `watermark`, `aspect`, `width`, `height`.

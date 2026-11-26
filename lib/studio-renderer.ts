@@ -37,6 +37,8 @@ export interface RenderFramePayload {
   transitionProgress?: number;
   activeVerseIndex?: number;
   totalVerses?: number;
+  /** Karaoke tracking — index of the word being recited in the current verse. */
+  activeWordIndex?: number;
   preRenderedBackdrop?: HTMLCanvasElement | null;
   transparentBackdrop?: boolean;
   overlayOnly?: boolean;
@@ -349,6 +351,7 @@ export function drawStudioFrame(
     fadeAlpha = 1,
     activeVerseIndex = 0,
     totalVerses = 1,
+    activeWordIndex,
     preRenderedBackdrop = null,
     transparentBackdrop = false,
   } = payload;
@@ -366,7 +369,9 @@ export function drawStudioFrame(
     if (state.coverMode) {
       drawUnifiedCoverTypography(ctx, state, surahName, reciterName);
     } else if (!state.hideVerses) {
-      drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum);
+      drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum, {
+        activeWordIndex,
+      });
       if (state.showProgressDots && totalVerses > 1 && totalVerses <= 24) {
         drawProgressDots(ctx, state, activeVerseIndex, totalVerses);
       }
@@ -411,7 +416,9 @@ export function drawStudioFrame(
       }
 
       ctx.globalAlpha = Math.max(0, Math.min(1, fadeAlpha));
-      drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum);
+      drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum, {
+        activeWordIndex,
+      });
       ctx.restore();
     }
 

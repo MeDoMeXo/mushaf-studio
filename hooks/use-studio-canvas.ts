@@ -12,6 +12,7 @@ import {
   type AudioCacheProgress,
 } from '@/lib/audio-cache';
 import { drawStudioFrame } from '@/lib/studio-renderer';
+import { buildAyahWordTimings, findActiveWordIndex } from '@/lib/verse-words';
 import type { QulVerse, QulChapter, StudioState } from '@/lib/quran-data';
 import { StudioAudioDsp } from '@/lib/studio-audio-dsp';
 import { calculateTransitionProgress, type VideoExportSettings } from '@/lib/video-export';
@@ -220,9 +221,29 @@ export function useStudioCanvas({
         isManualNav: isManualNavigatingRef.current,
       });
 
+      // Karaoke word tracking — read the live audio position (per-verse files
+      // only; a custom full-clip track has no per-ayah boundaries to follow).
+      let activeWordIndex: number | undefined;
+      const audio = studioAudioRef.current;
+      const verseText = activeVerse?.text_uthmani ?? '';
+      if (
+        !customAudioUrl &&
+        !state.coverMode &&
+        state.textSource !== 'translation' &&
+        audio &&
+        Number.isFinite(audio.duration) &&
+        audio.duration > 0 &&
+        (isPlaying || audio.currentTime > 0) &&
+        verseText.trim()
+      ) {
+        const ratio = Math.max(0, Math.min(1, audio.currentTime / audio.duration));
+        const wordIdx = findActiveWordIndex(buildAyahWordTimings(verseText), ratio);
+        activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
+      }
+
       drawStudioFrame(ctx, {
         state,
-        verseText: activeVerse?.text_uthmani ?? 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
+        verseText: verseText || 'بِسْمِ ٱللَّهِ ٱلرَّحْمَـٰنِ ٱلرَّحِيمِ',
         translationText: activeVerse?.translations?.[0]?.text ?? '',
         surahName: currentChapter?.name_arabic ?? 'الفاتحة',
         ayahLabel: `آية ${ayahNum}`,
@@ -236,6 +257,7 @@ export function useStudioCanvas({
         transitionProgress: progress,
         activeVerseIndex: activeIdxInRange,
         totalVerses: selectedVerses.length,
+        activeWordIndex,
       });
 
       syncCanvasMirror(cv, fullscreenCanvasRef?.current);
@@ -246,12 +268,14 @@ export function useStudioCanvas({
       currentChapter,
       reciterName,
       isPlaying,
+      customAudioUrl,
       activeIdxInRange,
       selectedVerses.length,
       canvasRef,
       fullscreenCanvasRef,
       bgVideoElRef,
       fadeStartRef,
+      studioAudioRef,
       exportSettings.transition,
       exportSettings.transitionDurationMs,
     ]

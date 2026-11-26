@@ -211,6 +211,12 @@ export function estimateExportSizeMb(params: {
 export const MAX_EXPORT_VERSES = 286;
 export const MAX_EXPORT_SLIDES = MAX_EXPORT_VERSES + 1;
 /**
+ * Ceiling for karaoke (word/segment-level) export slides. Word-granular slides
+ * multiply quickly (a verse averages ~12 words), so exports beyond this count
+ * gracefully fall back to per-verse slides (tracking preview still works live).
+ */
+export const MAX_WORD_SLIDES = 600;
+/**
  * Chained xfade on Windows creates large command lines (scaling + xfade filters per slide).
  * To guarantee strict immunity against Windows CreateProcessW 32,767-character buffer limits
  * (ENAMETOOLONG / uv_spawn errno -4064), we keep chained xfade to <= 30 slides (~10KB args)

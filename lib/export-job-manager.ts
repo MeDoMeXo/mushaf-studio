@@ -15,6 +15,7 @@ import {
   DEFAULT_VIDEO_EXPORT_SETTINGS,
   MAX_EXPORT_SLIDES,
   MAX_EXPORT_VERSES,
+  MAX_WORD_SLIDES,
   shouldRenderAnimatedAmbient,
   type AmbientSoundPreset,
   type AudioEffectPreset,
@@ -30,6 +31,15 @@ import { INTRO_COVER_DURATION_SEC } from '@/lib/surah-cover';
 export const JOBS_ROOT = path.join(os.tmpdir(), 'quran-export-jobs');
 const JOB_TTL_MS = 25 * 60 * 1000;
 const UUID_RE = /^[a-f0-9-]{36}$/i;
+
+export interface KaraokeWordTimelineEntry {
+  /** Index of the verse inside meta.verseIds. */
+  verseIdx: number;
+  /** Word being recited on this slide (segment-first word for segment slides). */
+  wordIdx: number;
+  /** Relative spoken-duration weight inside the verse. */
+  weight: number;
+}
 
 export interface ExportJobMeta {
   surahId: number;
@@ -47,6 +57,8 @@ export interface ExportJobMeta {
   verseIds: number[];
   /** Optional index-aligned verse texts (Uthmani) for synchronized SRT output. */
   verseTexts?: string[];
+  /** Karaoke word/segment timeline — per-slide entries whose durations split the verse audio. */
+  wordTimeline?: KaraokeWordTimelineEntry[];
   baseWidth: number;
   baseHeight: number;
   slideCount: number;
@@ -203,15 +215,47 @@ export async function createExportSession(
         .slice(0, MAX_EXPORT_VERSES)
         .map((n) => Math.max(1, Math.min(6236, Math.floor(Number(n) || 1))))
     : [1];
+
+  // Karaoke word/segment timeline — numeric-only sanitization: valid verse
+  // indices, non-negative words, positive weights, hard count ceiling.
+  const rawTimeline = Array.isArray((rawMeta as { wordTimeline?: unknown }).wordTimeline)
+    ? ((rawMeta as { wordTimeline: unknown[] }).wordTimeline as unknown[])
+    : null;
+  const wordTimeline = rawTimeline
+    ? rawTimeline
+        .slice(0, MAX_WORD_SLIDES)
+        .map((raw) => {
+          if (typeof raw === 'string') {
+            try {
+              return JSON.parse(raw) as KaraokeWordTimelineEntry;
+            } catch {
+              return null;
+            }
+          }
+          return raw as Record<string, unknown> | null;
+        })
+        .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
+        .map((e) => ({
+          verseIdx: Math.max(0, Math.min(verseIds.length - 1, Math.floor(Number(e.verseIdx ?? 0) || 0))),
+          wordIdx: Math.max(0, Math.min(999, Math.floor(Number(e.wordIdx ?? 0) || 0))),
+          weight: Math.max(0.1, Math.min(500, Number(e.weight ?? 1) || 1)),
+        }))
+    : undefined;
+
+  const slideCeiling = wordTimeline && wordTimeline.length ? MAX_WORD_SLIDES : MAX_EXPORT_SLIDES;
   const slideCount = Math.max(
     1,
     Math.min(
-      MAX_EXPORT_SLIDES,
+      slideCeiling,
       Math.floor(
         Number(
           rawMeta.slideCount ||
-            (includeIntroCover ? verseIds.length + 1 : verseIds.length) ||
-            1
+            (wordTimeline && wordTimeline.length
+              ? wordTimeline.length + (includeIntroCover ? 1 : 0)
+              : includeIntroCover
+                ? verseIds.length + 1
+                : verseIds.length) ||
+              1
         )
       )
     )
@@ -273,6 +317,7 @@ export async function createExportSession(
     reciterReadId: validReadId,
     verseIds,
     verseTexts,
+    wordTimeline: wordTimeline && wordTimeline.length ? wordTimeline : undefined,
     baseWidth: Math.max(160, Math.floor(Number(rawMeta.baseWidth || 1080))),
     baseHeight: Math.max(160, Math.floor(Number(rawMeta.baseHeight || 1920))),
     slideCount,

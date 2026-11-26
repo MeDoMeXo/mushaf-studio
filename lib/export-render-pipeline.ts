@@ -101,8 +101,11 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
     // 2) Render Video Slides + Mux with already-encoded audio (-c:a copy!)
     const outputPath = path.join(dir, `output.${outputExt}`);
+    // Karaoke slides step word-by-word — crossfades between them would read as
+    // flicker, so the timeline renders with clean hard cuts (the concat engine).
+    const isKaraoke = Array.isArray(meta.wordTimeline) && meta.wordTimeline.length > 0;
     const crf = getCrfForQuality(meta.format, meta.quality);
-    const xfadeName = getXfadeTransitionName(meta.transition);
+    const xfadeName = isKaraoke ? null : getXfadeTransitionName(meta.transition);
     const hasValidFile = (p: string) => fs.stat(p).then((s) => s.size > 256).catch(() => false);
     const bgVideoPath = path.join(dir, 'bg_video.bin');
     const hasBgVideoFile = meta.hasBgVideo ? await hasValidFile(bgVideoPath) : false;
@@ -113,7 +116,8 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     const overlayPath = path.join(dir, 'overlay.png');
     const hasOverlayFile = hasBgVideoFile ? await hasValidFile(overlayPath) : false;
 
-    const useFastConcat = shouldUseFastConcatEngine(slidePaths.length, meta.transition);
+    const useFastConcat =
+      isKaraoke || shouldUseFastConcatEngine(slidePaths.length, meta.transition);
     const effectiveFps = getEffectiveExportFps(
       meta.fps,
       slidePaths.length,
@@ -141,7 +145,10 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
     const sumDurs = slideDurations.reduce((a, b) => a + b, 0) || totalAudioDur;
     const scaleDur = totalAudioDur / sumDurs;
-    const normalizedDurs = slideDurations.map((d) => Math.max(0.4, d * scaleDur));
+    // Karaoke word slides can legitimately be sub-second — the 0.4s floor
+    // would accumulate drift across dozens of words, so it drops to 0.2 there.
+    const slideDurFloor = isKaraoke ? 0.2 : 0.4;
+    const normalizedDurs = slideDurations.map((d) => Math.max(slideDurFloor, d * scaleDur));
 
     const ayahSlideCount = Math.max(1, slidePaths.length - (meta.includeIntroCover ? 1 : 0));
     status.stage = 'encoding_video';
@@ -290,9 +297,12 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
       // Long-surah concat path: the chosen soft-fade transition is honored via a
       // per-slide fade-in (st=0) so every verse change still reads as a gentle
-      // fade instead of a hard cut.
+      // fade instead of a hard cut — disabled for karaoke (word slides must cut
+      // cleanly or the whole text block would pulse at every word change).
       const concatFade =
-        xfadeName && slidePaths.length > 1 ? getConcatSlideFadeSec(meta.transitionDurationMs) : 0;
+        !isKaraoke && xfadeName && slidePaths.length > 1
+          ? getConcatSlideFadeSec(meta.transitionDurationMs)
+          : 0;
       const fadeFilter = concatFade > 0 ? `,fade=t=in:st=0:d=${concatFade.toFixed(2)}` : '';
 
       videoArgs.push(
@@ -410,7 +420,41 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     // was built from — subtitles can never drift from the rendered timeline.
     if (Array.isArray(meta.verseTexts) && meta.verseTexts.some((t) => t && t.trim())) {
       try {
-        const srtBody = buildSrtFromTimeline(normalizedDurs, meta.verseTexts);
+        // Karaoke: word slides of one verse merge into a single SRT cue — the
+        // verse text rides its first word slide and spans the whole verse.
+        let srtDurations = normalizedDurs;
+        let srtTexts = meta.verseTexts;
+        if (isKaraoke) {
+          const introOffset = meta.includeIntroCover ? 1 : 0;
+          const restDur = normalizedDurs.slice(introOffset);
+          const restTexts = (meta.verseTexts ?? []).slice(introOffset);
+          const mDurs: number[] = [];
+          const mTexts: string[] = [];
+          let accDur = 0;
+          let accText = '';
+          for (let i = 0; i < restDur.length; i++) {
+            const t = (restTexts[i] ?? '').trim();
+            if (t && accText) {
+              mDurs.push(accDur);
+              mTexts.push(accText);
+              accDur = 0;
+              accText = '';
+            }
+            if (t && !accText) accText = t;
+            accDur += restDur[i];
+          }
+          if (accText) {
+            mDurs.push(accDur);
+            mTexts.push(accText);
+          }
+          srtDurations = introOffset
+            ? [normalizedDurs[0], ...mDurs]
+            : mDurs;
+          srtTexts = introOffset
+            ? ['', ...mTexts]
+            : mTexts;
+        }
+        const srtBody = buildSrtFromTimeline(srtDurations, srtTexts);
         if (srtBody) {
           await fs.writeFile(path.join(getJobDir(jobId), 'output.srt'), srtBody, 'utf8');
         }

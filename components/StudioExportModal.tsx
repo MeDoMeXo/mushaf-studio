@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { type AudioCacheProgress } from '@/lib/audio-cache';
 import { runExportPipeline } from '@/lib/export-pipeline';
+import { buildKaraokeExportPlan } from '@/lib/export-karaoke-plan';
 import type { QulVerse, StudioState } from '@/lib/quran-data';
 import { resolveTranslationOption, toArabicDigits } from '@/lib/quran-utils';
 import { ExportCompletedCard, type ExportCompletedMeta } from './studio-ui/ExportCompletedCard';
@@ -103,7 +104,7 @@ export function StudioExportModal({
   }, [isBusy]);
 
   // Derived export estimates: target dimensions, intro cover + ~5.5s/verse duration, size.
-  const { targetDims, estimatedSizeMb } = useMemo(() => {
+  const { targetDims, estimatedSizeMb, karaokeSlideCount } = useMemo(() => {
     const dims = resolveExportDimensions(
       studioState.width,
       studioState.height,
@@ -122,17 +123,26 @@ export function StudioExportModal({
       quality: exportSettings.quality,
       audioBitrateKbps: exportSettings.audioBitrate,
     });
-    return { targetDims: dims, estimatedSizeMb: sizeMb };
+    const plan = buildKaraokeExportPlan(
+      studioState,
+      selectedVerses,
+      dims,
+      exportSettings.includeIntroCover !== false
+    );
+    return {
+      targetDims: dims,
+      estimatedSizeMb: sizeMb,
+      karaokeSlideCount: plan ? plan.totalSlides : 0,
+    };
   }, [
-    studioState.width,
-    studioState.height,
+    studioState,
+    selectedVerses,
     exportSettings.resolution,
     exportSettings.fps,
     exportSettings.quality,
     exportSettings.audioBitrate,
     exportSettings.verseGapSec,
     exportSettings.includeIntroCover,
-    selectedVerses.length,
   ]);
 
   // Network helpers (rate-limit retries, verified blob download, trigger
@@ -373,9 +383,16 @@ export function StudioExportModal({
                 <div>
                   <p className="text-[11px] text-[var(--ink-muted)]">عدد الشرائح</p>
                   <p className="text-sm font-bold text-[var(--ink-primary)] tabular-nums">
-                    {toArabicDigits(selectedVerses.length)} آيات
-                    {exportSettings.includeIntroCover !== false ? ' + غلاف' : ''}
+                    {karaokeSlideCount > 0
+                      ? `${toArabicDigits(karaokeSlideCount)} شريحة تتبّع`
+                      : `${toArabicDigits(selectedVerses.length)} آيات`}
+                    {karaokeSlideCount === 0 && exportSettings.includeIntroCover !== false ? ' + غلاف' : ''}
                   </p>
+                  {karaokeSlideCount > 0 && (
+                    <p className="mt-0.5 text-[10px] text-[var(--brand-emerald)] dark:text-[#E6C75A]">
+                      تتبّع كلمة-بكلمة متزامن مع التلاوة
+                    </p>
+                  )}
                 </div>
                 <div>
                   <p className="text-[11px] text-[var(--ink-muted)]">الأبعاد النهائية</p>

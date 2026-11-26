@@ -85,6 +85,8 @@ export type AmbientEffect =
 export type TextSourceMode = 'uthmani' | 'translation' | 'both';
 /** Verse text layout on the studio canvas: wrapped lines (default) or one auto-shrunk line. */
 export type VerseLineMode = 'wrap' | 'single';
+/** Shape of the recited-word highlight (karaoke) — the main text color is never replaced. */
+export type WordHighlightStyle = 'block' | 'underline' | 'tint';
 export type LabelPosition = 'top' | 'bottom' | 'top-right' | 'top-left' | 'bottom-right' | 'bottom-left' | 'hidden';
 export type ColorLutId = 'none' | 'golden' | 'cinema' | 'emerald' | 'sepia' | 'midnight';
 export type AyahNumberStyle = IslamicAyahMedallionStyle;
@@ -119,10 +121,18 @@ export interface StudioState {
   align: 'center' | 'right' | 'left';
   shadow: boolean;
   glow: boolean;
-  /** Verse layout: wrapped lines (default) or a single auto-fitted line. */
+  /** Verse layout: wrapped auto-fitted lines (default) or single-line pronunciation segments that follow the recitation. */
   verseLineMode?: VerseLineMode;
   /** Hide verse text entirely (audio + background + ornaments only) for voice-only videos. */
   hideVerses?: boolean;
+  /** Word-level highlight following the recitation audio (karaoke tracking). */
+  wordHighlight?: boolean;
+  /** Highlight shape: background block / underline / tinted word color. */
+  wordHighlightStyle?: WordHighlightStyle;
+  /** Highlight color (main text color stays untouched). */
+  wordHighlightColor?: string;
+  /** Highlight opacity for the block/underline shapes (0.15–0.85). */
+  wordHighlightOpacity?: number;
   goldFrame: boolean;
   corners: boolean;
   frameStyle: IslamicFrameStyle;

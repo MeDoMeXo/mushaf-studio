@@ -7,6 +7,7 @@ import { promises as fs } from 'node:fs';
 import path from 'node:path';
 import { toArabicDigits } from '@/lib/quran-utils';
 import { INTRO_COVER_DURATION_SEC } from '@/lib/surah-cover';
+import { distributeWordDurations } from '@/lib/verse-words';
 import {
   buildAmbientNoiseFilter,
   buildAudioEffectFilter,
@@ -53,6 +54,19 @@ export async function prepareExportAudio(
   const hasIntro = Boolean(meta.includeIntroCover) && slidePaths.length > 1;
   const introDurSec = hasIntro ? (meta.introCoverDurationSec || INTRO_COVER_DURATION_SEC) : 0;
   const introSecStr = introDurSec.toFixed(3);
+  // Karaoke timeline — one slide per recited word/segment; verse audio is
+  // split across its entries by spoken weight so slides stay audio-locked.
+  let wordTimeline =
+    Array.isArray(meta.wordTimeline) && meta.wordTimeline.length > 0
+      ? meta.wordTimeline
+      : null;
+  const karaokeSlideCount = wordTimeline
+    ? wordTimeline.length + (hasIntro ? 1 : 0)
+    : 0;
+  if (wordTimeline && karaokeSlideCount !== slidePaths.length) {
+    // Defensive: timeline must match the uploaded slide count exactly.
+    wordTimeline = null;
+  }
   const targetRate = meta.format === 'webm' ? 48000 : 44100;
   const audioEncodeArgs =
     meta.format === 'webm'
@@ -70,11 +84,26 @@ export async function prepareExportAudio(
     const customPath = path.join(dir, 'custom_audio_in');
     const customInfo = await probeAudioInfo(customPath);
     const rawCustomDur = customInfo.duration;
-    const verseSlideCount = Math.max(1, slidePaths.length - (hasIntro ? 1 : 0));
-    const perSlide = Math.max(0.5, rawCustomDur / verseSlideCount);
+    const verseSlideCount = Math.max(
+      1,
+      slidePaths.length - (hasIntro ? 1 : 0)
+    );
     if (hasIntro) slideDurations[0] = introDurSec;
-    for (let i = hasIntro ? 1 : 0; i < slidePaths.length; i++) {
-      slideDurations[i] = perSlide;
+    if (wordTimeline) {
+      // Custom audio + karaoke: split the single track across word entries
+      // by spoken weight so highlight slides still advance with the audio.
+      const durs = distributeWordDurations(
+        wordTimeline.map((e) => e.weight),
+        Math.max(1, rawCustomDur)
+      );
+      for (let i = 0; i < durs.length; i++) {
+        slideDurations[hasIntro ? i + 1 : i] = durs[i];
+      }
+    } else {
+      const perSlide = Math.max(0.5, rawCustomDur / verseSlideCount);
+      for (let i = hasIntro ? 1 : 0; i < slidePaths.length; i++) {
+        slideDurations[i] = perSlide;
+      }
     }
     totalAudioDur = rawCustomDur + introDurSec;
 
@@ -216,8 +245,37 @@ export async function prepareExportAudio(
     checkCancelled();
 
     if (hasIntro) slideDurations[0] = introDurSec;
-    for (let i = 0; i < verseDurations.length; i++) {
-      slideDurations[hasIntro ? i + 1 : i] = verseDurations[i];
+    if (wordTimeline) {
+      // Split each verse's REAL audio duration across its word/segment
+      // entries by spoken weight; the inter-verse gap lands on the verse's
+      // final word slide so audio and slides stay in perfect lockstep.
+      const groups = new Map<number, { slideIdx: number[]; weights: number[] }>();
+      wordTimeline.forEach((entry, i) => {
+        const slideIdx = hasIntro ? i + 1 : i;
+        let g = groups.get(entry.verseIdx);
+        if (!g) {
+          g = { slideIdx: [], weights: [] };
+          groups.set(entry.verseIdx, g);
+        }
+        g.slideIdx.push(slideIdx);
+        g.weights.push(entry.weight);
+      });
+      for (const [verseIdx, group] of groups) {
+        const isLastVerse = verseIdx >= verseDurations.length - 1;
+        const gapSec = !isLastVerse && gapMs > 0 ? meta.verseGapSec : 0;
+        const audioDur = Math.max(
+          0.5,
+          (verseDurations[verseIdx] ?? 3.5) - gapSec
+        );
+        const durs = distributeWordDurations(group.weights, audioDur);
+        group.slideIdx.forEach((slideIdx, k) => {
+          slideDurations[slideIdx] = durs[k] + (k === durs.length - 1 ? gapSec : 0);
+        });
+      }
+    } else {
+      for (let i = 0; i < verseDurations.length; i++) {
+        slideDurations[hasIntro ? i + 1 : i] = verseDurations[i];
+      }
     }
     totalAudioDur = slideDurations.reduce((a, b) => a + b, 0);
 
