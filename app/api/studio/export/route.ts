@@ -581,9 +581,13 @@ export async function POST(req: NextRequest) {
   } catch (err) {
     console.error('[studio/export] render failed:', err);
     const msg = err instanceof Error ? err.message : String(err);
+    const errnoCode =
+      err && typeof err === 'object' && 'code' in err
+        ? String((err as { code?: unknown }).code)
+        : '';
     // Surface a clear install hint when FFmpeg/ffprobe is the root cause.
     const isMissingFfmpeg =
-      (err instanceof Error && err.code === 'ENOENT') ||
+      errnoCode === 'ENOENT' ||
       /ENOENT|spawn (ffmpeg|ffprobe)|not found/i.test(msg);
     return NextResponse.json(
       {

@@ -20,7 +20,7 @@ import {
 } from '@/lib/ffmpeg-resolver';
 import type { ActiveJobRuntime } from './export-job-manager';
 
-export { resolveFfmpegPath, resolveFfprobePath };
+export { isFfmpegAvailable, isFfprobeAvailable, resolveFfmpegPath, resolveFfprobePath };
 
 const execFileAsync = promisify(execFile);
 
