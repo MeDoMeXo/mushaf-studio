@@ -66,12 +66,14 @@ const LETTER_NAME_WEIGHTS = new Map<string, number>([
 /** Marks that may trail a disjointed letter (diacritics, madd, waqf signs). */
 const LETTER_TRAILING_MARK_RE = /^[\u064B-\u0655\u0670\u06D6-\u06DD\u06E4-\u06E6\u0640 ]*$/;
 
-/** Reduces a token to its bare Arabic letters (alef-wasla folded to ا). */
+/** Reduces a token to its bare Arabic letters (alef-wasla & Farsi yeh folded). */
 function normalizeToLetters(token: string): string {
   let out = '';
   for (const ch of token) {
     if (ch === '\u0671') {
       out += '\u0627';
+    } else if (ch === '\u06CC') {
+      out += '\u064A'; // Farsi yeh → Arabic yeh (defensive: QUL chapter names use it)
     } else if (
       (ch >= '\u0621' && ch <= '\u064A') ||
       (ch >= '\u0671' && ch <= '\u06D3')

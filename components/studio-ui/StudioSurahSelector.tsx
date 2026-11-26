@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { Search, X } from 'lucide-react';
 import type { QulChapter } from '@/lib/quran-data';
 import { filterChapters, toArabicDigits } from '@/lib/quran-utils';
@@ -10,6 +10,9 @@ interface StudioSurahSelectorProps {
   chapters: QulChapter[];
   onSelectSurah: (surahId: number) => void;
 }
+
+const formatChapterOption = (ch: QulChapter) =>
+  `${toArabicDigits(ch.id)}. سورة ${ch.name_arabic} (${toArabicDigits(ch.verses_count)} آية)`;
 
 export function StudioSurahSelector({
   currentSurahId,
@@ -22,6 +25,20 @@ export function StudioSurahSelector({
     return filterChapters(chapters, searchQuery, 'all');
   }, [chapters, searchQuery]);
 
+  const trimmedQuery = searchQuery.trim();
+
+  // ── التنشيط التلقائي للبحث ──
+  // When the query narrows the list to exactly ONE surah, the user's target
+  // is determined (any continuation of the query keeps it as the only
+  // match), so the surah loads immediately — no Enter or manual pick
+  // needed. Typing «الكهف» أو «18» يُحمّل السورة فوراً.
+  const uniqueMatch =
+    trimmedQuery && filteredChapters.length === 1 ? filteredChapters[0] : null;
+  useEffect(() => {
+    if (!uniqueMatch || uniqueMatch.id === currentSurahId) return;
+    onSelectSurah(uniqueMatch.id);
+  }, [uniqueMatch, currentSurahId, onSelectSurah]);
+
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && filteredChapters.length > 0) {
       e.preventDefault();
@@ -29,7 +46,16 @@ export function StudioSurahSelector({
     }
   };
 
-  const hasSearch = searchQuery.trim().length > 0;
+  const hasSearch = trimmedQuery.length > 0;
+
+  // Keep the controlled <select> honest: when the current surah is filtered
+  // out, it is still rendered (selected) so the widget never *displays* a
+  // surah the studio hasn't actually loaded.
+  const currentChapter = useMemo(
+    () => chapters.find((c) => c.id === currentSurahId),
+    [chapters, currentSurahId]
+  );
+  const currentInFiltered = filteredChapters.some((c) => c.id === currentSurahId);
 
   return (
     <div className="space-y-2">
@@ -74,6 +100,12 @@ export function StudioSurahSelector({
         )}
       </div>
 
+      {hasSearch && filteredChapters.length > 1 && (
+        <p className="text-[10px] leading-relaxed text-[var(--ink-muted)]">
+          أكمل البحث لتحديد السورة، أو اضغط Enter للانتقال إلى أول نتيجة.
+        </p>
+      )}
+
       {/* Surah Dropdown Selector */}
       <div>
         <select
@@ -83,16 +115,23 @@ export function StudioSurahSelector({
           onChange={(e) => onSelectSurah(Number(e.target.value))}
           className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-sm font-semibold text-[var(--ink-primary)] transition-colors focus:border-[var(--brand-gold)] focus:outline-none"
         >
+          {currentChapter && !currentInFiltered && (
+            <option value={currentChapter.id}>
+              {formatChapterOption(currentChapter)}
+            </option>
+          )}
           {filteredChapters.length > 0 ? (
             filteredChapters.map((ch) => (
               <option key={ch.id} value={ch.id}>
-                {toArabicDigits(ch.id)}. سورة {ch.name_arabic} ({toArabicDigits(ch.verses_count)} آية)
+                {formatChapterOption(ch)}
               </option>
             ))
           ) : (
-            <option disabled value="">
-              لا توجد سورة مطابقة لـ &quot;{searchQuery}&quot;
-            </option>
+            !currentChapter && (
+              <option disabled value="">
+                لا توجد سورة مطابقة لـ &quot;{searchQuery}&quot;
+              </option>
+            )
           )}
         </select>
       </div>

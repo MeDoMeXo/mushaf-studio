@@ -45,6 +45,19 @@ export function toArabicDigits(value: number | string): string {
   return String(value).replace(/[0-9]/g, (d) => ARABIC_DIGITS[Number(d)]);
 }
 
+const ARABIC_INDIC_DIGIT_RE = /[٠-٩۰-۹]/g;
+
+/** Converts Arabic-Indic/Persian digits (١٨ / ۱۸) to ASCII digits ("18"). */
+export function normalizeArabicDigits(input: string): string {
+  if (!input) return input;
+  return input.replace(ARABIC_INDIC_DIGIT_RE, (d) => {
+    const cp = d.codePointAt(0) ?? 0;
+    if (cp >= 0x0660 && cp <= 0x0669) return String(cp - 0x0660);
+    if (cp >= 0x06f0 && cp <= 0x06f9) return String(cp - 0x06f0);
+    return d;
+  });
+}
+
 export function formatAudioTime(seconds: number): string {
   if (!Number.isFinite(seconds) || seconds < 0) return '0:00';
   const total = Math.floor(seconds);
@@ -66,6 +79,8 @@ export function stripArabicDiacritics(input: string): string {
   return input
     .replace(/[\u064B-\u065F\u0670\u06D6-\u06ED\u0640]/g, '')
     .replace(/[\u0622\u0623\u0625\u0671]/g, '\u0627')
+    // Farsi yeh (QUL uses it in «یسٓ») folds to Arabic yeh so user queries match.
+    .replace(/\u06CC/g, '\u064A')
     .replace(/\u0629/g, '\u0647')
     .replace(/\u0649/g, '\u064A')
     .trim();
@@ -99,7 +114,8 @@ export function filterChapters(
   query: string,
   place: 'all' | 'makkah' | 'madinah'
 ): QulChapter[] {
-  const qNorm = stripArabicDiacritics(query).toLowerCase();
+  // Arabic-Indic digits fold to ASCII so «١٨» finds سورة 18 just like "18".
+  const qNorm = normalizeArabicDigits(stripArabicDiacritics(query)).toLowerCase();
   return chapters.filter((ch) => {
     if (place !== 'all' && ch.revelation_place !== place) return false;
     if (!qNorm) return true;
