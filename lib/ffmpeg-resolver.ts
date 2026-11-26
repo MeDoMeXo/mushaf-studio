@@ -1,47 +1,94 @@
-import { existsSync } from 'fs';
+import { existsSync, readdirSync } from 'fs';
 import path from 'path';
 
 /**
- * Auto-detect FFmpeg/ffprobe binaries across platforms (including Windows
- * WinGet / Scoop / Chocolatey paths and explicit PATH search).
+ * Auto-detect FFmpeg/ffprobe binaries across platforms (Windows WinGet /
+ * Scoop / Chocolatey, plus an explicit PATH walk).
  *
- * On Windows, `child_process.spawn('ffprobe')` fails with ENOENT even when
- * ffprobe.exe is on PATH because CreateProcess does not append the `.exe`
- * extension for bare names. We therefore walk PATH ourselves and return the
- * fully-qualified path to the executable. Only when every lookup fails do we
- * fall back to the bare name (letting the caller surface a clear error).
+ * Why the PATH walk: on Windows `child_process.spawn('ffprobe')` fails with
+ * ENOENT even when ffprobe.exe is on PATH (CreateProcess quirks with bare
+ * names), so we resolve the fully-qualified path ourselves.
+ *
+ * Why the WinGet scan is version-agnostic: the WinGet package folder name
+ * embeds the ffmpeg version (e.g. `ffmpeg-7.1.1-full_build`), which changes
+ * with every release. Hardcoding one version misses every other install.
+ * We therefore enumerate any `*ffmpeg*` package dir and search inside for
+ * `bin/<exe>` (direct or one level down).
+ *
+ * Failures (bare-name fallback) are NOT cached — so FFmpeg installed while
+ * the server is running is picked up on the very next export attempt
+ * without requiring a process restart.
  */
 let cachedFfmpegPath: string | null = null;
 let cachedFfprobePath: string | null = null;
+let warnedMissing = false;
 
-/** Directories to search for the binary, derived from PATH + well-known spots. */
-function buildSearchDirs(winExtras: string[]): string[] {
-  const dirs: string[] = [];
-  // 1. Well-known Windows install locations (passed in via winExtras).
-  if (process.platform === 'win32') {
-    dirs.push(...winExtras);
+/** List immediate subdirectories of `base` matching `filter`. Never throws. */
+function listSubDirs(base: string, filter: RegExp): string[] {
+  try {
+    if (!existsSync(base)) return [];
+    return readdirSync(base, { withFileTypes: true })
+      .filter((d) => d.isDirectory() && filter.test(d.name))
+      .map((d) => path.join(base, d.name));
+  } catch {
+    return [];
   }
-  // 2. Every directory on PATH (cross-platform). On Windows the separator is
-  //    `;`, on POSIX it is `:`.
+}
+
+/** Search `root/bin/<exe>` and `root/<any-subdir>/bin/<exe>`. */
+function findUnderRoot(root: string, fileName: string): string | null {
+  const direct = path.join(root, 'bin', fileName);
+  if (existsSync(direct)) return direct;
+  for (const sub of listSubDirs(root, /./)) {
+    const cand = path.join(sub, 'bin', fileName);
+    if (existsSync(cand)) return cand;
+  }
+  return null;
+}
+
+/** Every directory on PATH (plus common POSIX fallback dirs). */
+function buildPathDirs(): string[] {
+  const dirs: string[] = [];
   const pathEnv = process.env.PATH || process.env.Path || '';
   const sep = process.platform === 'win32' ? ';' : ':';
   for (const dir of pathEnv.split(sep)) {
-    const trimmed = dir.trim();
+    const trimmed = dir.trim().replace(/^"|"$/g, '');
     if (trimmed && !dirs.includes(trimmed)) dirs.push(trimmed);
   }
-  // 3. Common POSIX locations (Homebrew, /usr/local, snap).
   if (process.platform !== 'win32') {
     dirs.push('/usr/local/bin', '/usr/bin', '/opt/homebrew/bin', '/snap/bin');
   }
   return dirs;
 }
 
-/** Resolve a binary by walking search dirs for the platform-correct filename. */
-function resolveBinary(
-  bareName: string,
-  envVar: string,
-  winExtras: string[]
-): string {
+/** Windows roots scanned recursively-ish for any ffmpeg layout. */
+function windowsScanRoots(): string[] {
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const roots: string[] = [];
+  if (localAppData) {
+    // WinGet packages — any publisher containing "ffmpeg" (Gyan.FFmpeg, BtbN.FFmpeg, …)
+    roots.push(...listSubDirs(path.join(localAppData, 'Microsoft', 'WinGet', 'Packages'), /ffmpeg/i));
+    roots.push(path.join(localAppData, 'scoop', 'apps', 'ffmpeg', 'current'));
+  }
+  return roots;
+}
+
+/** Windows dirs checked directly as `dir/<exe>`. */
+function windowsDirectDirs(): string[] {
+  const localAppData = process.env.LOCALAPPDATA || '';
+  const programFiles = process.env.ProgramFiles || 'C:\\Program Files';
+  return [
+    path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
+    path.join(localAppData, 'scoop', 'apps', 'ffmpeg', 'current', 'bin'),
+    'C:\\ffmpeg\\bin',
+    path.join(programFiles, 'ffmpeg', 'bin'),
+    path.join(programFiles, 'FFmpeg', 'bin'),
+    'C:\\tools\\ffmpeg\\bin',
+    'C:\\ProgramData\\chocolatey\\bin',
+  ];
+}
+
+function resolveBinary(bareName: string, envVar: string): string {
   const ext = process.platform === 'win32' ? '.exe' : '';
   const fileName = `${bareName}${ext}`;
 
@@ -49,63 +96,76 @@ function resolveBinary(
   const envVal = process.env[envVar];
   if (envVal && existsSync(envVal)) return envVal;
 
-  // 2. Walk search dirs.
-  for (const dir of buildSearchDirs(winExtras)) {
-    const candidate = path.join(dir, fileName);
-    if (existsSync(candidate)) return candidate;
+  if (process.platform === 'win32') {
+    // 2. Version-agnostic WinGet / Scoop package scan.
+    for (const root of windowsScanRoots()) {
+      const hit = findUnderRoot(root, fileName);
+      if (hit) return hit;
+    }
+    // 3. Well-known direct install locations.
+    for (const dir of windowsDirectDirs()) {
+      const cand = path.join(dir, fileName);
+      if (existsSync(cand)) return cand;
+    }
   }
 
-  // 3. Last resort: return the bare name. On Windows this will ENOENT unless
-  //    the caller uses shell:true, but we keep it so callers can detect the
-  //    failure and fall back (e.g. probe via ffmpeg).
+  // 4. Walk every PATH entry (platform-correct separator + extension).
+  for (const dir of buildPathDirs()) {
+    const cand = path.join(dir, fileName);
+    if (existsSync(cand)) return cand;
+  }
+
+  // 5. Last resort: bare name (callers detect failure and fall back).
   return bareName;
 }
 
+/** Cache only successful resolutions — failures re-scan next call. */
+function cachedResolve(
+  cacheKey: 'ffmpeg' | 'ffprobe',
+  bareName: string,
+  envVar: string
+): string {
+  const cached = cacheKey === 'ffmpeg' ? cachedFfmpegPath : cachedFfprobePath;
+  if (cached) return cached;
+  const resolved = resolveBinary(bareName, envVar);
+  if (resolved !== bareName) {
+    if (cacheKey === 'ffmpeg') cachedFfmpegPath = resolved;
+    else cachedFfprobePath = resolved;
+  }
+  return resolved;
+}
+
+function warnMissing(kind: 'FFmpeg' | 'ffprobe'): void {
+  if (warnedMissing) return;
+  warnedMissing = true;
+  console.warn(
+    `[ffmpeg-resolver] ${kind} was not found on this machine — video export will fail. ` +
+      'Install FFmpeg (winget install Gyan.FFmpeg on Windows, brew install ffmpeg on macOS, ' +
+      'or apt install ffmpeg on Linux) — the resolver picks it up on the next export attempt ' +
+      'without restarting — or set the FFMPEG_PATH / FFPROBE_PATH env vars to the binaries.'
+  );
+}
+
 export function resolveFfmpegPath(): string {
-  if (cachedFfmpegPath) return cachedFfmpegPath;
-  const localAppData = process.env.LOCALAPPDATA || '';
-  const winExtras = process.platform === 'win32'
-    ? [
-        path.join(localAppData, 'Microsoft', 'WinGet', 'Packages', 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe', 'ffmpeg-9.1-full_build', 'bin'),
-        path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
-        'C:\\ffmpeg\\bin',
-        'C:\\Program Files\\ffmpeg\\bin',
-        'C:\\ProgramData\\chocolatey\\bin',
-        path.join(localAppData, 'scoop', 'apps', 'ffmpeg', 'current', 'bin'),
-      ]
-    : [];
-  return (cachedFfmpegPath = resolveBinary('ffmpeg', 'FFMPEG_PATH', winExtras));
+  return cachedResolve('ffmpeg', 'ffmpeg', 'FFMPEG_PATH');
 }
 
 export function resolveFfprobePath(): string {
-  if (cachedFfprobePath) return cachedFfprobePath;
-  const localAppData = process.env.LOCALAPPDATA || '';
-  const winExtras = process.platform === 'win32'
-    ? [
-        path.join(localAppData, 'Microsoft', 'WinGet', 'Packages', 'Gyan.FFmpeg_Microsoft.Winget.Source_8wekyb3d8bbwe', 'ffmpeg-9.1-full_build', 'bin'),
-        path.join(localAppData, 'Microsoft', 'WinGet', 'Links'),
-        'C:\\ffmpeg\\bin',
-        'C:\\Program Files\\ffmpeg\\bin',
-        'C:\\ProgramData\\chocolatey\\bin',
-        path.join(localAppData, 'scoop', 'apps', 'ffmpeg', 'current', 'bin'),
-      ]
-    : [];
-  return (cachedFfprobePath = resolveBinary('ffprobe', 'FFPROBE_PATH', winExtras));
+  return cachedResolve('ffprobe', 'ffprobe', 'FFPROBE_PATH');
 }
 
-/**
- * Whether the resolved ffprobe path points to a real file on disk. When false,
- * ffprobe is unavailable and callers should fall back to probing via ffmpeg.
- */
+/** Whether the resolved ffprobe path points to a real file on disk. */
 export function isFfprobeAvailable(): boolean {
   const p = resolveFfprobePath();
-  return p !== 'ffprobe' && p !== 'ffprobe.exe' && existsSync(p);
+  const ok = p !== 'ffprobe' && p !== 'ffprobe.exe' && existsSync(p);
+  if (!ok) warnMissing('ffprobe');
+  return ok;
 }
 
-/**
- * Whether the resolved ffmpeg path points to a real file on disk.
- */
+/** Whether the resolved ffmpeg path points to a real file on disk. */
 export function isFfmpegAvailable(): boolean {
   const p = resolveFfmpegPath();
-  return p !== 'ffmpeg' && p !== 'ffmpeg.exe' && existsSync(p);
+  const ok = p !== 'ffmpeg' && p !== 'ffmpeg.exe' && existsSync(p);
+  if (!ok) warnMissing('FFmpeg');
+  return ok;
 }

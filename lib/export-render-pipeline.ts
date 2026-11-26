@@ -44,7 +44,7 @@ import { prepareExportAudio } from './export-audio-prep';
 
 /** Arabic, actionable message shown when FFmpeg is not installed. */
 const FFMPEG_MISSING_MSG =
-  'لم يتم العثور على FFmpeg — ثبّته (winget install Gyan.FFmpeg على ويندوز، أو عبر Homebrew على ماك) واضبطه على PATH، أو اضبط FFMPEG_PATH، ثم أعد التصدير.';
+  'لم يتم العثور على FFmpeg — ثبّته (winget install Gyan.FFmpeg على ويندوز، أو brew install ffmpeg على ماك) ثم أعد التصدير مباشرة؛ وإن ثبّته يدوياً فأضبطه على PATH وأعد تشغيل خادم التطوير، أو اضبط FFMPEG_PATH.';
 
 
 export async function runExportPipeline(jobId: string): Promise<void> {

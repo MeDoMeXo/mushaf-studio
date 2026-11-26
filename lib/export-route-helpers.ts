@@ -27,7 +27,7 @@ const execFileAsync = promisify(execFile);
 
 /** Human-readable Arabic error shown when FFmpeg is not installed. */
 export const FFMPEG_MISSING_ERROR =
-  'لم يتم العثور على FFmpeg على النظام — ثبّته (winget install Gyan.FFmpeg على ويندوز) أو اضبط متغيّر البيئة FFMPEG_PATH ثم أعد التصدير.';
+  'لم يتم العثور على FFmpeg على النظام — ثبّته (winget install Gyan.FFmpeg على ويندوز، أو brew install ffmpeg على ماك) ثم أعد التصدير مباشرة؛ وإن ثبّته يدوياً فأضبطه على PATH وأعد تشغيل خادم التطوير، أو اضبط FFMPEG_PATH.';
 
 export interface ExportPayloadMeta {
   surahId: number;
