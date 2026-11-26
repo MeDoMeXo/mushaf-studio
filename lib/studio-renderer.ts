@@ -574,10 +574,8 @@ function drawAmbientEffect(
 }
 
 
-export { drawMainText, resolveLabelCoords } from './studio-text-renderer';
+export { drawMainText } from './studio-text-renderer';
+export { resolveLabelCoords } from './studio-text-labels';
 import { drawUnifiedCoverTypography } from './cover-canvas-renderer';
-import {
-  drawMainText,
-  drawMetadataLabels,
-  drawProgressDots,
-} from './studio-text-renderer';
+import { drawMainText } from './studio-text-renderer';
+import { drawMetadataLabels, drawProgressDots } from './studio-text-labels';

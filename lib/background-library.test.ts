@@ -1,7 +1,8 @@
 /**
- * Tests for the built-in background library registry: 10 curated animated
- * backgrounds (5 procedural Islamic + 5 licensed nature clips) served from
+ * Tests for the built-in background library registry: 9 curated animated
+ * backgrounds (5 procedural Islamic + 4 licensed nature clips) served from
  * public/assets/bg-library/ and referenced by id in export sessions.
+ * (جدول رقراق / nature-5-river was removed at the owner's request.)
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -15,13 +16,13 @@ import {
   getBuiltinBackgroundPublicPath,
 } from './background-library';
 
-test('BUILTIN_BG_LIBRARY holds exactly 10 unique entries — 5 islamic + 5 nature', () => {
-  assert.equal(BUILTIN_BG_LIBRARY.length, 10);
-  assert.equal(BUILTIN_BG_COUNT, 10);
+test('BUILTIN_BG_LIBRARY holds exactly 9 unique entries — 5 islamic + 4 nature', () => {
+  assert.equal(BUILTIN_BG_LIBRARY.length, 9);
+  assert.equal(BUILTIN_BG_COUNT, 9);
   const ids = new Set(BUILTIN_BG_LIBRARY.map((b) => b.id));
-  assert.equal(ids.size, 10, 'ids must be unique');
+  assert.equal(ids.size, 9, 'ids must be unique');
   assert.equal(BUILTIN_BG_LIBRARY.filter((b) => b.category === 'islamic').length, 5);
-  assert.equal(BUILTIN_BG_LIBRARY.filter((b) => b.category === 'nature').length, 5);
+  assert.equal(BUILTIN_BG_LIBRARY.filter((b) => b.category === 'nature').length, 4);
 });
 
 test('every library entry points at an existing mp4 inside public/assets/bg-library', () => {
@@ -37,7 +38,8 @@ test('every library entry points at an existing mp4 inside public/assets/bg-libr
 
 test('isBuiltinBackgroundId accepts known ids and rejects anything else', () => {
   assert.equal(isBuiltinBackgroundId('islamic-1-star-rotate'), true);
-  assert.equal(isBuiltinBackgroundId('nature-5-river'), true);
+  // removed entry (جدول رقراق) must be rejected like any unknown id
+  assert.equal(isBuiltinBackgroundId('nature-5-river'), false);
   // path traversal / injection attempts must never match
   assert.equal(isBuiltinBackgroundId('../../etc/passwd'), false);
   assert.equal(isBuiltinBackgroundId('islamic-1-star-rotate.mp4'), false);

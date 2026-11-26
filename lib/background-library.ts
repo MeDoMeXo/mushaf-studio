@@ -107,15 +107,6 @@ export const BUILTIN_BG_LIBRARY: readonly BuiltinBackground[] = [
     license: 'Mixkit License',
     sourceUrl: 'https://mixkit.co/free-stock-video/leaves/',
   },
-  {
-    id: 'nature-5-river',
-    name: 'جدول رقراق',
-    category: 'nature',
-    file: 'nature-5-river.mp4',
-    posterColors: ['#35566b', '#cfe8f2'],
-    license: 'Mixkit License',
-    sourceUrl: 'https://mixkit.co/free-stock-video/river/',
-  },
 ];
 
 export const BUILTIN_BG_COUNT = BUILTIN_BG_LIBRARY.length;

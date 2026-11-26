@@ -5,8 +5,13 @@
  * the rounded-rect highlight painter shared by the main text layer.
  */
 import type { StudioState } from './quran-data-types';
-import { resolveOrnamentConfig } from './ornaments/ornaments-geometry';
-import type { AyahWordTiming } from './verse-words';
+import { hexToRgba, resolveOrnamentConfig } from './ornaments/ornaments-geometry';
+import {
+  getTranslationDirection,
+  resolveTranslationOption,
+} from './quran-utils';
+import { isLightColor } from './studio-renderer-shared';
+import type { AyahSegment, AyahWordTiming } from './verse-words';
 
 /** Rounded-rect helper with manual fallback for older canvas implementations. */
 export function fillRoundedRect(
@@ -138,4 +143,91 @@ export function computeVerticalBudget(state: StudioState): {
     (hasBottomDots ? Math.round(minSide * 0.06) : 0);
   const availH = Math.max(h * 0.42, h - reservedTop - reservedBottom);
   return { reservedTop, reservedBottom, availH };
+}
+
+/**
+ * Slices the verse translation chunk that corresponds to one pronunciation
+ * segment (single-line mode): translation words map proportionally onto the
+ * ayah timeline [0..1] and the segment's [startRatio, endRatio] window picks
+ * the words being "covered" by that recitation phrase — the same line
+ * treatment the Arabic gets, keeping the translation contained per segment
+ * instead of repeating the whole block on every slide.
+ */
+export function splitTranslationForSegment(
+  translationText: string,
+  segment: AyahSegment
+): string {
+  const words = (translationText || '').trim().split(/\s+/).filter(Boolean);
+  if (!words.length) return '';
+  const total = words.length;
+  const picked: string[] = [];
+  for (let i = 0; i < total; i++) {
+    const mid = (i + 0.5) / total;
+    if (mid >= segment.startRatio - 1e-9 && mid <= segment.endRatio + 1e-9) {
+      picked.push(words[i]);
+    }
+  }
+  if (picked.length) return picked.join(' ');
+  // Rounding fallback — proportional slice by count.
+  const from = Math.min(total - 1, Math.max(0, Math.floor(segment.startRatio * total)));
+  const to = Math.max(from + 1, Math.min(total, Math.ceil(segment.endRatio * total)));
+  return words.slice(from, to).join(' ');
+}
+
+export interface TranslationBlockParams {
+  state: StudioState;
+  trLines: string[];
+  transFontSize: number;
+  trLineHeight: number;
+  gapBetween: number;
+  maxW: number;
+  x: number;
+  y: number;
+  hasArabic: boolean;
+  scaleFactor: number;
+  ornamentColor: string;
+  cairoFontStack: string;
+}
+
+/**
+ * Paints the (already auto-fitted) translation lines below the verse: a thin
+ * ornament divider when Arabic is present, then the wrapped lines with the
+ * translation's own direction and muted color. Returns the advanced y cursor.
+ */
+export function drawTranslationBlock(
+  ctx: CanvasRenderingContext2D,
+  p: TranslationBlockParams
+): number {
+  const { state, trLines, transFontSize, trLineHeight, gapBetween, maxW, x, y } = p;
+  const trMeta = resolveTranslationOption(state.translationId);
+  let cursor = y;
+
+  if (p.hasArabic) {
+    const dividerY = cursor + gapBetween * 0.5;
+    const dividerHalfW = Math.min(72, Math.round(maxW * 0.12));
+    ctx.save();
+    ctx.shadowColor = 'transparent';
+    ctx.shadowBlur = 0;
+    ctx.strokeStyle = hexToRgba(p.ornamentColor, 0.42);
+    ctx.lineWidth = Math.max(1.5, Math.round(p.scaleFactor * 1.8));
+    ctx.beginPath();
+    ctx.moveTo(x - dividerHalfW, dividerY);
+    ctx.lineTo(x + dividerHalfW, dividerY);
+    ctx.stroke();
+    ctx.restore();
+  }
+
+  cursor += gapBetween + trLineHeight / 2;
+  ctx.font = `500 ${transFontSize}px ${p.cairoFontStack}`;
+  ctx.textAlign = state.align;
+  ctx.fillStyle = isLightColor(state.textColor)
+    ? 'rgba(244, 241, 232, 0.90)'
+    : 'rgba(31, 27, 22, 0.86)';
+  ctx.direction = getTranslationDirection(trMeta.lang);
+  ctx.shadowBlur = state.shadow ? 8 : 0;
+  for (const line of trLines) {
+    ctx.fillText(line, x, cursor);
+    cursor += trLineHeight;
+  }
+  return cursor;
 }
