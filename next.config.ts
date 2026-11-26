@@ -1,4 +1,6 @@
-import type {NextConfig} from 'next';
+import type { NextConfig } from 'next';
+import ffmpegPath from 'ffmpeg-static';
+import ffprobeStatic from 'ffprobe-static';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -7,6 +9,17 @@ const nextConfig: NextConfig = {
   },
   typescript: {
     ignoreBuildErrors: false,
+  },
+  env: {
+    FFMPEG_PATH: ffmpegPath || '',
+    FFPROBE_PATH: ffprobeStatic.path || '',
+  },
+  serverExternalPackages: ['ffmpeg-static', 'ffprobe-static'],
+  outputFileTracingIncludes: {
+    '/api/**/*': [
+      './node_modules/ffmpeg-static/**/*',
+      './node_modules/ffprobe-static/**/*',
+    ],
   },
   // Allow access to remote image placeholder.
   images: {
@@ -49,7 +62,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
-  webpack: (config, {dev}) => {
+  webpack: (config, { dev }) => {
     // HMR is disabled in AI Studio via DISABLE_HMR env var.
     // Do not modify—file watching is disabled to prevent flickering during agent edits.
     if (dev && process.env.DISABLE_HMR === 'true') {
