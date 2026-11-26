@@ -39,7 +39,12 @@ import {
   probeOutputVideo,
   spawnFfmpegTracked,
 } from './export-job-helpers';
+import { isFfmpegAvailable } from './ffmpeg-resolver';
 import { prepareExportAudio } from './export-audio-prep';
+
+/** Arabic, actionable message shown when FFmpeg is not installed. */
+const FFMPEG_MISSING_MSG =
+  'لم يتم العثور على FFmpeg — ثبّته (winget install Gyan.FFmpeg على ويندوز، أو عبر Homebrew على ماك) واضبطه على PATH، أو اضبط FFMPEG_PATH، ثم أعد التصدير.';
 
 
 export async function runExportPipeline(jobId: string): Promise<void> {
@@ -50,6 +55,17 @@ export async function runExportPipeline(jobId: string): Promise<void> {
 
   const status = await readJobStatus(jobId);
   if (!status) {
+    activeJobs.delete(jobId);
+    return;
+  }
+
+  // Preflight: FFmpeg is required for every render path. Fail fast with a
+  // clear Arabic install hint instead of a mid-pipeline ENOENT crash.
+  if (!isFfmpegAvailable()) {
+    status.stage = 'error';
+    status.error = FFMPEG_MISSING_MSG;
+    status.stageLabel = FFMPEG_MISSING_MSG;
+    await writeJobStatus(status);
     activeJobs.delete(jobId);
     return;
   }
@@ -472,8 +488,13 @@ export async function runExportPipeline(jobId: string): Promise<void> {
     }
     console.error(`[studio/export/job:${jobId}] failed:`, err);
     const detail = err instanceof Error ? err.message : '';
+    const isENOENT =
+      (err instanceof Error && (err as NodeJS.ErrnoException).code === 'ENOENT') ||
+      /ENOENT|spawn (ffmpeg|ffprobe)/i.test(detail);
     let userMsg = 'تعذّر معالجة وتصدير الفيديو — جرّب اختيار دقة 720p أو 480p أو أعد المحاولة';
-    if (detail.includes('Failed to fetch verse audio') || detail.includes('HTTP ')) {
+    if (isENOENT) {
+      userMsg = FFMPEG_MISSING_MSG;
+    } else if (detail.includes('Failed to fetch verse audio') || detail.includes('HTTP ')) {
       userMsg = 'تعذّر تحميل بعض تلاوات القارئ من المصدر — جرّب إعادة المحاولة أو اختيار قارئ آخر';
     } else if (detail.includes('مفقودة') || detail.includes('الخلفية المختارة')) {
       userMsg = detail;

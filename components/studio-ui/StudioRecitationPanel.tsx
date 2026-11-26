@@ -25,6 +25,7 @@ import {
 import { clampVerseRange, toArabicDigits } from '@/lib/quran-utils';
 import { getStudioActiveReciters } from '@/lib/reciter-filter';
 import { useApp } from '../AppProvider';
+import { StudioSelect } from './StudioSelect';
 import { StudioSurahSelector } from './StudioSurahSelector';
 
 export type ReciterFilter =
@@ -147,7 +148,7 @@ export function StudioRecitationPanel({
         </span>
       </div>
 
-      <div className="studio-scroll min-h-0 flex-1 space-y-4 overflow-y-auto p-4">
+      <div className="studio-scroll min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4">
         {/* Surah Selection */}
         <div className="space-y-3">
           <StudioSurahSelector
@@ -350,20 +351,12 @@ export function StudioRecitationPanel({
                     )}
                   </span>
                 </div>
-                <select
-                  id="studio-translation-select"
-                  data-testid="studio-translation-select"
-                  value={state.translationId}
-                  onChange={(e) => onChangeTranslation(Number(e.target.value))}
+                <StudioSelect
                   aria-label="اختيار الترجمة المعتمدة من QUL"
-                  className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] px-2.5 text-xs font-semibold text-[var(--ink-primary)] transition-colors focus:border-[var(--brand-gold)] focus:outline-none"
-                >
-                  {TRANSLATIONS.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
+                  value={String(state.translationId)}
+                  options={TRANSLATIONS.map((t) => ({ value: String(t.id), label: t.name }))}
+                  onChange={(v) => onChangeTranslation(Number(v))}
+                />
               </div>
             )}
           </div>

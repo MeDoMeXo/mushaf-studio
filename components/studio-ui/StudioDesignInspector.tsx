@@ -229,8 +229,10 @@ export function StudioDesignInspector({
           </StudioTabsList>
         </div>
 
-        {/* Scrollable Inspector Body */}
-        <div className="studio-scroll min-h-0 flex-1 overflow-y-auto p-4">
+        {/* Scrollable Inspector Body — overflow-x-hidden keeps wide content
+            (link rows, font grids) inside the 364px frame instead of spilling
+            خارج الإطار on Windows / narrow viewports. */}
+        <div className="studio-scroll min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
           {/* TAB 1: Templates */}
           <StudioTabPanel value="templates" className="space-y-4 focus:outline-none">
             <StudioInspectorSection id="tpl-gallery" title="قوالب التصميم الجاهزة">

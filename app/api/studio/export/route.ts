@@ -32,12 +32,21 @@ import {
   type VideoResolutionTier,
 } from '@/lib/video-export';
 
-import { resolveFfmpegPath, resolveFfprobePath } from '@/lib/export-job-helpers';
+import {
+  isFfmpegAvailable,
+  isFfprobeAvailable,
+  resolveFfmpegPath,
+  resolveFfprobePath,
+} from '@/lib/export-job-helpers';
 
 export const runtime = 'nodejs';
 export const maxDuration = 300;
 
 const execFileAsync = promisify(execFile);
+
+/** Human-readable Arabic error shown when FFmpeg is not installed. */
+const FFMPEG_MISSING_ERROR =
+  'لم يتم العثور على FFmpeg على النظام — ثبّته (winget install Gyan.FFmpeg على ويندوز) أو اضبط متغيّر البيئة FFMPEG_PATH ثم أعد التصدير.';
 
 interface ExportPayloadMeta {
   surahId: number;
@@ -77,17 +86,45 @@ async function runWithConcurrency<T>(
 }
 
 async function probeDurationSeconds(filePath: string): Promise<number> {
-  const { stdout } = await execFileAsync(resolveFfprobePath(), [
-    '-v',
-    'error',
-    '-show_entries',
-    'format=duration',
-    '-of',
-    'default=noprint_wrappers=1:nokey=1',
-    filePath,
-  ]);
-  const parsed = Number.parseFloat(stdout.trim());
-  return Number.isFinite(parsed) && parsed > 0 ? parsed : 3.5;
+  // Preferred: ffprobe. Skipped when not installed (Windows often has ffmpeg
+  // without ffprobe discoverable via bare-name spawn).
+  if (isFfprobeAvailable()) {
+    try {
+      const { stdout } = await execFileAsync(resolveFfprobePath(), [
+        '-v',
+        'error',
+        '-show_entries',
+        'format=duration',
+        '-of',
+        'default=noprint_wrappers=1:nokey=1',
+        filePath,
+      ]);
+      const parsed = Number.parseFloat(stdout.trim());
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+    } catch {
+      // fall through to ffmpeg banner parsing
+    }
+  }
+  // Fallback: parse `Duration: HH:MM:SS.xx` from ffmpeg's `-i` stderr.
+  if (isFfmpegAvailable()) {
+    try {
+      await execFileAsync(resolveFfmpegPath(), ['-hide_banner', '-i', filePath], {
+        timeout: 15000,
+      });
+    } catch (err: unknown) {
+      const stderr =
+        err && typeof err === 'object' && 'stderr' in err
+          ? String((err as { stderr: string }).stderr)
+          : '';
+      const m = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{1,3})/);
+      if (m) {
+        const secs =
+          Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000;
+        if (Number.isFinite(secs) && secs > 0) return secs;
+      }
+    }
+  }
+  return 3.5;
 }
 
 async function downloadVerseAudio(
@@ -121,6 +158,12 @@ export async function POST(req: NextRequest) {
   const workDir = path.join(os.tmpdir(), `quran-export-${crypto.randomUUID()}`);
 
   try {
+    // Preflight: FFmpeg is required for every render path. Fail fast with a
+    // clear, actionable Arabic message instead of a cryptic ENOENT mid-pipeline.
+    if (!isFfmpegAvailable()) {
+      return NextResponse.json({ error: FFMPEG_MISSING_ERROR }, { status: 503 });
+    }
+
     const formData = await req.formData();
     const metaRaw = formData.get('meta');
     if (typeof metaRaw !== 'string') {
@@ -537,9 +580,18 @@ export async function POST(req: NextRequest) {
     });
   } catch (err) {
     console.error('[studio/export] render failed:', err);
+    const msg = err instanceof Error ? err.message : String(err);
+    // Surface a clear install hint when FFmpeg/ffprobe is the root cause.
+    const isMissingFfmpeg =
+      (err instanceof Error && err.code === 'ENOENT') ||
+      /ENOENT|spawn (ffmpeg|ffprobe)|not found/i.test(msg);
     return NextResponse.json(
-      { error: 'تعذّر معالجة وتصدير الفيديو — حاول اختيار دقة أخف أو أعد المحاولة' },
-      { status: 500 }
+      {
+        error: isMissingFfmpeg
+          ? FFMPEG_MISSING_ERROR
+          : 'تعذّر معالجة وتصدير الفيديو — حاول اختيار دقة أخف أو أعد المحاولة',
+      },
+      { status: isMissingFfmpeg ? 503 : 500 }
     );
   } finally {
     await fs.rm(workDir, { recursive: true, force: true }).catch(() => {});

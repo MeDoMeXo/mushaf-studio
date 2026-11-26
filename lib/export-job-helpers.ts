@@ -12,12 +12,45 @@ import { parseFfmpegTimeSeconds } from '@/lib/video-export';
 import { readCachedAudio, writeCachedAudio } from '@/lib/server-audio-cache';
 import { resolveReciterOption } from '@/lib/reciter-filter';
 import { getOrSliceVerseAudio } from '@/lib/mp3quran-timing';
-import { resolveFfmpegPath, resolveFfprobePath } from '@/lib/ffmpeg-resolver';
+import {
+  isFfmpegAvailable,
+  isFfprobeAvailable,
+  resolveFfmpegPath,
+  resolveFfprobePath,
+} from '@/lib/ffmpeg-resolver';
 import type { ActiveJobRuntime } from './export-job-manager';
 
 export { resolveFfmpegPath, resolveFfprobePath };
 
 const execFileAsync = promisify(execFile);
+
+/**
+ * Probe media duration by parsing ffmpeg's stderr banner output
+ * (`Duration: 00:03:45.12,`) — used as a fallback when ffprobe is missing
+ * (common on Windows where `spawn('ffprobe')` ENOENTs even with PATH set).
+ */
+async function probeDurationViaFfmpeg(filePath: string): Promise<number | null> {
+  if (!isFfmpegAvailable()) return null;
+  try {
+    // `ffmpeg -i <file>` exits non-zero but prints the input's duration to
+    // stderr before failing — exactly what we need.
+    await execFileAsync(resolveFfmpegPath(), ['-hide_banner', '-i', filePath], {
+      timeout: 15000,
+    });
+  } catch (err: unknown) {
+    const stderr =
+      err && typeof err === 'object' && 'stderr' in err
+        ? String((err as { stderr: string }).stderr)
+        : '';
+    const m = stderr.match(/Duration:\s*(\d{2}):(\d{2}):(\d{2})[.,](\d{1,3})/);
+    if (m) {
+      const secs =
+        Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3]) + Number(m[4]) / 1000;
+      if (Number.isFinite(secs) && secs > 0) return secs;
+    }
+  }
+  return null;
+}
 
 export async function runWithConcurrency<T>(
   items: T[],
@@ -43,33 +76,50 @@ export interface AudioProbeInfo {
 }
 
 export async function probeAudioInfo(filePath: string): Promise<AudioProbeInfo> {
-  const { stdout } = await execFileAsync(resolveFfprobePath(), [
-    '-v',
-    'error',
-    '-select_streams',
-    'a:0',
-    '-show_entries',
-    'format=duration:stream=sample_rate,channels',
-    '-of',
-    'json',
-    filePath,
-  ]);
-  try {
-    const parsed = JSON.parse(stdout) as {
-      format?: { duration?: string };
-      streams?: { sample_rate?: string; channels?: number }[];
-    };
-    const duration = Number.parseFloat(parsed.format?.duration ?? '');
-    const sampleRate = Number.parseInt(parsed.streams?.[0]?.sample_rate ?? '', 10);
-    const channels = Number(parsed.streams?.[0]?.channels ?? 0);
-    return {
-      duration: Number.isFinite(duration) && duration > 0 ? duration : 3.5,
-      sampleRate: Number.isFinite(sampleRate) && sampleRate >= 8000 ? sampleRate : 44100,
-      channels: channels === 1 || channels === 2 ? channels : 2,
-    };
-  } catch {
-    return { duration: 3.5, sampleRate: 44100, channels: 2 };
+  // Preferred path: ffprobe JSON output. Skipped entirely when ffprobe is not
+  // installed (Windows often ships ffmpeg without ffprobe on PATH), in which
+  // case we fall back to parsing ffmpeg's stderr banner below.
+  if (isFfprobeAvailable()) {
+    try {
+      const { stdout } = await execFileAsync(resolveFfprobePath(), [
+        '-v',
+        'error',
+        '-select_streams',
+        'a:0',
+        '-show_entries',
+        'format=duration:stream=sample_rate,channels',
+        '-of',
+        'json',
+        filePath,
+      ]);
+      const parsed = JSON.parse(stdout) as {
+        format?: { duration?: string };
+        streams?: { sample_rate?: string; channels?: number }[];
+      };
+      const duration = Number.parseFloat(parsed.format?.duration ?? '');
+      const sampleRate = Number.parseInt(parsed.streams?.[0]?.sample_rate ?? '', 10);
+      const channels = Number(parsed.streams?.[0]?.channels ?? 0);
+      const dur = Number.isFinite(duration) && duration > 0 ? duration : 3.5;
+      if (Number.isFinite(duration) && duration > 0) {
+        return {
+          duration: dur,
+          sampleRate: Number.isFinite(sampleRate) && sampleRate >= 8000 ? sampleRate : 44100,
+          channels: channels === 1 || channels === 2 ? channels : 2,
+        };
+      }
+    } catch {
+      // ffprobe ran but failed to parse this file — fall through to ffmpeg.
+    }
   }
+
+  // Fallback: derive duration from ffmpeg's `-i` stderr banner. This keeps the
+  // export pipeline working even when only ffmpeg is installed (no ffprobe).
+  const ffmpegDur = await probeDurationViaFfmpeg(filePath);
+  return {
+    duration: ffmpegDur && ffmpegDur > 0 ? ffmpegDur : 3.5,
+    sampleRate: 44100,
+    channels: 2,
+  };
 }
 
 export interface OutputVideoProbeInfo {

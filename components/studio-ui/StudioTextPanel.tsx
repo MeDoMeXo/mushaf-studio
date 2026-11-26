@@ -20,6 +20,7 @@ import { resolveDomFontFamily } from '@/lib/studio-renderer-shared';
 import { AYAH_MEDALLION_OPTIONS } from '@/lib/islamic-ornaments';
 import { StudioSlider, StudioSwitch } from './StudioControls';
 import { StudioTabPanel } from './StudioTabs';
+import { StudioSelect } from './StudioSelect';
 import { StudioInspectorSection } from './StudioInspectorSection';
 import { StudioWordTrackSection } from './StudioWordTrackSection';
 import { StudioLinksSection } from './StudioLinksSection';
@@ -49,27 +50,23 @@ export interface StudioTextPanelProps {
 export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
   return (
     <StudioTabPanel value="text" className="space-y-4 focus:outline-none">
-      {/* الخطوط: القرآني + معاينة حية بخط الاختيار + خط الترجمة */}
+      {/* الخطوط: القرآني + معاينة حية بخط الاختيار + خط الترجمة.
+          StudioSelect (بدل <select> الأصلية) حتى لا تتجاوز قائمة الخطوط
+          حافة الشاشة على ويندوز داخل اللوحة الضيقة. */}
       <StudioInspectorSection id="txt-typography" title="الخط والسماكة وخط الترجمة">
         <div>
-          <label
-            htmlFor="st-font-select"
+          <span
             className="mb-1.5 block text-xs font-semibold text-[var(--ink-muted)]"
           >
             نوع الخط القرآني
-          </label>
-          <select
-            id="st-font-select"
+          </span>
+          <StudioSelect
+            aria-label="نوع الخط القرآني"
             value={state.fontFamily}
-            onChange={(e) => onPatchState({ fontFamily: e.target.value })}
-            className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-xs font-semibold text-[var(--ink-primary)] focus:border-[var(--brand-gold)] focus:outline-none"
-          >
-            {STUDIO_FONTS.map((f) => (
-              <option key={f.value} value={f.value} style={{ fontFamily: resolveDomFontFamily(f.value) }}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+            options={STUDIO_FONTS.map((f) => ({ value: f.value, label: f.label }))}
+            optionStyle={(v) => ({ fontFamily: resolveDomFontFamily(v) })}
+            onChange={(v) => onPatchState({ fontFamily: v })}
+          />
           {/* عينة حية بخط الاختيار الحالي — يرى المستخدم شكل الكتابة قبل الاعتماد */}
           <div
             aria-hidden="true"
@@ -86,24 +83,17 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
         </div>
 
         <div>
-          <label
-            htmlFor="st-translation-font-select"
+          <span
             className="mb-1.5 block text-xs font-semibold text-[var(--ink-muted)]"
           >
             خط الترجمة
-          </label>
-          <select
-            id="st-translation-font-select"
+          </span>
+          <StudioSelect
+            aria-label="خط الترجمة"
             value={state.translationFontFamily || 'Cairo'}
-            onChange={(e) => onPatchState({ translationFontFamily: e.target.value })}
-            className="h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-xs font-semibold text-[var(--ink-primary)] focus:border-[var(--brand-gold)] focus:outline-none"
-          >
-            {STUDIO_TRANSLATION_FONTS.map((f) => (
-              <option key={f.value} value={f.value}>
-                {f.label}
-              </option>
-            ))}
-          </select>
+            options={STUDIO_TRANSLATION_FONTS.map((f) => ({ value: f.value, label: f.label }))}
+            onChange={(v) => onPatchState({ translationFontFamily: v })}
+          />
           <p className="mt-1 text-[10px] leading-relaxed text-[var(--ink-muted)]">
             يُطبّق على نص الترجمة أسفل الآية — الخطوط الداعمة للحروف اللاتينية فقط.
           </p>
@@ -341,57 +331,39 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
 
           <div className="grid grid-cols-2 gap-2">
             <div>
-              <label
-                htmlFor="st-surah-pos"
+              <span
                 className="mb-1 block text-[11px] font-semibold text-[var(--ink-muted)]"
               >
                 موقع اسم السورة
-              </label>
-              <select
-                id="st-surah-pos"
+              </span>
+              <StudioSelect
+                aria-label="موقع اسم السورة"
                 value={state.surahPosition}
-                onChange={(e) => {
-                  const pos = e.target.value as LabelPosition;
-                  onPatchState({
-                    surahPosition: pos,
-                    showFooter: pos !== 'hidden',
-                  });
+                options={LABEL_POSITION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                onChange={(v) => {
+                  const pos = v as LabelPosition;
+                  onPatchState({ surahPosition: pos, showFooter: pos !== 'hidden' });
                 }}
-                className="h-8 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-[11px] font-semibold text-[var(--ink-primary)]"
-              >
-                {LABEL_POSITION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                compact
+              />
             </div>
 
             <div>
-              <label
-                htmlFor="st-reciter-pos"
+              <span
                 className="mb-1 block text-[11px] font-semibold text-[var(--ink-muted)]"
               >
                 موقع اسم القارئ
-              </label>
-              <select
-                id="st-reciter-pos"
+              </span>
+              <StudioSelect
+                aria-label="موقع اسم القارئ"
                 value={state.reciterPosition}
-                onChange={(e) => {
-                  const pos = e.target.value as LabelPosition;
-                  onPatchState({
-                    reciterPosition: pos,
-                    showReciterFooter: pos !== 'hidden',
-                  });
+                options={LABEL_POSITION_OPTIONS.map((o) => ({ value: o.value, label: o.label }))}
+                onChange={(v) => {
+                  const pos = v as LabelPosition;
+                  onPatchState({ reciterPosition: pos, showReciterFooter: pos !== 'hidden' });
                 }}
-                className="h-8 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-[11px] font-semibold text-[var(--ink-primary)]"
-              >
-                {LABEL_POSITION_OPTIONS.map((opt) => (
-                  <option key={opt.value} value={opt.value}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+                compact
+              />
             </div>
           </div>
 
