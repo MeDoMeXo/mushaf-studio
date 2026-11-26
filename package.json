@@ -5,11 +5,16 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
+    "dev": "next dev -p 3000 2>&1 | tee dev.log",
+    "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
+    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
     "lint": "eslint .",
-    "clean": "next clean"
+    "test": "bun test",
+    "clean": "next clean",
+    "db:push": "echo \"[db] skip: this project does not use Prisma\"",
+    "db:generate": "echo \"[db] skip: this project does not use Prisma\"",
+    "db:migrate": "echo \"[db] skip: this project does not use Prisma\"",
+    "db:reset": "echo \"[db] skip: this project does not use Prisma\""
   },
   "dependencies": {
     "@google/genai": "^3.6.1",
