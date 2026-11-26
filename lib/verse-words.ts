@@ -21,6 +21,93 @@ const ARABIC_LETTER_RE = /[\u0621-\u064A\u0671-\u06D3]/g;
 const DIACRITIC_RE = /[\u064B-\u0652\u0670]/g;
 const ELONGATION_RE = /[\u0653-\u0655\u06E4-\u06E6]/g;
 
+/* ────────────────────────────────────────────────────────────────────────
+ * الحروف المقطعة (fawātiḥ) — the 29 surah openings are recited letter by
+ * letter: «الم» is spoken «أَلِفْ لَامْ مِيمْ», «كهيعص» as «كَافْ هَا يَا
+ * عَيْنْ صَادْ». Text-length weights badly underestimate them (a 3-letter
+ * token ≈ ⅓ of its real spoken duration), so the karaoke highlight races
+ * ahead of the reciter — reaching later words/ayahs while he is still
+ * spelling the opening. The engine therefore:
+ *   1. splits an opening token into per-letter tokens (matching the mushaf,
+ *      which writes these letters disjointed — hence «مقطعة»), and
+ *   2. weights every letter by its SPOKEN NAME duration (ألف، لام، ميم…)
+ *      plus the natural inter-letter breathing reciters take.
+ * ──────────────────────────────────────────────────────────────────────── */
+
+/** The 14 disjointed-letter strings, normalized (alef-wasla → plain alef). */
+const DISJOINTED_OPENINGS = new Set([
+  'الم', 'المص', 'المر', 'الر', 'كهيعص', 'طه', 'طس', 'طسم', 'يس', 'حم',
+  'عسق', 'ص', 'ق', 'ن',
+]);
+
+/**
+ * Spoken-name weights for the 14 disjointed letters. Calibrated against the
+ * generic token weights: a two-syllable name (مِيمْ، صَادْ…) ≈ a short
+ * 3-letter word with reciter madd; a single-syllable name (هَا، رَا) ≈ a
+ * 2-letter word, plus inter-letter breathing baked in.
+ */
+const LETTER_NAME_WEIGHTS = new Map<string, number>([
+  ['ا', 2.9], // أَلِفْ — reciters elongate heavily (أَلِيـــفْ)
+  ['ل', 2.5], // لَامْ
+  ['م', 2.7], // مِيمْ
+  ['ص', 2.6], // صَادْ
+  ['ق', 2.6], // قَافْ
+  ['ن', 2.6], // نُونْ
+  ['ط', 1.9], // طَا
+  ['ه', 1.8], // هَا
+  ['ي', 1.8], // يَا
+  ['ع', 2.7], // عَيْنْ
+  ['ك', 2.6], // كَافْ
+  ['ر', 1.8], // رَا
+  ['س', 2.6], // سِينْ
+  ['ح', 1.8], // حَا
+]);
+
+/** Marks that may trail a disjointed letter (diacritics, madd, waqf signs). */
+const LETTER_TRAILING_MARK_RE = /^[\u064B-\u0655\u0670\u06D6-\u06DD\u06E4-\u06E6\u0640 ]*$/;
+
+/** Reduces a token to its bare Arabic letters (alef-wasla folded to ا). */
+function normalizeToLetters(token: string): string {
+  let out = '';
+  for (const ch of token) {
+    if (ch === '\u0671') {
+      out += '\u0627';
+    } else if (
+      (ch >= '\u0621' && ch <= '\u064A') ||
+      (ch >= '\u0671' && ch <= '\u06D3')
+    ) {
+      out += ch;
+    }
+  }
+  return out;
+}
+
+/**
+ * Splits a disjointed-opening token into per-letter tokens («الٓمٓ» →
+ * «ا»، «لٓ»، «مٓ»), each letter keeping its diacritics/madd; a trailing waqf
+ * mark stays attached to the last letter. Returns null when the token is
+ * not one of the openings (or is a single letter like «صٓ» — nothing to
+ * split, its weight is boosted by spokenTokenWeight instead).
+ */
+function splitDisjointedToken(token: string): string[] | null {
+  const norm = normalizeToLetters(token);
+  if (!DISJOINTED_OPENINGS.has(norm) || norm.length < 2) return null;
+  const parts: string[] = [];
+  let current = '';
+  for (const ch of token) {
+    const isLetter =
+      (ch >= '\u0621' && ch <= '\u064A') || (ch >= '\u0671' && ch <= '\u06D3');
+    if (isLetter) {
+      if (current) parts.push(current);
+      current = ch;
+    } else if (current && LETTER_TRAILING_MARK_RE.test(ch)) {
+      current += ch; // diacritic / madd / waqf — attaches to its letter
+    }
+  }
+  if (current) parts.push(current);
+  return parts.length === norm.length ? parts : null;
+}
+
 export interface AyahWordTiming {
   /** Token index inside the ayah. */
   index: number;
@@ -36,12 +123,19 @@ export interface AyahWordTiming {
   hasPause: boolean;
 }
 
-/** Splits ayah text into display tokens, merging standalone pause marks. */
+/**
+ * Splits ayah text into display tokens, merging standalone pause marks and
+ * expanding disjointed-opening tokens into per-letter tokens so the karaoke
+ * tracks each spelled letter («ا» «لٓ» «مٓ») exactly as recited.
+ */
 export function splitAyahTokens(text: string): string[] {
   const raw = (text || '').trim().split(/\s+/).filter(Boolean);
   const tokens: string[] = [];
   for (const t of raw) {
-    if (STANDALONE_PAUSE_RE.test(t) && tokens.length > 0) {
+    const expanded = splitDisjointedToken(t);
+    if (expanded) {
+      tokens.push(...expanded);
+    } else if (STANDALONE_PAUSE_RE.test(t) && tokens.length > 0) {
       tokens[tokens.length - 1] = `${tokens[tokens.length - 1]} ${t}`;
     } else {
       tokens.push(t);
@@ -50,8 +144,27 @@ export function splitAyahTokens(text: string): string[] {
   return tokens;
 }
 
-/** Estimates the relative spoken duration of one token. */
+/**
+ * Estimates the relative spoken duration of one token. Disjointed opening
+ * letters are weighted by their spoken NAMES («مٓ» is recited «مِيمْ», not a
+ * bare consonant), which is what keeps the highlight locked to the reciter
+ * while he spells the opening.
+ */
 export function spokenTokenWeight(token: string): number {
+  const norm = normalizeToLetters(token);
+  const nameW = norm.length === 1 ? LETTER_NAME_WEIGHTS.get(norm) : undefined;
+  if (nameW !== undefined) {
+    // Single disjointed letter («صٓ», «نٓ», or a letter produced by
+    // splitAyahTokens expanding an opening): spoken-name duration + waqf.
+    return nameW + (TRAILING_PAUSE_RE.test(token) ? 1.8 : 0);
+  }
+  if (norm.length >= 2 && DISJOINTED_OPENINGS.has(norm)) {
+    // Un-split opening token (defensive — splitAyahTokens already expands
+    // these): weight the whole group by the sum of its letters' names.
+    let sum = 0;
+    for (const ch of norm) sum += LETTER_NAME_WEIGHTS.get(ch) ?? 2.4;
+    return sum + (TRAILING_PAUSE_RE.test(token) ? 1.8 : 0);
+  }
   const letters = (token.match(ARABIC_LETTER_RE) || []).length;
   const stripped = stripArabicDiacritics(token);
   const solidLetters = (stripped.match(ARABIC_LETTER_RE) || []).length;
