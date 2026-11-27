@@ -13,6 +13,11 @@ import {
 } from '@/lib/audio-cache';
 import { drawStudioFrame } from '@/lib/studio-renderer';
 import { buildAyahWordTimings, findActiveWordIndex } from '@/lib/verse-words';
+import {
+  findActiveWordIndexBySec,
+  type WordTimingSpan,
+} from '@/lib/word-timing-engine';
+import { getReciterSpecQuery } from '@/lib/quran-utils';
 import type { QulVerse, QulChapter, StudioState } from '@/lib/quran-data';
 import { StudioAudioDsp } from '@/lib/studio-audio-dsp';
 import { calculateTransitionProgress, type VideoExportSettings } from '@/lib/video-export';
@@ -36,6 +41,24 @@ function syncCanvasMirror(
     dstCtx.clearRect(0, 0, dst.width, dst.height);
     dstCtx.drawImage(src, 0, 0);
   }
+}
+
+/** كاش وحدة لجدول أوزان كلمات النصوص — كان يُعاد بناؤه كل إطار. */
+const timingsByTextCache = new Map<string, ReturnType<typeof buildAyahWordTimings>>();
+
+/** يرجع جدول أوزان النص من الكاش (يبنيه أول مرة فقط). */
+function getTimingsForText(text: string): ReturnType<typeof buildAyahWordTimings> {
+  let t = timingsByTextCache.get(text);
+  if (!t) {
+    t = buildAyahWordTimings(text);
+    timingsByTextCache.set(text, t);
+    if (timingsByTextCache.size > 64) {
+      // كاش جلسة صغير — نتجاوز الحد نحذف الأقدم (أول مفتاح).
+      const oldest = timingsByTextCache.keys().next().value;
+      if (oldest !== undefined) timingsByTextCache.delete(oldest);
+    }
+  }
+  return t;
 }
 
 export interface UseStudioCanvasInput {
@@ -100,6 +123,17 @@ export function useStudioCanvas({
   const [bgImgRevision, setBgImgRevision] = useState(0);
   const [audioCacheRecord, setAudioCacheRecord] = useState<AudioCacheRecord | null>(null);
 
+  // كاش توقيتات الكلمات الحقيقية (غلاف الطاقة من الخادم) — مفتاحه
+  // `${reciter}:${verseId}`. يُملأ عبر POST /api/word-timing عند تغيّر
+  // الآيات/القارئ، ويستهلكه renderOnce فيندمج الإيقاع الفعلي للقارئ.
+  const wordTimingsRef = useRef<Map<string, WordTimingSpan[]>>(new Map());
+  // مرجع مستقر لقائمة الآيات — تأثير الجلب يقرأها دون أن يعتمد عليها
+  // في مصفوفة التبعيات (هوية المصفوفة تتقلّب؛ المفتاح الآيتي هو الضابط).
+  const selectedVersesRef = useRef(selectedVerses);
+  useEffect(() => {
+    selectedVersesRef.current = selectedVerses;
+  }, [selectedVerses]);
+
   // Stable primitive key representing selected reciter + verse IDs for automatic browser audio caching
   const selectedVerseIdsKey = useMemo(
     () => selectedVerses.map((v) => v.id).join(','),
@@ -154,6 +188,70 @@ export function useStudioCanvas({
       controller.abort();
     };
   }, [cacheScopeKey, state.reciter, selectedVerseIdsKey, cacheRetryNonce, exportModalOpen, onAudioCacheRecord]);
+
+  // ─── جلب توقيتات الكلمات الحقيقية (غلاف الطاقة الخادمي) ────────────────
+  // عند تغيّر الآيات أو القارئ: طلب POST لكل الآيات المحدّدة (دفعات ٢٤)
+  // يحسب الخادم حدود كلمات كل آية من طاقتها الصوتية الفعلية فيتكّف
+  // التتبّع مع إيقاع القارئ (مدوده ووقفاته) بدل التوزيع التقديري.
+  // الفشل صامت: يبقى النموذج التقديري (النسبة الزمنية) كاحتياطي.
+  useEffect(() => {
+    if (
+      customAudioUrl ||
+      state.coverMode ||
+      state.textSource === 'translation' ||
+      !selectedVerseIdsKey
+    ) {
+      return;
+    }
+    const controller = new AbortController();
+    const cache = wordTimingsRef.current;
+    const specQuery = getReciterSpecQuery(state.reciter);
+    const pending = (selectedVersesRef.current ?? [])
+      .map((v) => ({ verseId: v.id, text: (v.text_uthmani ?? '').trim() }))
+      .filter(
+        (it) =>
+          it.text.length > 0 &&
+          it.verseId > 0 &&
+          !cache.has(`${state.reciter}:${it.verseId}`)
+      );
+    const CHUNK = 24;
+    void (async () => {
+      for (let i = 0; i < pending.length; i += CHUNK) {
+        if (controller.signal.aborted) return;
+        const chunk = pending.slice(i, i + CHUNK);
+        try {
+          const res = await fetch(`/api/word-timing${specQuery}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ reciter: state.reciter, items: chunk }),
+            signal: controller.signal,
+          });
+          if (!res.ok) continue;
+          const data = (await res.json()) as {
+            results?: { verseId: number; ok: boolean; spans?: { i: number; s: number; e: number }[] }[];
+          };
+          for (const r of data.results ?? []) {
+            if (r.ok && Array.isArray(r.spans) && r.spans.length) {
+              cache.set(
+                `${state.reciter}:${r.verseId}`,
+                r.spans.map((s) => ({ index: s.i, startSec: s.s, endSec: s.e }))
+              );
+            }
+          }
+        } catch {
+          // إلغاء أو انقطاع شبكة — النموذج التقديري يكفي حتى المحاولة القادمة
+          return;
+        }
+      }
+    })();
+    return () => controller.abort();
+  }, [
+    state.reciter,
+    state.coverMode,
+    state.textSource,
+    selectedVerseIdsKey,
+    customAudioUrl,
+  ]);
 
   // Preload background image when uploaded or generated via AI
   useEffect(() => {
@@ -222,9 +320,9 @@ export function useStudioCanvas({
       });
 
       // Karaoke word tracking — read the live audio position. For per-verse
-      // files the ratio is the verse's own audio; for a custom full-clip track
-      // the ratio comes from the verse boundaries (silence-detected or manual)
-      // so highlighting follows the uploaded recitation verse by verse.
+      // files the real word boundaries (energy-envelope from the server) come
+      // first; a custom full-clip track uses its verse boundaries ratio; the
+      // estimated weight model stays as the silent fallback.
       let activeWordIndex: number | undefined;
       const audio = studioAudioRef.current;
       const verseText = activeVerse?.text_uthmani ?? '';
@@ -243,9 +341,19 @@ export function useStudioCanvas({
         (isPlaying || audio.currentTime > 0)
       ) {
         const syncOffsetMs = Math.max(-1000, Math.min(1000, Number(state.wordSyncOffsetMs) || 0));
-        let ratio: number;
-        if (bounds && bounds.length === selectedVerses.length) {
-          // الملف المخصص: نسبة التقدّم داخل شريحة الآية الحالية وفق الحدود.
+
+        // ١) التوقيتات الحقيقية (ملفات الآيات فقط): موضع التشغيل بالثواني
+        //    يقارَن مباشرة بحدود الكلمات الفعلية — فيتّبع التظليل إيقاع
+        //    القارئ الحقيقي ويتجاوز سكوت البداية/النهاية بدقة.
+        const realSpans = !customAudioUrl && activeVerse
+          ? wordTimingsRef.current.get(`${state.reciter}:${activeVerse.id}`)
+          : undefined;
+        if (realSpans && realSpans.length) {
+          const offsetSec = syncOffsetMs / 1000;
+          const wordIdx = findActiveWordIndexBySec(realSpans, audio.currentTime - offsetSec);
+          activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
+        } else if (bounds && bounds.length === selectedVerses.length) {
+          // ٢) الملف المخصص: نسبة التقدّم داخل شريحة الآية وفق الحدود.
           const idx = Math.min(
             bounds.length - 1,
             Math.max(0, activeIdxInRange)
@@ -253,21 +361,20 @@ export function useStudioCanvas({
           const vStart = bounds[idx];
           const vEnd = idx + 1 < bounds.length ? bounds[idx + 1] : audio.duration;
           const span = Math.max(0.05, vEnd - vStart);
-          ratio = Math.max(0, Math.min(1, (audio.currentTime - vStart) / span));
+          let ratio = Math.max(0, Math.min(1, (audio.currentTime - vStart) / span));
           if (syncOffsetMs !== 0) {
             ratio = Math.max(0, Math.min(1, ratio + syncOffsetMs / (span * 1000)));
           }
+          const wordIdx = findActiveWordIndex(getTimingsForText(verseText), ratio);
+          activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
         } else if (!customAudioUrl) {
+          // ٣) الاحتياطي التقديري (قبل وصول التوقيتات الحقيقية أو عند فشلها).
           const rawRatio = audio.currentTime / audio.duration;
-          ratio =
+          const ratio =
             syncOffsetMs !== 0
               ? Math.max(0, Math.min(1, rawRatio + syncOffsetMs / (audio.duration * 1000)))
               : rawRatio;
-        } else {
-          ratio = 0;
-        }
-        if (ratio > 0 || !customAudioUrl) {
-          const wordIdx = findActiveWordIndex(buildAyahWordTimings(verseText), ratio);
+          const wordIdx = findActiveWordIndex(getTimingsForText(verseText), ratio);
           activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
         }
       }

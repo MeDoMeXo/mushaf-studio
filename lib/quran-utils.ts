@@ -176,6 +176,17 @@ export function getReciterAudioUrl(
   return base;
 }
 
+/**
+ * استعلام مواصفة القارئ المخصص (folder/server/readId) للإلحاق بمسارات
+ * API التي تحتاج نفس آلية وكيل الصوت — سلسلة فارغة للقراء المدمجين.
+ */
+export function getReciterSpecQuery(reciterSlug: string): string {
+  if (isBuiltInReciterSlug(reciterSlug)) return '';
+  const reciter = resolveReciterForUrl(reciterSlug);
+  if (isBuiltInReciterSlug(reciter.slug)) return ''; // لم تُعرف مواصفة صالحة
+  return buildCustomReciterSpecQuery(reciter);
+}
+
 export function pickVerseOfDay(
   customVod: { surah: number; ayah: number } | null | undefined,
   now: Date = new Date()

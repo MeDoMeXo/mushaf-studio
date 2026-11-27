@@ -8,6 +8,8 @@ import path from 'node:path';
 import { toArabicDigits } from '@/lib/quran-utils';
 import { INTRO_COVER_DURATION_SEC } from '@/lib/surah-cover';
 import { distributeWordDurations } from '@/lib/verse-words';
+import { buildSlideDurationsFromSpans, type WordTimingSpan } from '@/lib/word-timing-engine';
+import { getVerseWordTimingsFromFile } from '@/lib/word-timing-server';
 import {
   buildAmbientNoiseFilter,
   buildAudioEffectFilter,
@@ -74,6 +76,22 @@ export async function prepareExportAudio(
       : ['-c:a', 'aac', '-profile:a', 'aac_low', '-b:a', `${meta.audioBitrate}k`, '-ar', '44100', '-ac', '2'];
 
   let totalAudioDur = 0;
+
+  // أوزان كلمات كل آية من خط الكاريوكي (تُحسب مرة قبل الحلقة) —
+  // تُستخدم لاستخراج حدود الكلمات الحقيقية من غلاف الطاقة لكل ملف.
+  const verseWeightsMap = new Map<number, number[]>();
+  if (wordTimeline) {
+    for (const e of wordTimeline) {
+      let w = verseWeightsMap.get(e.verseIdx);
+      if (!w) {
+        w = [];
+        verseWeightsMap.set(e.verseIdx, w);
+      }
+      w.push(e.weight);
+    }
+  }
+  // حدود الكلمات الحقيقية لكل آية (null/undefined = التوزيع التقديري القديم).
+  const verseWordSpans: (WordTimingSpan[] | null)[] = [];
 
   if (meta.hasCustomAudio) {
     status.stage = 'mixing_audio';
@@ -267,6 +285,19 @@ export async function prepareExportAudio(
         const isLast = idx === verseIds.length - 1;
         verseDurations[idx] = info.duration + (!isLast && gapMs > 0 ? meta.verseGapSec : 0);
 
+        // حدود الكلمات الحقيقية من غلاف طاقة الملف المنزّل — تُحسب هنا
+        // قبل حذف الملفات، وتتراجع بصمت للتوزيع التقديري عند التعذّر.
+        if (wordTimeline && verseWeightsMap.size) {
+          const weights = verseWeightsMap.get(idx);
+          if (weights && weights.length) {
+            try {
+              verseWordSpans[idx] = await getVerseWordTimingsFromFile(mp3Path, weights);
+            } catch {
+              verseWordSpans[idx] = null;
+            }
+          }
+        }
+
         completedAudio++;
         const now = Date.now();
         if (completedAudio === verseIds.length || now - lastStatusUpdate > 450) {
@@ -308,7 +339,14 @@ export async function prepareExportAudio(
           0.5,
           (verseDurations[verseIdx] ?? 3.5) - gapSec
         );
-        const durs = distributeWordDurations(group.weights, audioDur);
+        // الحدود الحقيقية أولاً (غلاف الطاقة الفعلي للقارئ)؛ التقديري
+        // احتياطي عند فشل التحليل. الفاصل بين الآيات يُضاف لشريحة آخر
+        // كلمة كالسابق حتى يبقى الصوت والشرائح في قفل تام.
+        const realSpans = verseWordSpans[verseIdx];
+        const durs =
+          realSpans && realSpans.length === group.weights.length
+            ? buildSlideDurationsFromSpans(realSpans, audioDur, 0.12)
+            : distributeWordDurations(group.weights, audioDur);
         group.slideIdx.forEach((slideIdx, k) => {
           slideDurations[slideIdx] = durs[k] + (k === durs.length - 1 ? gapSec : 0);
         });
