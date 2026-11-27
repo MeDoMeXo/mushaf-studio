@@ -12,9 +12,12 @@ quran-dev.log
 *.zip
 
 # Workspace sandbox folders (agent environment, not part of the project)
-download/
-skills/
-upload/
+# Anchored to the repo ROOT (/) so they never mask real project paths such as
+# app/api/studio/export/download/route.ts (the bare "download/" pattern silently
+# excluded it from git — the export download endpoint 404'd in production).
+/download/
+/skills/
+/upload/
 .zscripts/
 Caddyfile
 
