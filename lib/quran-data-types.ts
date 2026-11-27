@@ -123,6 +123,12 @@ export interface StudioState {
   letterSpacing?: number;
   /** فاصل صمت اختياري بين الآيات أثناء تشغيل المعاينة في الاستوديو (ثوانٍ، ‎0..5). */
   playbackGapSec?: number;
+  /** حدود الآيات للملف الصوتي المرفوع (ثوانٍ بداية كل آية، تصاعدية صارمة) —
+   *  تُضبط تلقائياً بكشف السكوت أو يدوياً من لوحة «ملف صوتي مخصص»، وتنتقل
+   *  مع التصدير (meta.customVerseBounds) لتبقى الشرائح ملتصقة بالصوت. */
+  customVerseBounds?: number[];
+  /** مصدر الحدود الحالية: auto = كشف السكوت، manual = ضبط يدوي. */
+  customVerseBoundsSource?: 'auto' | 'manual';
   /** معايرة يدوية لمزامنة تتبع الكلمات مع الصوت (مللي ثانية، ‎-1000..1000). */
   wordSyncOffsetMs?: number;
   textColor: string;

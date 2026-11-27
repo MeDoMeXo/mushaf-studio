@@ -110,6 +110,9 @@ export function useStudioMisc(input: UseStudioMiscInput): UseStudioMiscResult {
         surah: nextId,
         fromAyah: 1,
         toAyah: 3,
+        // سورة جديدة = آيات جديدة — حدود الملف المرفوع القديمة تُصفَّر.
+        customVerseBounds: undefined,
+        customVerseBoundsSource: undefined,
       }));
     },
     [commitState, setIsPlaying, studioAudioRef, setActiveIdxInRange]
@@ -117,7 +120,13 @@ export function useStudioMisc(input: UseStudioMiscInput): UseStudioMiscResult {
 
   const handleSelectReciter = useCallback(
     (slug: string) => {
-      commitState((p) => ({ ...p, reciter: slug }));
+      commitState((p) => ({
+        ...p,
+        reciter: slug,
+        // اختيار قارئ مدمج يلغي الملف المرفوع — والحدود معه.
+        customVerseBounds: undefined,
+        customVerseBoundsSource: undefined,
+      }));
       setCustomAudioUrl(null);
       setCustomAudioFile(null);
       setCustomAudioName('');

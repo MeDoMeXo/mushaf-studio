@@ -61,6 +61,13 @@ export interface ExportJobMeta {
   verseTranslations?: string[];
   /** Karaoke word/segment timeline — per-slide entries whose durations split the verse audio. */
   wordTimeline?: KaraokeWordTimelineEntry[];
+  /**
+   * Verse start times (seconds) inside the uploaded custom audio — computed
+   * client-side (silence detection or manual). When present and aligned with
+   * verseIds, slide durations lock to the real recitation instead of the
+   * even/near-even split.
+   */
+  customVerseBounds?: number[];
   baseWidth: number;
   baseHeight: number;
   slideCount: number;
@@ -278,6 +285,25 @@ export async function createExportSession(
         .map((t) => String(typeof t === 'string' ? t : '').slice(0, 900))
     : undefined;
 
+  // Custom-audio verse boundaries — strictly increasing start seconds, one per
+  // verse, finite and capped. Only meaningful with an uploaded custom audio.
+  const customVerseBounds = Array.isArray(rawMeta.customVerseBounds)
+    ? rawMeta.customVerseBounds
+        .slice(0, verseIds.length)
+        .map((t) => Number(t))
+        .filter((t) => Number.isFinite(t) && t >= 0 && t <= 7200)
+        .reduce<number[]>((acc, t) => {
+          if (acc.length < verseIds.length && (acc.length === 0 || t > acc[acc.length - 1])) {
+            acc.push(Math.round(t * 1000) / 1000);
+          }
+          return acc;
+        }, [])
+    : undefined;
+  const validCustomVerseBounds =
+    customVerseBounds && customVerseBounds.length === verseIds.length
+      ? customVerseBounds
+      : undefined;
+
   const requestedReciterSlug = typeof rawMeta.reciter === 'string' ? rawMeta.reciter : '';
   const matchedReciter = RECITERS.find((r) => r.slug === requestedReciterSlug);
   // Custom-reciter wire spec: built-ins ignore it entirely (whitelist stays
@@ -328,6 +354,7 @@ export async function createExportSession(
     verseTexts,
     verseTranslations,
     wordTimeline: wordTimeline && wordTimeline.length ? wordTimeline : undefined,
+    customVerseBounds: validCustomVerseBounds,
     baseWidth: Math.max(160, Math.floor(Number(rawMeta.baseWidth || 1080))),
     baseHeight: Math.max(160, Math.floor(Number(rawMeta.baseHeight || 1920))),
     slideCount,

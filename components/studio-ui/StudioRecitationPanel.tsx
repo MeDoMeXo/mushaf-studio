@@ -33,6 +33,7 @@ import {
   StudioAccordionCurtain,
   StudioCurtainToolbar,
 } from './StudioAccordionCurtain';
+import { StudioCustomAudioBoundsPanel } from './StudioCustomAudioBoundsPanel';
 import { StudioReciterDirectory } from './StudioReciterDirectory';
 import { StudioSelect } from './StudioSelect';
 import { StudioSurahSelector } from './StudioSurahSelector';
@@ -52,6 +53,14 @@ interface StudioRecitationPanelProps {
   selectedVersesCount: number;
   customAudioUrl: string | null;
   customAudioName: string;
+  /** الملف المرفوع نفسه (File) — تُحلَّل حدود آياته محلياً في المتصفح. */
+  customAudioFile?: File | null;
+  /** موضع التشغيل الحالي (ثوانٍ) — لزر «اجعل بداية الآية هنا». */
+  audioCurrentTime?: number;
+  /** مدة الملف الصوتي الحالي (ثوانٍ). */
+  audioDuration?: number;
+  /** هل التشغيل جارٍ الآن؟ */
+  isPlaying?: boolean;
   reciterQuery: string;
   reciterFilter: ReciterFilter;
   previewingReciter: string | null;
@@ -63,6 +72,10 @@ interface StudioRecitationPanelProps {
   loadingTranslation?: boolean;
   onAudioFileUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemoveCustomAudio: () => void;
+  /** تعديل جزئي لحالة الاستوديو (حدود الآيات وغيرها). */
+  onPatchState: (patch: Partial<StudioState>) => void;
+  /** إشعارات عائمة قصيرة (نتائج الكشف/الضبط). */
+  showToast: (msg: string) => void;
   onReciterQueryChange: (q: string) => void;
   onReciterFilterChange: (filter: ReciterFilter) => void;
   onSelectReciter: (slug: string) => void;
@@ -82,6 +95,10 @@ export function StudioRecitationPanel({
   selectedVersesCount,
   customAudioUrl,
   customAudioName,
+  customAudioFile = null,
+  audioCurrentTime = 0,
+  audioDuration = 0,
+  isPlaying = false,
   reciterQuery,
   reciterFilter,
   previewingReciter,
@@ -93,6 +110,8 @@ export function StudioRecitationPanel({
   loadingTranslation = false,
   onAudioFileUpload,
   onRemoveCustomAudio,
+  onPatchState,
+  showToast,
   onReciterQueryChange,
   onReciterFilterChange,
   onSelectReciter,
@@ -442,19 +461,30 @@ export function StudioRecitationPanel({
             />
           </div>
           {customAudioUrl ? (
-            <div className="mt-2.5 flex items-center justify-between gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs">
-              <span className="truncate font-bold text-emerald-700 dark:text-emerald-300">
-                ✓ تلاوة خاصة نشطة: {customAudioName}
-              </span>
-              <button
-                type="button"
-                onClick={onRemoveCustomAudio}
-                aria-label="إزالة الملف الصوتي المخصص"
-                className="shrink-0 rounded p-1 text-[var(--ink-muted)] hover:text-red-500"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            </div>
+            <>
+              <div className="flex items-center justify-between gap-2 rounded-xl border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1.5 text-xs">
+                <span className="truncate font-bold text-emerald-700 dark:text-emerald-300">
+                  ✓ تلاوة خاصة نشطة: {customAudioName}
+                </span>
+                <button
+                  type="button"
+                  onClick={onRemoveCustomAudio}
+                  aria-label="إزالة الملف الصوتي المخصص"
+                  className="shrink-0 rounded p-1 text-[var(--ink-muted)] hover:text-red-500"
+                >
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
+                </button>
+              </div>
+              <StudioCustomAudioBoundsPanel
+                state={state}
+                customAudioFile={customAudioFile ?? null}
+                audioCurrentTime={audioCurrentTime}
+                audioDuration={audioDuration}
+                isPlaying={isPlaying}
+                onPatchState={onPatchState}
+                showToast={showToast}
+              />
+            </>
           ) : (
             <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
               إذا كان لديك مقطع مقتطع للآية، ارفعه هنا ليتطابق مع الشريحة فوراً.

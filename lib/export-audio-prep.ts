@@ -89,15 +89,56 @@ export async function prepareExportAudio(
       slidePaths.length - (hasIntro ? 1 : 0)
     );
     if (hasIntro) slideDurations[0] = introDurSec;
-    if (wordTimeline) {
-      // Custom audio + karaoke: split the single track across word entries
-      // by spoken weight so highlight slides still advance with the audio.
+    // Real verse boundaries inside the uploaded track (silence-detected or
+    // manual, one start per verse, strictly increasing) — when present they
+    // replace the even split so each verse slide lasts exactly as long as its
+    // actual recitation segment.
+    const verseBounds =
+      Array.isArray(meta.customVerseBounds) &&
+      meta.customVerseBounds.length === verseSlideCount &&
+      meta.customVerseBounds.every((t, i, arr) =>
+        Number.isFinite(t) && t >= 0 && (i === 0 || t > arr[i - 1])
+      )
+        ? meta.customVerseBounds
+        : null;
+    const verseSegmentDurs = verseBounds
+      ? verseBounds.map((start, i) =>
+          Math.max(0.3, (i + 1 < verseBounds.length ? verseBounds[i + 1] : rawCustomDur) - start)
+        )
+      : null;
+    if (wordTimeline && verseSegmentDurs) {
+      // Custom audio + real boundaries + karaoke: each verse's word slides
+      // share that verse's actual audio segment by spoken weight — highlight
+      // stays audio-locked inside every verse.
+      let slideCursor = hasIntro ? 1 : 0;
+      for (let v = 0; v < verseSegmentDurs.length; v++) {
+        const entries = wordTimeline.filter((e) => e.verseIdx === v);
+        if (!entries.length) continue;
+        const durs = distributeWordDurations(
+          entries.map((e) => e.weight),
+          verseSegmentDurs[v]
+        );
+        for (let w = 0; w < durs.length; w++) {
+          if (slideCursor < slideDurations.length) {
+            slideDurations[slideCursor] = durs[w];
+            slideCursor++;
+          }
+        }
+      }
+    } else if (wordTimeline) {
+      // Custom audio + karaoke (no boundaries): split the single track across
+      // word entries by spoken weight so highlight slides still advance with the audio.
       const durs = distributeWordDurations(
         wordTimeline.map((e) => e.weight),
         Math.max(1, rawCustomDur)
       );
       for (let i = 0; i < durs.length; i++) {
         slideDurations[hasIntro ? i + 1 : i] = durs[i];
+      }
+    } else if (verseSegmentDurs) {
+      // Custom audio + real boundaries, classic per-verse slides.
+      for (let i = 0; i < verseSegmentDurs.length && i < verseSlideCount; i++) {
+        slideDurations[hasIntro ? i + 1 : i] = verseSegmentDurs[i];
       }
     } else {
       const perSlide = Math.max(0.5, rawCustomDur / verseSlideCount);

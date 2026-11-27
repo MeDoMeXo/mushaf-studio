@@ -12,6 +12,7 @@
  */
 import type { SavedCustomTemplate, StudioState } from './quran-data';
 import { toArabicDigits } from './quran-utils';
+import { MAX_BOUNDARY_VERSES } from './custom-audio-boundaries';
 
 export const TEMPLATE_SHARE_FORMAT = 'mushaf-studio-template';
 export const TEMPLATE_SHARE_VERSION = 1;
@@ -43,6 +44,8 @@ export const TEMPLATE_PATCH_FIELDS = [
   'letterSpacing',
   'playbackGapSec',
   'wordSyncOffsetMs',
+  'customVerseBounds',
+  'customVerseBoundsSource',
   'textColor',
   'align',
   'shadow',
@@ -115,6 +118,11 @@ const PATCH_FIELD_TYPE_GUARDS: Record<TemplatePatchKey, (v: unknown) => boolean>
   letterSpacing: isNumber,
   playbackGapSec: isNumber,
   wordSyncOffsetMs: isNumber,
+  customVerseBounds: (v) =>
+    Array.isArray(v) &&
+    v.length <= MAX_BOUNDARY_VERSES &&
+    v.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= 7200),
+  customVerseBoundsSource: (v) => v === 'auto' || v === 'manual',
   textColor: (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v),
   align: (v) => typeof v === 'string',
   shadow: isBoolOrNum,
@@ -211,6 +219,17 @@ export function buildSavedDesignTemplate(input: {
       letterSpacing: Number(state.letterSpacing ?? 0),
       playbackGapSec: Number(state.playbackGapSec ?? 0),
       wordSyncOffsetMs: Number(state.wordSyncOffsetMs ?? 0),
+      // حدود الآيات للملف المرفوع تنتقل مع القالب فقط إن كانت مضبوطة — القالب
+      // لا يرتبط بملف صوتي، لكن إبقاءها يسهّل إعادة استخدام الضبط على نفس المقطع.
+      ...(Array.isArray(state.customVerseBounds) && state.customVerseBounds.length
+        ? {
+            customVerseBounds: state.customVerseBounds
+              .slice(0, MAX_BOUNDARY_VERSES)
+              .map((t) => Number(t.toFixed(3))),
+            customVerseBoundsSource:
+              state.customVerseBoundsSource === 'manual' ? 'manual' : 'auto',
+          }
+        : {}),
       textColor: state.textColor,
       align: state.align,
       shadow: state.shadow,

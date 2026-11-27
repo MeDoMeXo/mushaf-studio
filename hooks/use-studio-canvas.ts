@@ -221,30 +221,55 @@ export function useStudioCanvas({
         isManualNav: isManualNavigatingRef.current,
       });
 
-      // Karaoke word tracking — read the live audio position (per-verse files
-      // only; a custom full-clip track has no per-ayah boundaries to follow).
+      // Karaoke word tracking — read the live audio position. For per-verse
+      // files the ratio is the verse's own audio; for a custom full-clip track
+      // the ratio comes from the verse boundaries (silence-detected or manual)
+      // so highlighting follows the uploaded recitation verse by verse.
       let activeWordIndex: number | undefined;
       const audio = studioAudioRef.current;
       const verseText = activeVerse?.text_uthmani ?? '';
+      const bounds = customAudioUrl
+        ? (Array.isArray(state.customVerseBounds) && state.customVerseBounds.length
+            ? state.customVerseBounds
+            : null)
+        : null;
       if (
-        !customAudioUrl &&
+        verseText.trim() &&
         !state.coverMode &&
         state.textSource !== 'translation' &&
         audio &&
         Number.isFinite(audio.duration) &&
         audio.duration > 0 &&
-        (isPlaying || audio.currentTime > 0) &&
-        verseText.trim()
+        (isPlaying || audio.currentTime > 0)
       ) {
-        // معايرة مزامنة التتبع (مللي ثانية): إزاحة نسبة تقدّم الصوت بمقدار
-        // فارق المستخدم قبل اختيار الكلمة النشطة — تُقصّ ضمن [0..1] دائماً.
         const syncOffsetMs = Math.max(-1000, Math.min(1000, Number(state.wordSyncOffsetMs) || 0));
-        const rawRatio = audio.currentTime / audio.duration;
-        const shiftedRatio =
-          syncOffsetMs !== 0 ? rawRatio + syncOffsetMs / (audio.duration * 1000) : rawRatio;
-        const ratio = Math.max(0, Math.min(1, shiftedRatio));
-        const wordIdx = findActiveWordIndex(buildAyahWordTimings(verseText), ratio);
-        activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
+        let ratio: number;
+        if (bounds && bounds.length === selectedVerses.length) {
+          // الملف المخصص: نسبة التقدّم داخل شريحة الآية الحالية وفق الحدود.
+          const idx = Math.min(
+            bounds.length - 1,
+            Math.max(0, activeIdxInRange)
+          );
+          const vStart = bounds[idx];
+          const vEnd = idx + 1 < bounds.length ? bounds[idx + 1] : audio.duration;
+          const span = Math.max(0.05, vEnd - vStart);
+          ratio = Math.max(0, Math.min(1, (audio.currentTime - vStart) / span));
+          if (syncOffsetMs !== 0) {
+            ratio = Math.max(0, Math.min(1, ratio + syncOffsetMs / (span * 1000)));
+          }
+        } else if (!customAudioUrl) {
+          const rawRatio = audio.currentTime / audio.duration;
+          ratio =
+            syncOffsetMs !== 0
+              ? Math.max(0, Math.min(1, rawRatio + syncOffsetMs / (audio.duration * 1000)))
+              : rawRatio;
+        } else {
+          ratio = 0;
+        }
+        if (ratio > 0 || !customAudioUrl) {
+          const wordIdx = findActiveWordIndex(buildAyahWordTimings(verseText), ratio);
+          activeWordIndex = wordIdx >= 0 ? wordIdx : undefined;
+        }
       }
 
       drawStudioFrame(ctx, {

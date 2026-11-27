@@ -190,6 +190,8 @@ export function StudioView() {
     exportSettings,
     // فاصل الآيات في المعاينة يأتي من StudioState (وليس من إعدادات التصدير)
     playbackGapSec: state.playbackGapSec ?? 0,
+    // حدود الآيات للملف المرفوع — تقدّم الآيات التلقائي في المعاينة
+    customVerseBounds: state.customVerseBounds,
     showToast,
   });
   const {
@@ -351,14 +353,29 @@ export function StudioView() {
             selectedVersesCount={selectedVerses.length}
             customAudioUrl={customAudioUrl}
             customAudioName={customAudioName}
+            customAudioFile={customAudioFile}
+            audioCurrentTime={audioCurrentTime}
+            audioDuration={audioDuration}
+            isPlaying={isPlaying}
             reciterQuery={reciterQuery}
             reciterFilter={reciterFilter}
             previewingReciter={previewingReciter}
             audioFileInputRef={audioFileInputRef}
+            onPatchState={handlePatchState}
+            showToast={showToast}
             onSelectSurah={handleSelectSurah}
             onChangeRange={(fromAyah, toAyah) => {
               setActiveIdxInRange(0);
-              commitState((p) => ({ ...p, fromAyah, toAyah }));
+              // تغيّر نطاق الآيات = عدد الآيات تغيّر — الحدود القديمة لم تعد
+              // صالحة (مفهرسة بعدد الآيات) فتُصفَّر ليُعاد ضبطها.
+              commitState((p) => ({
+                ...p,
+                fromAyah,
+                toAyah,
+                ...(p.fromAyah !== fromAyah || p.toAyah !== toAyah
+                  ? { customVerseBounds: undefined, customVerseBoundsSource: undefined }
+                  : {}),
+              }));
             }}
             onChangeTextSource={(textSource) => handlePatchState({ textSource })}
             onChangeTranslation={(translationId) => handlePatchState({ translationId })}
@@ -368,6 +385,11 @@ export function StudioView() {
               setCustomAudioUrl(null);
               setCustomAudioFile(null);
               setCustomAudioName('');
+              commitState((p) => ({
+                ...p,
+                customVerseBounds: undefined,
+                customVerseBoundsSource: undefined,
+              }));
             }}
             onReciterQueryChange={setReciterQuery}
             onReciterFilterChange={setReciterFilter}

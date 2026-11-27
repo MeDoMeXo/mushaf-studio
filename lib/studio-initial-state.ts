@@ -49,6 +49,10 @@ export function buildInitialStudioState(
     letterSpacing: 0,
     playbackGapSec: 0,
     wordSyncOffsetMs: 0,
+    // حدود الآيات للملف المرفوع تبدأ غير مضبوطة (undefined) — يعبّئها كشف
+    // السكوت أو الضبط اليدوي، وتُصفَّر عند تغيير السورة/النطاق/الملف.
+    customVerseBounds: undefined,
+    customVerseBoundsSource: undefined,
     textColor: cfg.studio.color || '#FAF7F0',
     align: 'center',
     shadow: true,

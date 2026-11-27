@@ -21,6 +21,9 @@ export interface UseStudioPlaybackInput {
   exportSettings: VideoExportSettings;
   /** فاصل صمت بين الآيات أثناء معاينة الاستوديو (ثوانٍ، 0..5) — من StudioState. */
   playbackGapSec?: number;
+  /** حدود الآيات داخل الملف الصوتي المرفوع (ثوانٍ بداية كل آية) — تُستخدم
+   *  للتقدّم التلقائي بين الآيات أثناء المعاينة ومزامنة الكاريوكي. */
+  customVerseBounds?: number[];
   showToast: (msg: string) => void;
 }
 
@@ -49,6 +52,7 @@ export function useStudioPlayback({
   customAudioUrl,
   exportSettings,
   playbackGapSec = 0,
+  customVerseBounds,
   showToast,
 }: UseStudioPlaybackInput): UseStudioPlaybackResult {
   const studioAudioRef = useRef<HTMLAudioElement | null>(null);
@@ -207,6 +211,29 @@ export function useStudioPlayback({
     const onTime = () => {
       setAudioCurrentTime(audio.currentTime);
       if (Number.isFinite(audio.duration)) setAudioDuration(audio.duration);
+
+      // تقدّم تلقائي بين الآيات مع الملف الصوتي المرفوع: عندما يتجاوز موضع
+      // التشغيل بداية الآية التالية (وفق الحدود المضبوطة) ننتقل إليها
+      // فوراً — نفس سلوك الملفات الفردية لكن على خط الحدود الزمني.
+      if (
+        customAudioUrl &&
+        Array.isArray(customVerseBounds) &&
+        customVerseBounds.length === selectedVerses.length &&
+        isPlaying
+      ) {
+        const t = audio.currentTime;
+        let target = activeIdxInRange;
+        for (let i = customVerseBounds.length - 1; i >= 0; i--) {
+          if (t >= customVerseBounds[i]) {
+            target = i;
+            break;
+          }
+        }
+        if (target !== activeIdxInRange) {
+          fadeStartRef.current = performance.now();
+          setActiveIdxInRange(target);
+        }
+      }
     };
     const onEnded = () => {
       if (!customAudioUrl && activeIdxInRange + 1 < selectedVerses.length) {
@@ -239,7 +266,7 @@ export function useStudioPlayback({
       audio.removeEventListener('ended', onEnded);
       audio.removeEventListener('pause', onPause);
     };
-  }, [activeIdxInRange, selectedVerses.length, customAudioUrl, playVerseAtIndex, playbackGapSec, clearPendingGap]);
+  }, [activeIdxInRange, selectedVerses.length, customAudioUrl, customVerseBounds, isPlaying, playVerseAtIndex, playbackGapSec, clearPendingGap]);
 
   // Keep Web Audio live preview DSP synced
   useEffect(() => {

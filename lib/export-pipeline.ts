@@ -210,6 +210,15 @@ export async function runExportPipeline(
     // Karaoke timeline — the server splits each verse's real audio duration
     // across these word/segment weights so slides stay audio-locked.
     wordTimeline: timeline ?? undefined,
+    // Verse boundaries inside the uploaded custom audio (seconds, one per
+    // verse) — silence-detected or manually set; the server locks slide
+    // durations to the real recitation instead of an even split.
+    customVerseBounds:
+      customAudioFile &&
+      Array.isArray(studioState.customVerseBounds) &&
+      studioState.customVerseBounds.length === selectedVerses.length
+        ? studioState.customVerseBounds
+        : undefined,
     slideCount: totalSlides,
     includeIntroCover,
     introCoverDurationSec: includeIntroCover ? INTRO_COVER_DURATION_SEC : 0,
