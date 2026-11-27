@@ -176,7 +176,13 @@ export function useStudioMedia({
               customVerseBounds: result.starts,
               customVerseBoundsSource: 'auto',
             }));
-            showToast('تم كشف حدود الآيات تلقائياً — راجعها وعدّلها إن لزم');
+            // رسالة الاحتياطي (فشل التحليل الدقيق لكن المدة معروفة) تُعرض،
+            // وإلا فالكشف الدقيق نجح ويصمت.
+            showToast(
+              result.message
+                ? 'تعذّر التحليل الدقيق — طُبّق توزيع متساوٍ، عدّله من لوحة حدود الآيات'
+                : 'تم كشف حدود الآيات تلقائياً — راجعها وعدّلها إن لزم'
+            );
           } else if (result.durationSec > 0) {
             const fallback = buildEvenFallbackBounds(count, result.durationSec);
             if (fallback.length === count) {
@@ -187,7 +193,12 @@ export function useStudioMedia({
               }));
             }
             showToast(
-              'تعذّر كشف الفواصل بدقة — طُبّق توزيع متساوٍ، عدّل الحدود يدوياً من لوحة حدود الآيات'
+              result.message ??
+                'تعذّر كشف الفواصل بدقة — طُبّق توزيع متساوٍ، عدّل الحدود يدوياً من لوحة حدود الآيات'
+            );
+          } else {
+            showToast(
+              'تعذّر قراءة الملف الصوتي — جرّب MP3 أو M4A وتأكد أن الملف غير تالف'
             );
           }
         })

@@ -414,7 +414,11 @@ export function StudioRecitationPanel({
                 <StudioSelect
                   aria-label="اختيار الترجمة المعتمدة من QUL"
                   value={String(state.translationId)}
-                  options={TRANSLATIONS.map((t) => ({ value: String(t.id), label: t.name }))}
+                  options={TRANSLATIONS.map((t) => ({
+                    value: String(t.id),
+                    label: t.name,
+                    group: t.langLabel ?? 'الترجمات',
+                  }))}
                   onChange={(v) => onChangeTranslation(Number(v))}
                 />
               </div>

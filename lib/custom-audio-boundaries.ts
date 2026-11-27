@@ -46,6 +46,12 @@ export interface SilenceDetectionResult {
   ok: boolean;
   /** رسالة عربية موجزة عند الفشل. */
   message?: string;
+  /**
+   * كيف حُدِّدت المدة: decoded = فك ترميز Web Audio كاملاً، audio-element =
+   * عنصر <audio> (عند تعذّر فك الترميز الكامل)، estimated = تقدير من حجم
+   * الملف ونسبة البت (آخر احتياطي حتى لا تكون المدة ٠ أبداً).
+   */
+  durationSource?: 'decoded' | 'audio-element' | 'estimated';
 }
 
 /** يبني نهايات الآيات من بداياتها + مدة الملف (نقية). */
@@ -189,8 +195,112 @@ export function detectBoundariesFromPeakLevels(
 }
 
 /**
- * فكّ ترميز الملف الصوتي في المتصفح واستخرج مستويات الذروة لكل نافذة.
+ * يجلب مدة الملف عبر عنصر <audio> — احتياطي خفيف لا يفك الملف كاملاً في
+ * الذاكرة (يكفيه header/المدة)، ينجح غالباً حيث يفشل decodeAudioData
+ * (ملفات ضخمة أو صيغ يدعمها المشغّل لا فاكّ Web Audio مثل OGG/Opus في Safari).
+ */
+async function getDurationViaAudioElement(url: string): Promise<number> {
+  return new Promise((resolve) => {
+    const el = document.createElement('audio');
+    let settled = false;
+    const finish = (d: number) => {
+      if (settled) return;
+      settled = true;
+      el.removeAttribute('src');
+      el.load();
+      resolve(Number.isFinite(d) && d > 0 ? d : 0);
+    };
+    el.preload = 'metadata';
+    el.muted = true;
+    const onMeta = () => {
+      // بعض المتصفحات تعطي Infinity أول لحظة لملفات البث — أعِد المحاولة
+      // عبر currentTime الشقلبة المعروفة
+      if (Number.isFinite(el.duration) && el.duration > 0) {
+        finish(el.duration);
+      } else {
+        el.currentTime = 1e101;
+        el.ontimeupdate = () => {
+          el.ontimeupdate = null;
+          finish(el.duration);
+        };
+      }
+    };
+    el.onloadedmetadata = onMeta;
+    el.ondurationchange = () => {
+      if (Number.isFinite(el.duration) && el.duration > 0) finish(el.duration);
+    };
+    el.onerror = () => finish(0);
+    window.setTimeout(() => finish(el.duration || 0), 8000);
+    el.src = url;
+    el.load();
+  });
+}
+
+/**
+ * استخراج معدل البت من أول فريم MP3 (رأس MPEG) — بلا فك ترميز كامل:
+ * نبحث عن sync bytes (0xFFEx) في أول كيلوبايت ونقرأ bitrate من الجدول.
+ * يعطي تقدير مدة دقيقاً جداً للملفات ذات الرأس الموحّد CBR.
+ */
+async function readMp3BitrateKbps(file: File): Promise<number | null> {
+  try {
+    const head = new Uint8Array(await file.slice(0, 2048).arrayBuffer());
+    // جدول البت رايت MPEG-1 Layer-3 (بت 4-7 من البايت الثاني بعد sync)
+    const V1L3 = [0, 32, 40, 48, 56, 64, 80, 96, 112, 128, 160, 192, 224, 256, 320, 0];
+    const V2L3 = [0, 8, 16, 24, 32, 40, 48, 56, 64, 80, 96, 112, 128, 144, 160, 0];
+    for (let i = 0; i < head.length - 4; i++) {
+      if (head[i] !== 0xff || (head[i + 1] & 0xe0) !== 0xe0) continue;
+      const verBits = (head[i + 1] >> 3) & 0x03; // 00=V2.5 01=محجوز 10=V2 11=V1
+      const layerBits = (head[i + 1] >> 1) & 0x03; // 01=Layer III
+      if (verBits === 0x01 || layerBits !== 0x01) continue;
+      const brIdx = (head[i + 2] >> 4) & 0x0f;
+      const table = verBits === 0x03 ? V1L3 : V2L3;
+      const kbps = table[brIdx];
+      if (kbps > 0) return kbps;
+      return null;
+    }
+  } catch {
+    // قراءة جزئية فشلت — تجاهل
+  }
+  return null;
+}
+
+/**
+ * تقدير المدة من حجم الملف — احتياطي أخير حتى لا تكون المدة ٠ أبداً:
+ * نقرأ معدل البت الحقيقي من رأس MP3 إن أمكن (دقة ممتازة)، وإلا نستخدم
+ * متوسط كيلوبايت/ثانية النموذجي لكل صيغة. المدة المقارَبة كافية لتوزيع
+ * متساوٍ يعدّله المستخدم.
+ */
+async function estimateDurationFromBytes(file: File): Promise<number> {
+  const kb = file.size / 1024;
+  const ext = (file.name.split('.').pop() || '').toLowerCase();
+
+  // MP3: معدل البت من أول فريم → تقدير دقيق
+  if (ext === 'mp3') {
+    const kbps = await readMp3BitrateKbps(file);
+    if (kbps && kbps > 0) {
+      // كيلوبايت/ثانية = kbps/8؛ نطرح تقديراً صغيراً للرأس والوسوم
+      const kBytesPerSec = kbps / 8;
+      return Math.max(1, Math.round((kb - 2) / kBytesPerSec));
+    }
+  }
+
+  // كيلوبايت في الثانية النموذجي لكل صيغة شائعة (تقديرات متوسطة)
+  const kbpsTable: Record<string, number> = {
+    mp3: 16, m4a: 12, aac: 12, ogg: 12, opus: 10,
+    wav: 88, flac: 70, webm: 12, wma: 16, amr: 1.2,
+  };
+  const kbps = kbpsTable[ext] ?? 14;
+  return Math.max(1, Math.round(kb / kbps));
+}
+
+/**
+ * فكّ ترميز الملف الصوتي في المتصفح واستخراج مستويات الذروة لكل نافذة.
  * يعمل على الملف المحلي مباشرة (لا رفع للخادم) ويعيد نتيجة الكشف كاملة.
+ *
+ * ثلاث مراحل متدرجة كي لا يخسر المستخدم التتبّع أبداً:
+ *  1) decodeAudioData الكامل — أفضل دقة (عندما ينجح).
+ *  2) عند فشله: مدة من عنصر <audio> (خفيف) + توزيع متساوٍ يدعو للتعديل.
+ *  3) عند فشل الاثنين: مدة مُقدَّرة من حجم الملف + توزيع متساوٍ.
  */
 export async function analyzeCustomAudioFile(
   file: File,
@@ -205,6 +315,8 @@ export async function analyzeCustomAudioFile(
   if (!AudioCtx) {
     return { starts: [], durationSec: 0, ok: false, message: 'المتصفح لا يدعم تحليل الصوت' };
   }
+
+  // المرحلة 1: فك الترميز الكامل (أفضل دقة)
   try {
     const buf = await file.arrayBuffer();
     const ctx = new AudioCtx();
@@ -223,19 +335,57 @@ export async function analyzeCustomAudioFile(
         }
         peakLevels.push(peak);
       }
-      return detectBoundariesFromPeakLevels(
+      const result = detectBoundariesFromPeakLevels(
         peakLevels,
         verseCount,
         windowSec,
         durationSec,
         opts
       );
+      return { ...result, durationSource: 'decoded' };
     } finally {
       void ctx.close().catch(() => {});
     }
   } catch {
-    return { starts: [], durationSec: 0, ok: false, message: 'تعذّر فك ترميز الملف الصوتي' };
+    // نكمل بالمرحلة 2 — لا نفقد التتبّع
   }
+
+  // المرحلة 2: مدة من <audio> (رأس الملف فقط — خفيف وينجح مع معظم الصيغ)
+  let durationSec = 0;
+  let durationSource: 'audio-element' | 'estimated' = 'audio-element';
+  try {
+    const probeUrl = URL.createObjectURL(file);
+    try {
+      durationSec = await getDurationViaAudioElement(probeUrl);
+    } finally {
+      URL.revokeObjectURL(probeUrl);
+    }
+  } catch {
+    durationSec = 0;
+  }
+  if (!(durationSec > 0)) {
+    // المرحلة 3: تقدير من الحجم
+    durationSec = await estimateDurationFromBytes(file);
+    durationSource = 'estimated';
+  }
+  if (!(durationSec > 0)) {
+    return {
+      starts: [],
+      durationSec: 0,
+      ok: false,
+      message: 'تعذّر قراءة الملف الصوتي — جرّب صيغة MP3 أو M4A وشدّد أن الملف غير تالف',
+    };
+  }
+
+  // وصلنا هنا = فشل الكشف الدقيق لكن المدة معروفة → توزيع متساوٍ قابل للتعديل
+  return {
+    starts: buildEvenFallbackBounds(verseCount, durationSec),
+    durationSec,
+    ok: true,
+    durationSource,
+    message:
+      'تعذّر التحليل الدقيق (صيغة غير مدعومة أو ملف ضخم) — طُبّق توزيع متساوٍ، اضبط بدايات الآيات يدوياً أثناء الاستماع',
+  };
 }
 
 /** أين تقع اللحظة t داخل الحدود؟ (فهرس الآية، نقية). */

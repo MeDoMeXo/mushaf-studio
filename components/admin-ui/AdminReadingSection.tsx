@@ -51,10 +51,18 @@ export function AdminReadingSection({
               }
               className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-sm text-[var(--ink-primary)]"
             >
-              {TRANSLATIONS.map((t) => (
-                <option key={t.id} value={t.id}>
-                  {t.name}
-                </option>
+              {Array.from(
+                new Set(TRANSLATIONS.map((t) => t.langLabel ?? 'الترجمات'))
+              ).map((langLabel) => (
+                <optgroup key={langLabel} label={langLabel}>
+                  {TRANSLATIONS.filter((t) => (t.langLabel ?? 'الترجمات') === langLabel).map(
+                    (t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    )
+                  )}
+                </optgroup>
               ))}
             </select>
           </div>

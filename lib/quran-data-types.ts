@@ -62,6 +62,8 @@ export interface TranslationOption {
   id: number;
   name: string;
   lang: string;
+  /** تسمية اللغة كما تظهر للمستخدم (مثل «العربية») — للعرض فقط. */
+  langLabel?: string;
 }
 
 export interface GradientPreset {

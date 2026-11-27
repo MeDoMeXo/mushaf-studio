@@ -69,8 +69,15 @@ export function StudioCustomAudioBoundsPanel({
           customVerseBounds: result.starts,
           customVerseBoundsSource: 'auto',
         });
-        showToast(`تم كشف حدود ${toArabicDigits(verseCount)} آيات تلقائياً`);
-        setDetectMsg(null);
+        // رسالة توجيهية عند النجاح عبر الاحتياطي (فشل التحليل الدقيق لكن
+        // المدة حُدِّدت بـ<audio> أو بالتقدير) — الكشف الدقيق يصمت تماماً.
+        if (result.message) {
+          setDetectMsg(result.message);
+          showToast('طُبّق توزيع متساوٍ — اضبط الحدود أثناء الاستماع');
+        } else {
+          setDetectMsg(null);
+          showToast(`تم كشف حدود ${toArabicDigits(verseCount)} آيات تلقائياً`);
+        }
       } else {
         // احتياطي: توزيع متساوٍ حتى يعدّله المستخدم يدوياً.
         const fallback = buildEvenFallbackBounds(verseCount, result.durationSec);
@@ -192,11 +199,19 @@ export function StudioCustomAudioBoundsPanel({
       )}
 
       {!bounds && (
-        <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
-          اضغط «كشف تلقائي» لتحليل فواصل السكوت بين الآيات، أو اضبط بداية كل
-          آية يدوياً أثناء الاستماع. بدون حدود تُقسَّم مدة المقطع على الآيات
-          بالتساوي تقريبياً.
-        </p>
+        <div className="space-y-1.5">
+          <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            اضغط «كشف تلقائي» لتحليل فواصل السكوت بين الآيات، أو اضبط بداية كل
+            آية يدوياً أثناء الاستماع. بدون حدود تُقسَّم مدة المقطع على الآيات
+            بالتساوي تقريبياً.
+          </p>
+          {/* إرشاد الصيغة المثلى — أفضل توافق مع كل المتصفحات لفك الترميز */}
+          <p className="text-[10px] leading-relaxed text-[var(--ink-muted)]/80">
+            💡 أفضل صيغة: <span className="font-bold">MP3</span> أو{' '}
+            <span className="font-bold">M4A/AAC</span> (‎128-320kbps‎). تُدعَم
+            أيضاً WAV/OGG/FLAC بحسب المتصفح، وملفات AMR أو المقطّعة قد تفشل.
+          </p>
+        </div>
       )}
 
       {bounds && !aligned && (

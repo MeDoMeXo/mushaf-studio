@@ -17,6 +17,8 @@ import { ChevronDown, Check } from 'lucide-react';
 export interface StudioSelectOption {
   value: string;
   label: string;
+  /** عنوان مجموعة اختياري — الخيارات المتتالية بنفس العنوان تُجمَّع تحته. */
+  group?: string;
 }
 
 interface StudioSelectProps {
@@ -114,33 +116,44 @@ export function StudioSelect({
             dropUp ? 'bottom-full mb-1' : 'top-full mt-1'
           }`}
         >
-          {options.map((opt) => {
+          {options.map((opt, i) => {
             const active = opt.value === value;
+            const showGroupHeader =
+              opt.group !== undefined && opt.group !== options[i - 1]?.group;
             return (
-              <button
-                key={opt.value}
-                type="button"
-                role="option"
-                aria-selected={active}
-                onClick={() => {
-                  onChange(opt.value);
-                  setOpen(false);
-                }}
-                style={optionStyle ? optionStyle(opt.value) : undefined}
-                className={`flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-right text-[11px] font-semibold transition-colors ${
-                  active
-                    ? 'bg-[var(--brand-gold)]/15 text-[var(--ink-primary)]'
-                    : 'text-[var(--ink-primary)] hover:bg-[var(--surface-subtle)]'
-                }`}
-              >
-                <span className="min-w-0 flex-1 truncate">{opt.label}</span>
-                {active && (
-                  <Check
-                    className="h-3 w-3 shrink-0 text-[var(--brand-gold)]"
-                    aria-hidden="true"
-                  />
+              <React.Fragment key={opt.value}>
+                {showGroupHeader && (
+                  <div
+                    role="presentation"
+                    className="sticky top-0 z-[1] bg-[var(--surface-card)] px-2.5 pt-1.5 pb-1 text-[10px] font-bold uppercase tracking-wide text-[var(--ink-muted)]"
+                  >
+                    {opt.group}
+                  </div>
                 )}
-              </button>
+                <button
+                  type="button"
+                  role="option"
+                  aria-selected={active}
+                  onClick={() => {
+                    onChange(opt.value);
+                    setOpen(false);
+                  }}
+                  style={optionStyle ? optionStyle(opt.value) : undefined}
+                  className={`flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-right text-[11px] font-semibold transition-colors ${
+                    active
+                      ? 'bg-[var(--brand-gold)]/15 text-[var(--ink-primary)]'
+                      : 'text-[var(--ink-primary)] hover:bg-[var(--surface-subtle)]'
+                  }`}
+                >
+                  <span className="min-w-0 flex-1 truncate">{opt.label}</span>
+                  {active && (
+                    <Check
+                      className="h-3 w-3 shrink-0 text-[var(--brand-gold)]"
+                      aria-hidden="true"
+                    />
+                  )}
+                </button>
+              </React.Fragment>
             );
           })}
         </div>

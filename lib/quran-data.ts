@@ -106,12 +106,31 @@ export const RECITERS: ReciterOption[] = [
 ];
 
 export const TRANSLATIONS: TranslationOption[] = [
-  { id: 131, name: 'د. مصطفى خطاب — The Clear Quran', lang: 'en' },
-  { id: 20, name: 'Saheeh International', lang: 'en' },
-  { id: 149, name: 'Fadel Soliman — Bridges’ Translation', lang: 'en' },
-  { id: 85, name: 'عبد الله يوسف علي', lang: 'en' },
-  { id: 95, name: 'تفهيم القرآن — المودودي', lang: 'en' },
-  { id: 167, name: 'معارف القرآن (تفسيري)', lang: 'en' },
+  // ── العربية ──────────────────────────────────────────────────────────
+  { id: 78, name: 'وزارة الأوقاف المصرية', lang: 'ar', langLabel: 'العربية' },
+  { id: 79, name: 'أبو عادل (عبد الرحمن ناصر السعدي)', lang: 'ar', langLabel: 'العربية' },
+  { id: 81, name: 'Burhan Muhammad-Amin', lang: 'ar', langLabel: 'العربية' },
+
+  // ── الإنجليزية ───────────────────────────────────────────────────────
+  { id: 131, name: 'د. مصطفى خطاب — The Clear Quran', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 20, name: 'Saheeh International', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 85, name: 'Abdul Haleem', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 149, name: 'Fadel Soliman — Bridges’ Translation', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 84, name: 'Mufti Taqi Usmani', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 206, name: 'Ruwwad Center', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 207, name: 'Dr. T. B. Irving', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 171, name: 'Abridged Explanation of the Quran', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 103, name: 'Helmi Nasr — البرتغالية', lang: 'pt', langLabel: 'البرتغالية' },
+
+  // ── الأردية ──────────────────────────────────────────────────────────
+  { id: 95, name: 'تفهيم القرآن — المودودي (Tafheem-ul-Quran)', lang: 'ur', langLabel: 'الأردية' },
+  { id: 158, name: 'بیان القرآن — د. اسرار احمد', lang: 'ur', langLabel: 'الأردية' },
+  { id: 97, name: 'Tafheem e Qur’an — Syed Abu Ali Maududi', lang: 'ur', langLabel: 'الأردية' },
+
+  // ─ـ لغات أخرى ────────────────────────────────────────────────────────
+  { id: 167, name: 'معارف القرآن (تفسيري)', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 135, name: 'Persian — Rowwad Translation Center', lang: 'fa', langLabel: 'الفارسية' },
+  { id: 82, name: 'Suhel Farooq Khan — الهندية', lang: 'hi', langLabel: 'الهندية' },
 ];
 
 export const DEFAULT_TRANSLATION_ID = 131;
