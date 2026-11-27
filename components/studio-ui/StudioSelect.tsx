@@ -60,6 +60,9 @@ export function StudioSelect({
 
   // Position the portalled list: fixed coordinates matching the trigger's
   // bounding box, clamped to the viewport (drop up when more room above).
+  // Only updates state when a value actually changed — a re-render on every
+  // scroll event used to re-run the centering effect below and snap the
+  // list back to the selected option mid-scroll (the "unstable menu" bug).
   const positionList = React.useCallback(() => {
     if (!open || !wrapperRef.current) return;
     const rect = wrapperRef.current.getBoundingClientRect();
@@ -67,8 +70,19 @@ export function StudioSelect({
     const roomBelow = window.innerHeight - rect.bottom;
     const roomAbove = rect.top;
     const up = roomBelow < Math.min(maxH, 200) && roomAbove > roomBelow;
-    setDropUp(up);
-    setFixedPos({ top: rect.top, left: rect.left, width: rect.width, height: rect.height });
+    setDropUp((prev) => (prev === up ? prev : up));
+    setFixedPos((prev) => {
+      if (
+        prev &&
+        prev.top === rect.top &&
+        prev.left === rect.left &&
+        Math.abs(prev.width - rect.width) < 0.5 &&
+        Math.abs(prev.height - rect.height) < 0.5
+      ) {
+        return prev; // لا تغيير — احتفظ بالمرجع القديم (لا إعادة رسم)
+      }
+      return { top: rect.top, left: rect.left, width: rect.width, height: rect.height };
+    });
   }, [open]);
 
   useLayoutEffect(() => {
@@ -84,15 +98,24 @@ export function StudioSelect({
     };
   }, [open, positionList]);
 
-  // On open, scroll the selected option into view (it may sit far down a
-  // long grouped list — e.g. the default translation inside the English
-  // group). Native scrollIntoView with block:'center' — group headers are
-  // NOT sticky (they scroll with content, like native <select> optgroups),
-  // so no header covers rows and no height math is needed. The original bug
-  // (options clipped by the panel's overflow:hidden) is solved by the
-  // body portal, not by geometry.
+  // On open, scroll the selected option into view ONCE (it may sit far
+  // down a long grouped list — e.g. the default translation inside the
+  // English group). Native scrollIntoView with block:'center' — group
+  // headers are NOT sticky (they scroll with content, like native <select>
+  // optgroups), so no header covers rows and no height math is needed.
+  // The original bug (options clipped by the panel's overflow:hidden) is
+  // solved by the body portal, not by geometry.
+  // Runs on the open transition only — never on later position updates,
+  // otherwise the user's own scrolling inside the list would be cancelled
+  // and snap back to the selected option (the "unstable menu" bug).
+  const centeredRef = useRef(false);
   useLayoutEffect(() => {
-    if (!open || !fixedPos || !listRef.current) return;
+    if (!open) {
+      centeredRef.current = false;
+      return;
+    }
+    if (centeredRef.current || !fixedPos || !listRef.current) return;
+    centeredRef.current = true;
     const list = listRef.current;
     const sel = list.querySelector<HTMLElement>('[aria-selected="true"]');
     if (!sel) return;
