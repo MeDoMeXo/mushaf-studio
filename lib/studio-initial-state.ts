@@ -53,6 +53,8 @@ export function buildInitialStudioState(
     // السكوت أو الضبط اليدوي، وتُصفَّر عند تغيير السورة/النطاق/الملف.
     customVerseBounds: undefined,
     customVerseBoundsSource: undefined,
+    // اسم قارئ التلاوة المرفوعة — يُملأ من لوحة «ملف صوتي مخصص».
+    customReciterName: '',
     textColor: cfg.studio.color || '#FAF7F0',
     align: 'center',
     shadow: true,

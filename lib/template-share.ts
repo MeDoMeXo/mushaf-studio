@@ -46,6 +46,7 @@ export const TEMPLATE_PATCH_FIELDS = [
   'wordSyncOffsetMs',
   'customVerseBounds',
   'customVerseBoundsSource',
+  'customReciterName',
   'textColor',
   'align',
   'shadow',
@@ -123,6 +124,7 @@ const PATCH_FIELD_TYPE_GUARDS: Record<TemplatePatchKey, (v: unknown) => boolean>
     v.length <= MAX_BOUNDARY_VERSES &&
     v.every((t) => typeof t === 'number' && Number.isFinite(t) && t >= 0 && t <= 7200),
   customVerseBoundsSource: (v) => v === 'auto' || v === 'manual',
+  customReciterName: (v) => typeof v === 'string' && v.length <= 60,
   textColor: (v) => typeof v === 'string' && /^#[0-9a-fA-F]{3,8}$/.test(v),
   align: (v) => typeof v === 'string',
   shadow: isBoolOrNum,
@@ -229,6 +231,9 @@ export function buildSavedDesignTemplate(input: {
             customVerseBoundsSource:
               state.customVerseBoundsSource === 'manual' ? 'manual' : 'auto',
           }
+        : {}),
+      ...(state.customReciterName
+        ? { customReciterName: state.customReciterName.slice(0, 60) }
         : {}),
       textColor: state.textColor,
       align: state.align,

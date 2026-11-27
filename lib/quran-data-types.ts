@@ -129,6 +129,9 @@ export interface StudioState {
   customVerseBounds?: number[];
   /** مصدر الحدود الحالية: auto = كشف السكوت، manual = ضبط يدوي. */
   customVerseBoundsSource?: 'auto' | 'manual';
+  /** اسم القارئ للملف الصوتي المرفوع — يظهر في تذييل المعاينة والتصدير
+   *  بدل اسم القارئ المدمج المختار (لا معنى له مع تلاوة خارجية). */
+  customReciterName?: string;
   /** معايرة يدوية لمزامنة تتبع الكلمات مع الصوت (مللي ثانية، ‎-1000..1000). */
   wordSyncOffsetMs?: number;
   textColor: string;

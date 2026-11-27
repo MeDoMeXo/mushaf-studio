@@ -11,6 +11,10 @@ import {
   getBuiltinBackgroundPublicPath,
   type BuiltinBackground,
 } from '@/lib/background-library';
+import {
+  analyzeCustomAudioFile,
+  buildEvenFallbackBounds,
+} from '@/lib/custom-audio-boundaries';
 import type { StudioState } from '@/lib/quran-data';
 
 export interface UseStudioMediaInput {
@@ -23,6 +27,9 @@ export interface UseStudioMediaInput {
   bgLibraryId?: string | null;
   /** Current state.bgType, to gate the sync below to video mode only. */
   bgType?: StudioState['bgType'];
+  /** عدد الآيات المحددة حالياً — يلزم الكشف التلقائي لحدود الآيات فور رفع
+   *  الملف الصوتي المخصص (التتبّع يعمل مباشرة دون خطوة يدوية). */
+  verseCount?: number;
 }
 
 export interface UseStudioMediaResult {
@@ -52,6 +59,7 @@ export function useStudioMedia({
   showToast,
   bgLibraryId,
   bgType,
+  verseCount,
 }: UseStudioMediaInput): UseStudioMediaResult {
   const [bgVideoUrl, setBgVideoUrl] = useState<string | null>(null);
   const [bgVideoFile, setBgVideoFile] = useState<File | null>(null);
@@ -154,9 +162,41 @@ export function useStudioMedia({
       setCustomAudioFile(file);
       setCustomAudioName(file.name);
       showToast(`تم إرفاق المقطع الصوتي: ${file.name}`);
+
+      // كشف تلقائي لحدود الآيات فور الرفع (Web Audio في المتصفح، بلا رفع
+      // للخادم) — يضمن عمل تتبّع الكلمات والتقدّم بين الآيات مباشرة دون
+      // خطوة يدوية. عند تعذّر الكشف نطبّق توزيعاً متساوياً كنقطة انطلاق
+      // يقوّمها المستخدم يدوياً من لوحة «حدود الآيات».
+      const count = Math.max(1, Math.floor(verseCount ?? 1));
+      void analyzeCustomAudioFile(file, count)
+        .then((result) => {
+          if (result.ok && result.starts.length === count) {
+            commitState((p) => ({
+              ...p,
+              customVerseBounds: result.starts,
+              customVerseBoundsSource: 'auto',
+            }));
+            showToast('تم كشف حدود الآيات تلقائياً — راجعها وعدّلها إن لزم');
+          } else if (result.durationSec > 0) {
+            const fallback = buildEvenFallbackBounds(count, result.durationSec);
+            if (fallback.length === count) {
+              commitState((p) => ({
+                ...p,
+                customVerseBounds: fallback,
+                customVerseBoundsSource: 'auto',
+              }));
+            }
+            showToast(
+              'تعذّر كشف الفواصل بدقة — طُبّق توزيع متساوٍ، عدّل الحدود يدوياً من لوحة حدود الآيات'
+            );
+          }
+        })
+        .catch(() => {
+          /* التحليل اختياري — اللوحة اليدوية تبقى متاحة */
+        });
       e.target.value = '';
     },
-    [showToast]
+    [commitState, showToast, verseCount]
   );
 
   return {

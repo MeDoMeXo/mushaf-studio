@@ -165,7 +165,7 @@ export function StudioView() {
     handleRemoveBgVideo,
     handleSelectBgLibrary,
     handleAudioFileUpload,
-  } = useStudioMedia({ commitState, showToast });
+  } = useStudioMedia({ commitState, showToast, verseCount: selectedVerses.length });
   const {
     studioAudioRef,
     previewAudioRef,
@@ -238,6 +238,13 @@ export function StudioView() {
     return list.find((r) => r.slug === state.reciter) ?? list[0] ?? RECITERS[0];
   }, [config.customReciters, config.disabledReciters, state.reciter]);
 
+  // اسم القارئ الظاهر: عند رفع تلاوة خارجية يُستخدم اسم قارئها المُدخل
+  // (إن وُجد) — اسم القارئ المدمج المختار لا معنى له مع مقطع خارجي.
+  const displayedReciterName =
+    customAudioUrl && (state.customReciterName ?? '').trim()
+      ? (state.customReciterName ?? '').trim()
+      : activeReciterObj.name;
+
   const {
     renderOnce,
     triggerTransitionPreview,
@@ -251,7 +258,7 @@ export function StudioView() {
     activeIdxInRange,
     isPlaying,
     currentChapter,
-    reciterName: activeReciterObj.name,
+    reciterName: displayedReciterName,
     canvasRef,
     fullscreenCanvasRef,
     fullscreenOpen,
@@ -277,7 +284,7 @@ export function StudioView() {
       state,
       activeVerse,
       surahName: currentChapter?.name_arabic,
-      reciterName: activeReciterObj.name,
+      reciterName: displayedReciterName,
       config,
       canvasRef,
       renderOnce,
@@ -332,7 +339,7 @@ export function StudioView() {
           fromAyah={state.fromAyah}
           toAyah={state.toAyah}
           selectedCount={selectedVerses.length}
-          reciterName={activeReciterObj.name}
+          reciterName={displayedReciterName}
           canUndo={canUndo}
           canRedo={canRedo}
           onUndo={handleUndo}
@@ -411,7 +418,7 @@ export function StudioView() {
             isPlaying={isPlaying}
             audioCurrentTime={audioCurrentTime}
             audioDuration={audioDuration}
-            activeReciterName={activeReciterObj.name}
+            activeReciterName={displayedReciterName}
             exportSettings={exportSettings}
             previewEstimatedSizeMb={previewEstimatedSizeMb}
             onAspectSelect={handleAspectSelect}
@@ -513,7 +520,7 @@ export function StudioView() {
           onOpenChange={setFullscreenOpen}
           attachCanvasRef={attachFullscreenCanvas}
           surahName={currentChapter?.name_arabic ?? 'الفاتحة'}
-          reciterName={activeReciterObj.name}
+          reciterName={displayedReciterName}
           coverMode={Boolean(state.coverMode)}
           selectedVerses={selectedVerses}
           activeIdxInRange={activeIdxInRange}
@@ -545,7 +552,7 @@ export function StudioView() {
             state.fromAyah === 1 &&
             state.toAyah === (currentChapter?.verses_count ?? state.toAyah)
           }
-          reciterName={activeReciterObj.name}
+          reciterName={displayedReciterName}
           onAspectSelect={handleAspectSelect}
           getBgImageEl={() => bgImgElRef.current}
           bgVideoFile={bgVideoFile}

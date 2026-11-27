@@ -475,6 +475,26 @@ export function StudioRecitationPanel({
                   <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </button>
               </div>
+              {/* اسم القارئ للتلاوة المرفوعة — يظهر في تذييل المعاينة والتصدير */}
+              <div className="flex items-center gap-2">
+                <label
+                  htmlFor="custom-reciter-name"
+                  className="shrink-0 text-[11px] font-semibold text-[var(--ink-muted)]"
+                >
+                  اسم القارئ
+                </label>
+                <input
+                  id="custom-reciter-name"
+                  type="text"
+                  value={state.customReciterName ?? ''}
+                  maxLength={60}
+                  placeholder="مثال: الشيخ عبد الرحمن السديس"
+                  onChange={(e) =>
+                    onPatchState({ customReciterName: e.target.value })
+                  }
+                  className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-xs font-semibold text-[var(--ink-primary)] placeholder:font-normal placeholder:text-[var(--ink-muted)]/60 focus:outline-none focus:ring-1 focus:ring-[var(--brand-gold)]/60"
+                />
+              </div>
               <StudioCustomAudioBoundsPanel
                 state={state}
                 customAudioFile={customAudioFile ?? null}
