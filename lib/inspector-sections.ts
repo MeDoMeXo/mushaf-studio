@@ -1,7 +1,7 @@
 /**
- * سجل أقسام لوحة التنسيق (خمسة تبويبات) — المصدر الوحيد لهوية كل قسم:
- * المعرّف + التبويب + التسمية العربية. تستخدمه إدارة ظهور الأقسام في
- * الاستوديو (use-inspector-section-visibility) ومفتاح localStorage.
+ * سجل أقسام لوحة التنسيق في الاستوديو (خمسة تبويبات) — المصدر الوحيد لهوية كل قسم:
+ * المعرّف + التبويب + التسمية العربية. تُدار إعدادات الظهور مركزيّاً من لوحة
+ * التحكم (SiteConfig.studio.hiddenInspectorSections).
  * إضافة قسم جديد = سطر واحد هنا + غلاف StudioInspectorSection في اللوح.
  */
 
@@ -13,8 +13,13 @@ export interface InspectorSectionMeta {
   label: string;
 }
 
-/** مفتاح تخزين تفضيلات إظهار الأقسام في المتصفح. */
-export const INSPECTOR_SECTION_STORAGE_KEY = 'mushaf-studio-inspector-sections';
+export const INSPECTOR_TAB_ORDER: readonly InspectorSectionTab[] = [
+  'templates',
+  'ornaments',
+  'background',
+  'text',
+  'audio',
+];
 
 export const INSPECTOR_TAB_LABELS: Record<InspectorSectionTab, string> = {
   templates: 'قوالب',
@@ -52,7 +57,6 @@ export const INSPECTOR_SECTIONS: InspectorSectionMeta[] = [
   { id: 'txt-labels', tab: 'text', label: 'اسم السورة والقارئ' },
   { id: 'txt-layers', tab: 'text', label: 'المؤثرات وعناصر الشريحة' },
   { id: 'txt-watermark', tab: 'text', label: 'العلامة المائية' },
-  { id: 'txt-links', tab: 'text', label: 'الروابط' },
 
   // ── تبويب الصوت ──
   { id: 'aud-dsp', tab: 'audio', label: 'الهندسة الصوتية والمؤثرات المحيطية' },
@@ -64,7 +68,43 @@ export const INSPECTOR_SECTIONS: InspectorSectionMeta[] = [
 
 const SECTION_IDS = new Set(INSPECTOR_SECTIONS.map((s) => s.id));
 
-/** هل هذا المعرّف قسم مسجّل فعلاً؟ (حماية من قيم دخيلة في التخزين المحلي) */
+/** هل هذا المعرّف قسم مسجّل فعلاً؟ (حماية من قيم دخيلة في الإعدادات المحفوظة) */
 export function isInspectorSectionId(id: unknown): id is string {
   return typeof id === 'string' && SECTION_IDS.has(id);
 }
+
+export function getInspectorSectionsByTab(tab: InspectorSectionTab): InspectorSectionMeta[] {
+  return INSPECTOR_SECTIONS.filter((s) => s.tab === tab);
+}
+
+export function sanitizeHiddenInspectorSections(raw: unknown): string[] {
+  if (!Array.isArray(raw)) return [];
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of raw) {
+    if (isInspectorSectionId(item) && !seen.has(item)) {
+      seen.add(item);
+      result.push(item);
+    }
+  }
+  return result;
+}
+
+export function isInspectorSectionHidden(
+  hiddenIds: readonly string[] | undefined,
+  id: string
+): boolean {
+  return Array.isArray(hiddenIds) && hiddenIds.includes(id);
+}
+
+export function toggleHiddenInspectorSection(
+  hiddenIds: readonly string[],
+  id: string
+): string[] {
+  if (!isInspectorSectionId(id)) return [...hiddenIds];
+  if (hiddenIds.includes(id)) {
+    return hiddenIds.filter((item) => item !== id);
+  }
+  return [...hiddenIds, id];
+}
+

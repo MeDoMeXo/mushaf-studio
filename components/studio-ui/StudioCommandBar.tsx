@@ -49,27 +49,27 @@ export function StudioCommandBar({
   onExportVideo,
 }: StudioCommandBarProps) {
   return (
-    <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] px-4 py-2.5">
+    <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] px-3 py-2 sm:gap-3 sm:px-4 sm:py-2.5">
       {/* Right (RTL start): Editorial Breadcrumb & Current Project Context */}
       <div className="flex min-w-0 flex-col gap-0.5">
         <div className="flex items-center gap-2">
-          <h1 className="font-display text-lg font-bold leading-tight text-[var(--brand-emerald)] dark:text-[#E6C75A] sm:text-xl">
+          <h1 className="font-display text-base font-bold leading-tight text-[var(--brand-emerald)] dark:text-[#E6C75A] sm:text-xl">
             استوديو التلاوات
           </h1>
           <span className="text-[var(--border-hairline)]" aria-hidden="true">
             /
           </span>
-          <span className="truncate text-sm font-bold text-[var(--ink-primary)]">
+          <span className="truncate text-xs font-bold text-[var(--ink-primary)] sm:text-sm">
             سورة {surahName}
           </span>
         </div>
-        <div className="flex flex-wrap items-center gap-1.5 text-xs text-[var(--ink-muted)] tabular-nums">
+        <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-[var(--ink-muted)] tabular-nums sm:text-xs">
           <span>
             الآيات {toArabicDigits(fromAyah)}–{toArabicDigits(toAyah)} (
             {toArabicDigits(selectedCount)})
           </span>
           <span aria-hidden="true">·</span>
-          <span className="truncate max-w-[200px]">{reciterName}</span>
+          <span className="max-w-[160px] truncate sm:max-w-[220px]">{reciterName}</span>
         </div>
       </div>
 

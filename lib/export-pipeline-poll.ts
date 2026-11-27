@@ -8,6 +8,8 @@ import {
   abortableSleep,
   extractErrorMessage,
   fetchVerifiedVideoBlob,
+  isHtmlResponse,
+  safeParseJsonResponse,
   triggerDownload,
   verifyAndDownload,
 } from '@/lib/export-network';
@@ -75,6 +77,8 @@ export async function waitForExportCompletion(
         `/api/studio/export/session?id=${encodeURIComponent(jobId)}`,
         {
           method: 'GET',
+          credentials: 'same-origin',
+          headers: { Accept: 'application/json' },
           cache: 'no-store',
           signal,
         }
@@ -109,11 +113,40 @@ export async function waitForExportCompletion(
       continue;
     }
 
+    if (isHtmlResponse(pollRes)) {
+      consecutivePollErrors++;
+      if (consecutivePollErrors >= 5) {
+        await safeParseJsonResponse<{ status: ExportJobStatus }>(
+          pollRes,
+          'متابعة حالة التصدير'
+        );
+      }
+      cb.onStageLabel('المعالجة مستمرة على الخادم — جاري إعادة التحقق من الحالة...');
+      nextPollDelayMs = computeBackoff(consecutivePollErrors);
+      continue;
+    }
+
+    let parsedPoll: { status: ExportJobStatus };
+    try {
+      parsedPoll = await safeParseJsonResponse<{ status: ExportJobStatus }>(
+        pollRes,
+        'متابعة حالة التصدير'
+      );
+    } catch (parseErr) {
+      consecutivePollErrors++;
+      if (consecutivePollErrors >= 5) {
+        throw parseErr;
+      }
+      cb.onStageLabel('المعالجة مستمرة على الخادم — جاري إعادة التحقق من الحالة...');
+      nextPollDelayMs = computeBackoff(consecutivePollErrors);
+      continue;
+    }
+
     consecutivePollErrors = 0;
     rateLimitHits = 0;
     nextPollDelayMs = basePollMs;
 
-    const { status: jobStatus } = (await pollRes.json()) as { status: ExportJobStatus };
+    const { status: jobStatus } = parsedPoll;
     cb.onProgress(jobStatus.progressPct);
     if (jobStatus.stageLabel) {
       cb.onStageLabel(jobStatus.stageLabel);

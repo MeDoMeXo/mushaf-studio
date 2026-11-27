@@ -143,9 +143,9 @@ export function HomeView() {
   );
 
   return (
-    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-5 sm:px-6">
+    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-24 pt-5 sm:px-6 2xl:max-w-[1680px]">
       {/* Editorial Verse of the Day Hero */}
-      <section className="relative overflow-hidden rounded-2xl border border-[#1B4A3A] bg-gradient-to-br from-[#06221A] via-[#0B3D2E] to-[#124D3A] px-6 py-10 text-[#FAF7F0] shadow-md sm:px-12 sm:py-14">
+      <section className="relative overflow-hidden rounded-2xl border border-[#1B4A3A] bg-gradient-to-br from-[#06221A] via-[#0B3D2E] to-[#124D3A] px-5 py-8 text-[#FAF7F0] shadow-md sm:px-12 sm:py-14">
         <div
           aria-hidden="true"
           className="pointer-events-none absolute inset-3 rounded-xl border border-[#E6C75A]/20"
@@ -291,9 +291,9 @@ export function HomeView() {
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2.5">
+          <div className="flex w-full flex-wrap items-center gap-2.5 sm:w-auto">
             {/* Search Box */}
-            <div className="relative">
+            <div className="relative min-w-0 flex-1 sm:flex-initial">
               <Search
                 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-muted)]"
                 aria-hidden="true"
@@ -304,7 +304,7 @@ export function HomeView() {
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="ابحث باسم السورة أو رقمها..."
                 aria-label="تصفية السور بالاسم أو الرقم"
-                className="h-9 w-60 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] pl-8 pr-9 text-xs font-medium text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--brand-gold)] focus:outline-none"
+                className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-card)] pl-8 pr-9 text-xs font-medium text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--brand-gold)] focus:outline-none sm:w-64"
               />
               {query && (
                 <button
@@ -359,7 +359,7 @@ export function HomeView() {
         </div>
 
         {loadingChapters ? (
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {Array.from({ length: 12 }).map((_, i) => (
               <div
                 key={i}
@@ -384,7 +384,7 @@ export function HomeView() {
             </button>
           </div>
         ) : (
-          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
             {visibleChapters.map((ch) => (
               <Link
                 key={ch.id}

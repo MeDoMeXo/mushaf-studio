@@ -1,10 +1,9 @@
 'use client';
 
 /**
- * StudioTextPanel — typography, colors, labels, layers, watermark + links.
+ * StudioTextPanel — typography, colors, labels, layers + watermark.
  * Extracted from StudioDesignInspector (600-line rule): pure props-in panel.
- * قسم تتبّع الكلمة مستقل في StudioWordTrackSection، والروابط في
- * StudioLinksSection — كلاهما بسبب قاعدة ٦٠٠ سطر.
+ * قسم تتبّع الكلمة مستقل في StudioWordTrackSection بسبب قاعدة ٦٠٠ سطر.
  */
 import React from 'react';
 import {
@@ -23,7 +22,6 @@ import { StudioTabPanel } from './StudioTabs';
 import { StudioSelect } from './StudioSelect';
 import { StudioInspectorSection } from './StudioInspectorSection';
 import { StudioWordTrackSection } from './StudioWordTrackSection';
-import { StudioLinksSection } from './StudioLinksSection';
 
 const VERSE_WEIGHT_OPTIONS = [
   { value: 400, label: 'عادي' },
@@ -49,7 +47,7 @@ export interface StudioTextPanelProps {
 
 export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
   return (
-    <StudioTabPanel value="text" className="space-y-4 focus:outline-none">
+    <StudioTabPanel value="text" className="space-y-2.5 focus:outline-none">
       {/* الخطوط: القرآني + معاينة حية بخط الاختيار + خط الترجمة.
           StudioSelect (بدل <select> الأصلية) حتى لا تتجاوز قائمة الخطوط
           حافة الشاشة على ويندوز داخل اللوحة الضيقة. */}
@@ -107,7 +105,7 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
             <p className="mb-1.5 text-xs font-semibold text-[var(--ink-muted)]">
               سماكة خط الآية
             </p>
-            <div className="grid grid-cols-3 gap-1.5">
+            <div className="grid grid-cols-2 gap-1.5">
               {VERSE_WEIGHT_OPTIONS.map((wOpt) => (
                 <button
                   key={wOpt.value}
@@ -220,7 +218,7 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
       </StudioInspectorSection>
 
       <StudioInspectorSection id="txt-colors" title="لون النص والمحاذاة">
-        <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
+        <div className="space-y-3">
           <div>
             <p className="mb-2 text-xs font-semibold text-[var(--ink-muted)]">لون النص</p>
             <div className="grid grid-cols-8 gap-1.5">
@@ -272,7 +270,7 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
 
       {/* Islamic Ayah Medallion Section */}
       <StudioInspectorSection id="txt-ayahnum" title="رقم الآية بزخرفة إسلامية">
-        <div className="space-y-2.5 border-t border-[var(--border-hairline)] pt-4">
+        <div className="space-y-2.5">
           <StudioSwitch
             id="text-show-ayah-switch"
             label="رقم الآية بزخرفة إسلامية"
@@ -306,9 +304,9 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
 
       {/* Surah & Reciter Labels Positioning */}
       <StudioInspectorSection id="txt-labels" title="اسم السورة والقارئ">
-        <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
-          <p className="text-xs font-bold text-[var(--ink-primary)]">
-            موقع وسماكة اسم السورة والقارئ
+        <div className="space-y-3">
+          <p className="text-[11px] font-semibold text-[var(--ink-muted)]">
+            سماكة الخط والموضع
           </p>
 
           <div className="grid grid-cols-3 gap-1">
@@ -397,10 +395,7 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
 
       {/* Layer Switches (Radix Switch) */}
       <StudioInspectorSection id="txt-layers" title="المؤثرات وعناصر الشريحة">
-        <div className="space-y-0.5 border-t border-[var(--border-hairline)] pt-4">
-          <p className="mb-1.5 text-xs font-bold text-[var(--ink-primary)]">
-            المؤثرات وعناصر الشريحة
-          </p>
+        <div className="space-y-0.5">
           <StudioSwitch
             id="switch-hide-verses"
             label="إخفاء نص الآيات (فيديو صوتي فقط)"
@@ -458,12 +453,12 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
       </StudioInspectorSection>
 
       <StudioInspectorSection id="txt-watermark" title="العلامة المائية">
-        <div className="border-t border-[var(--border-hairline)] pt-4">
+        <div>
           <label
             htmlFor="st-watermark"
-            className="mb-1.5 block text-xs font-semibold text-[var(--ink-muted)]"
+            className="mb-1.5 block text-[11px] font-semibold text-[var(--ink-muted)]"
           >
-            العلامة المائية (اختياري)
+            نص العلامة المائية (اختياري)
           </label>
           <input
             id="st-watermark"
@@ -474,11 +469,6 @@ export function StudioTextPanel({ state, onPatchState }: StudioTextPanelProps) {
             className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-xs text-[var(--ink-primary)] focus:border-[var(--brand-gold)] focus:outline-none"
           />
         </div>
-      </StudioInspectorSection>
-
-      {/* قسم الروابط: داخلية سريعة + خارجية يديرها المستخدم */}
-      <StudioInspectorSection id="txt-links" title="الروابط">
-        <StudioLinksSection />
       </StudioInspectorSection>
     </StudioTabPanel>
   );

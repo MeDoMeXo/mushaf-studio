@@ -109,14 +109,14 @@ export function StudioStagePanel({
   return (
     <section
       aria-label="المعاينة الحية والتصدير"
-      className="order-first flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] xl:order-none xl:h-full"
+      className="order-first flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] md:col-span-2 xl:order-none xl:col-span-1 xl:h-full"
     >
       {/* Top Stage Bar: Aspect Switcher (Motion layoutId) + Dimensions + Fullscreen */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-3 py-2 sm:px-4">
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-3 py-2 sm:flex-nowrap sm:px-4">
         <div
           role="group"
           aria-label="مقاس التصميم"
-          className="studio-scroll flex max-w-full flex-nowrap items-center gap-0.5 overflow-x-auto rounded-lg bg-[var(--surface-subtle)] p-1"
+          className="flex max-w-full flex-wrap items-center gap-0.5 rounded-lg bg-[var(--surface-subtle)] p-1 sm:flex-nowrap"
         >
           {ASPECT_PRESETS.map((preset) => {
             const active = state.aspect === preset.id;
@@ -220,7 +220,7 @@ export function StudioStagePanel({
       )}
 
       {/* Pro Darkroom Canvas Artboard Viewport */}
-      <div className="studio-stage-grid relative flex min-h-[360px] w-full flex-1 flex-col items-center justify-center overflow-hidden px-4 py-4 xl:min-h-0">
+      <div className="studio-stage-grid relative flex min-h-[300px] w-full flex-1 flex-col items-center justify-center overflow-hidden px-3 py-3 sm:min-h-[360px] sm:px-4 sm:py-4 xl:min-h-0">
         {/* Live Browser Audio Cache Progress Status */}
         {!customAudioUrl && audioCache.total > 0 && (
           <div
@@ -272,10 +272,10 @@ export function StudioStagePanel({
           style={stageAspectStyle}
           className={`relative overflow-hidden rounded-xl ring-1 ring-black/15 shadow-2xl dark:ring-white/10 ${
             state.height > state.width
-              ? 'h-[360px] w-auto max-w-full xl:h-full xl:max-h-[480px]'
+              ? 'h-[310px] w-auto max-w-full sm:h-[360px] xl:h-full xl:max-h-[480px] 2xl:max-h-[580px]'
               : state.height === state.width
-                ? 'h-[340px] w-auto max-w-full xl:h-full xl:max-h-[440px]'
-                : 'max-h-[340px] w-full max-w-[520px] xl:max-h-full'
+                ? 'h-[290px] w-auto max-w-full sm:h-[340px] xl:h-full xl:max-h-[440px] 2xl:max-h-[540px]'
+                : 'max-h-[260px] w-full max-w-[520px] sm:max-h-[340px] xl:max-h-full 2xl:max-w-[640px]'
           }`}
         >
           <canvas

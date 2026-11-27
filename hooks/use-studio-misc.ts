@@ -29,9 +29,14 @@ export interface UseStudioMiscInput {
   commitState: (
     updater: StudioState | ((prev: StudioState) => StudioState)
   ) => void;
+  replaceStateSilent: (updater: (prev: StudioState) => StudioState) => void;
   studioAudioRef: React.RefObject<HTMLAudioElement | null>;
+  isPlaying: boolean;
+  activeIdxInRange: number;
   setIsPlaying: (v: boolean) => void;
   setActiveIdxInRange: (v: number) => void;
+  handleTogglePlay: () => void;
+  playVerseAtIndex: (idx: number) => void;
   setCustomAudioUrl: React.Dispatch<React.SetStateAction<string | null>>;
   setCustomAudioFile: React.Dispatch<React.SetStateAction<File | null>>;
   setCustomAudioName: React.Dispatch<React.SetStateAction<string>>;
@@ -44,6 +49,11 @@ export interface UseStudioMiscResult {
   handleRedo: () => void;
   handleSelectSurah: (nextId: number) => void;
   handleSelectReciter: (slug: string) => void;
+  handleStageTogglePlay: () => void;
+  handleSelectCoverSlide: () => void;
+  handleSelectVerseIndex: (idx: number) => void;
+  handlePrevSlide: () => void;
+  handleNextSlide: () => void;
   previewTargetDims: { width: number; height: number };
   previewEstimatedSizeMb: number;
 }
@@ -56,9 +66,14 @@ export function useStudioMisc(input: UseStudioMiscInput): UseStudioMiscResult {
     setExportSettings,
     setHistory,
     commitState,
+    replaceStateSilent,
     studioAudioRef,
+    isPlaying,
+    activeIdxInRange,
     setIsPlaying,
     setActiveIdxInRange,
+    handleTogglePlay,
+    playVerseAtIndex,
     setCustomAudioUrl,
     setCustomAudioFile,
     setCustomAudioName,
@@ -132,12 +147,61 @@ export function useStudioMisc(input: UseStudioMiscInput): UseStudioMiscResult {
     [selectedVersesCount, exportSettings, previewTargetDims]
   );
 
+  const handleStageTogglePlay = useCallback(() => {
+    if (!isPlaying && state.coverMode) replaceStateSilent((prev) => ({ ...prev, coverMode: false }));
+    handleTogglePlay();
+  }, [handleTogglePlay, isPlaying, replaceStateSilent, state.coverMode]);
+
+  const handleSelectCoverSlide = useCallback(() => {
+    studioAudioRef.current?.pause();
+    setIsPlaying(false);
+    if (!state.coverMode) replaceStateSilent((p) => ({ ...p, coverMode: true }));
+  }, [replaceStateSilent, setIsPlaying, state.coverMode, studioAudioRef]);
+
+  const handleSelectVerseIndex = useCallback(
+    (idx: number) => {
+      if (state.coverMode) replaceStateSilent((p) => ({ ...p, coverMode: false }));
+      setActiveIdxInRange(idx);
+      if (isPlaying) playVerseAtIndex(idx);
+    },
+    [isPlaying, playVerseAtIndex, replaceStateSilent, setActiveIdxInRange, state.coverMode]
+  );
+
+  const handlePrevSlide = useCallback(() => {
+    if (!state.coverMode && activeIdxInRange === 0) {
+      studioAudioRef.current?.pause();
+      setIsPlaying(false);
+      replaceStateSilent((p) => ({ ...p, coverMode: true }));
+      return;
+    }
+    const prev = Math.max(0, activeIdxInRange - 1);
+    setActiveIdxInRange(prev);
+    if (isPlaying) playVerseAtIndex(prev);
+  }, [activeIdxInRange, isPlaying, playVerseAtIndex, replaceStateSilent, setActiveIdxInRange, setIsPlaying, state.coverMode, studioAudioRef]);
+
+  const handleNextSlide = useCallback(() => {
+    if (state.coverMode) {
+      replaceStateSilent((p) => ({ ...p, coverMode: false }));
+      setActiveIdxInRange(0);
+      if (isPlaying) playVerseAtIndex(0);
+      return;
+    }
+    const next = Math.min(selectedVersesCount - 1, activeIdxInRange + 1);
+    setActiveIdxInRange(next);
+    if (isPlaying) playVerseAtIndex(next);
+  }, [activeIdxInRange, isPlaying, playVerseAtIndex, replaceStateSilent, selectedVersesCount, setActiveIdxInRange, state.coverMode]);
+
   return {
     updateExportSettings,
     handleUndo,
     handleRedo,
     handleSelectSurah,
     handleSelectReciter,
+    handleStageTogglePlay,
+    handleSelectCoverSlide,
+    handleSelectVerseIndex,
+    handlePrevSlide,
+    handleNextSlide,
     previewTargetDims,
     previewEstimatedSizeMb,
   };

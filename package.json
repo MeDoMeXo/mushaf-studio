@@ -5,11 +5,11 @@
   "license": "MIT",
   "private": true,
   "scripts": {
-    "dev": "node scripts/dev.mjs",
+    "dev": "next dev -p 3000 -H 0.0.0.0",
     "build": "next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/",
-    "start": "NODE_ENV=production bun .next/standalone/server.js 2>&1 | tee server.log",
+    "start": "NODE_ENV=production node .next/standalone/server.js",
     "lint": "eslint .",
-    "test": "bun test",
+    "test": "tsx --test lib/*.test.ts",
     "clean": "next clean",
     "db:push": "echo \"[db] skip: this project does not use Prisma\"",
     "db:generate": "echo \"[db] skip: this project does not use Prisma\"",
@@ -46,6 +46,7 @@
     "eslint": "9.39.1",
     "eslint-config-next": "16.0.8",
     "tailwindcss": "4.1.11",
+    "tsx": "^4.23.15",
     "typescript": "5.9.3"
   },
   "overrides": {

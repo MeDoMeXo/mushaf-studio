@@ -6,9 +6,7 @@
  * Extracted from StudioDesignInspector (600-line rule).
  */
 import React from 'react';
-import * as AccordionPrimitive from '@radix-ui/react-accordion';
 import {
-  ChevronDown,
   Clapperboard,
   Film,
   Video,
@@ -59,24 +57,31 @@ export function StudioAudioPanel({
   onOpenExportModal,
 }: StudioAudioPanelProps) {
   return (
-    <StudioTabPanel value="audio" className="space-y-4 focus:outline-none">
-      <StudioInspectorSection id="aud-dsp" title="الهندسة الصوتية والمؤثرات المحيطية">
+    <StudioTabPanel value="audio" className="space-y-2.5 focus:outline-none">
+      <StudioInspectorSection
+        id="aud-dsp"
+        title="الهندسة الصوتية والمؤثرات المحيطية"
+        badge={
+          exportSettings.audioPreset !== 'natural' ? (
+            <span className="rounded-md bg-[var(--brand-gold)]/15 px-1.5 py-0.5 text-[10px] font-bold text-[var(--brand-gold)]">
+              {AUDIO_EFFECT_PRESETS.find((p) => p.id === exportSettings.audioPreset)?.label}
+            </span>
+          ) : undefined
+        }
+      >
       <div>
-        <div className="flex items-center justify-between">
-          <p className="text-xs font-bold text-[var(--ink-primary)]">
-            الهندسة الصوتية والمؤثرات المحيطية
-          </p>
-          {exportSettings.audioPreset !== 'natural' && (
+        {exportSettings.audioPreset !== 'natural' && (
+          <div className="mb-2 flex justify-end">
             <button
               type="button"
               onClick={() => onUpdateExportSettings({ audioPreset: 'natural' })}
               className="text-[11px] font-semibold text-[var(--brand-emerald)] underline dark:text-[#E6C75A]"
             >
-              إعادة تعيين
+              إعادة تعيين إلى طبيعي
             </button>
-          )}
-        </div>
-        <div className="mt-2 grid grid-cols-2 gap-1.5">
+          </div>
+        )}
+        <div className="grid grid-cols-2 gap-1.5">
           {AUDIO_EFFECT_PRESETS.map((preset) => {
             const active = exportSettings.audioPreset === preset.id;
             return (
@@ -101,9 +106,9 @@ export function StudioAudioPanel({
       </StudioInspectorSection>
 
       <StudioInspectorSection id="aud-ambient" title="مؤثرات طبيعية هادئة">
-      <div className="border-t border-[var(--border-hairline)] pt-4">
-        <p className="text-xs font-bold text-[var(--ink-primary)]">
-          مؤثرات طبيعية هادئة (بدون موسيقى)
+      <div>
+        <p className="text-[11px] font-medium text-[var(--ink-muted)]">
+          خلفيات صوتية طبيعية هادئة (بدون موسيقى)
         </p>
         <div className="mt-2 flex flex-wrap gap-1.5">
           {AMBIENT_SOUND_PRESETS.map((amb) => {
@@ -144,7 +149,7 @@ export function StudioAudioPanel({
       </StudioInspectorSection>
 
       <StudioInspectorSection id="aud-transitions" title="الانتقالات وفاصل الآيات">
-      <div className="space-y-3.5 border-t border-[var(--border-hairline)] pt-4">
+      <div className="space-y-3.5">
         <div>
           <label
             htmlFor="st-transition-select"
@@ -214,77 +219,33 @@ export function StudioAudioPanel({
       </div>
       </StudioInspectorSection>
 
-      {/* Radix UI Accordion: Cinematic LUTs & Video Export Presets */}
-      <AccordionPrimitive.Root
-        type="multiple"
-        className="mt-5 divide-y divide-[var(--border-hairline)] border-t border-[var(--border-hairline)]"
+      {/* Curtain 4: Cinematic LUTs & Transitions */}
+      <StudioInspectorSection
+        id="aud-cinematic"
+        title="فلاتر الألوان السينمائية"
+        icon={<Clapperboard className="h-3.5 w-3.5" />}
       >
-        {/* Accordion 1: Cinematic LUTs & Transitions */}
-      <StudioInspectorSection id="aud-cinematic" title="فلاتر الألوان السينمائية">
-        <AccordionPrimitive.Item value="cinematic">
-          <AccordionPrimitive.Header>
-            <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between py-3 text-right text-xs font-bold text-[var(--ink-primary)] transition-colors hover:text-[var(--brand-emerald)] dark:hover:text-[#E6C75A]">
-              <span className="flex items-center gap-2">
-                <Clapperboard
-                  className="h-4 w-4 text-[var(--brand-gold)]"
-                  aria-hidden="true"
-                />
-                <span>فلاتر الألوان السينمائية والانتقالات</span>
-              </span>
-              <ChevronDown
-                className="h-4 w-4 text-[var(--ink-muted)] transition-transform duration-200 group-data-[state=open]:rotate-180"
-                aria-hidden="true"
-              />
-            </AccordionPrimitive.Trigger>
-          </AccordionPrimitive.Header>
-          <AccordionPrimitive.Content className="space-y-3.5 pb-4 pt-1">
-            <div className="grid grid-cols-2 gap-2">
-              <div>
-                <label
-                  htmlFor="acc-aspect-select"
-                  className="mb-1 block text-[11px] font-semibold text-[var(--ink-muted)]"
-                >
-                  أبعاد الفيديو
-                </label>
-                <select
-                  id="acc-aspect-select"
-                  value={state.aspect}
-                  onChange={(e) => onAspectSelect(e.target.value as AspectPresetId)}
-                  className="h-8 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-[11px] font-semibold text-[var(--ink-primary)]"
-                >
-                  {ASPECT_PRESETS.map((ap) => (
-                    <option key={ap.id} value={ap.id}>
-                      {ap.ratio} ({ap.label})
-                    </option>
-                  ))}
-                  <option value="custom">مخصص</option>
-                </select>
-              </div>
-
-              <div>
-                <label
-                  htmlFor="acc-transition-select"
-                  className="mb-1 block text-[11px] font-semibold text-[var(--ink-muted)]"
-                >
-                  الانتقال
-                </label>
-                <select
-                  id="acc-transition-select"
-                  value={exportSettings.transition}
-                  onChange={(e) =>
-                    onUpdateExportSettings({
-                      transition: e.target.value as VideoExportSettings['transition'],
-                    })
-                  }
-                  className="h-8 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-[11px] font-semibold text-[var(--ink-primary)]"
-                >
-                  {SLIDE_TRANSITION_OPTIONS.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+        <div className="space-y-3.5">
+            <div>
+              <label
+                htmlFor="acc-aspect-select"
+                className="mb-1 block text-[11px] font-semibold text-[var(--ink-muted)]"
+              >
+                أبعاد الفيديو
+              </label>
+              <select
+                id="acc-aspect-select"
+                value={state.aspect}
+                onChange={(e) => onAspectSelect(e.target.value as AspectPresetId)}
+                className="h-8 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2 text-[11px] font-semibold text-[var(--ink-primary)]"
+              >
+                {ASPECT_PRESETS.map((ap) => (
+                  <option key={ap.id} value={ap.id}>
+                    {ap.ratio} ({ap.label})
+                  </option>
+                ))}
+                <option value="custom">مخصص</option>
+              </select>
             </div>
 
             <StudioSlider
@@ -329,26 +290,16 @@ export function StudioAudioPanel({
                 })}
               </div>
             </div>
-          </AccordionPrimitive.Content>
-        </AccordionPrimitive.Item>
+        </div>
       </StudioInspectorSection>
 
-        {/* Accordion 2: Video Quality & Export Preset */}
-      <StudioInspectorSection id="aud-quality" title="جودة الفيديو وإعدادات التصدير">
-        <AccordionPrimitive.Item value="quality">
-          <AccordionPrimitive.Header>
-            <AccordionPrimitive.Trigger className="group flex w-full items-center justify-between py-3 text-right text-xs font-bold text-[var(--ink-primary)] transition-colors hover:text-[var(--brand-emerald)] dark:hover:text-[#E6C75A]">
-              <span className="flex items-center gap-2">
-                <Film className="h-4 w-4 text-[var(--brand-gold)]" aria-hidden="true" />
-                <span>جودة الفيديو وإعدادات التصدير</span>
-              </span>
-              <ChevronDown
-                className="h-4 w-4 text-[var(--ink-muted)] transition-transform duration-200 group-data-[state=open]:rotate-180"
-                aria-hidden="true"
-              />
-            </AccordionPrimitive.Trigger>
-          </AccordionPrimitive.Header>
-          <AccordionPrimitive.Content className="space-y-3 pb-3 pt-1">
+      {/* Curtain 5: Video Quality & Export Preset */}
+      <StudioInspectorSection
+        id="aud-quality"
+        title="جودة الفيديو وإعدادات التصدير"
+        icon={<Film className="h-3.5 w-3.5" />}
+      >
+        <div className="space-y-3">
             <div>
               <label
                 htmlFor="acc-quality-preset"
@@ -483,10 +434,8 @@ export function StudioAudioPanel({
               <Video className="h-3.5 w-3.5" aria-hidden="true" />
               <span>تصدير الفيديو ({exportSettings.format.toUpperCase()})</span>
             </button>
-          </AccordionPrimitive.Content>
-        </AccordionPrimitive.Item>
+        </div>
       </StudioInspectorSection>
-      </AccordionPrimitive.Root>
     </StudioTabPanel>
   );
 }

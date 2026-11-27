@@ -51,7 +51,7 @@ export function StudioBackgroundPanel({
   onSelectBgLibrary,
 }: StudioBackgroundPanelProps) {
   return (
-    <StudioTabPanel value="background" className="space-y-4 focus:outline-none">
+    <StudioTabPanel value="background" className="space-y-2.5 focus:outline-none">
       <StudioInspectorSection id="bg-source" title="نوع الخلفية ومصدرها">
       <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--surface-subtle)] p-1 sm:grid-cols-4">
         {(
@@ -288,9 +288,9 @@ export function StudioBackgroundPanel({
       </StudioInspectorSection>
 
       <StudioInspectorSection id="bg-ambient" title="حركة الخلفية والمؤثرات">
-      <div className="border-t border-[var(--border-hairline)] pt-4">
-        <p className="text-xs font-semibold text-[var(--ink-muted)]">
-          حركة الخلفية (أثناء التشغيل والفيديو)
+      <div>
+        <p className="text-[11px] font-medium text-[var(--ink-muted)]">
+          تظهر الحركة أثناء التشغيل وفي الفيديو المُصدَّر
         </p>
         <div className="mt-2 grid grid-cols-3 gap-1.5">
           {(
@@ -325,7 +325,7 @@ export function StudioBackgroundPanel({
       </StudioInspectorSection>
 
       <StudioInspectorSection id="bg-adjust" title="تعتيم وتظليل وضبابية الخلفية">
-      <div className="space-y-4 border-t border-[var(--border-hairline)] pt-4">
+      <div className="space-y-3.5">
         <StudioSlider
           id="st-overlay"
           label="تعتيم الخلفية"

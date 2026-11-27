@@ -5,7 +5,7 @@
  * Extracted from AdminView (600-line rule): fully derived from draft.
  */
 import React from 'react';
-import { RECITERS, TRANSLATIONS, type SiteConfig } from '@/lib/quran-data';
+import { TRANSLATIONS, type SiteConfig } from '@/lib/quran-data';
 import { getActiveReciters } from '@/lib/reciter-filter';
 import { toArabicDigits } from '@/lib/quran-utils';
 import { StudioSlider, StudioSwitch } from '../studio-ui/StudioControls';
@@ -21,6 +21,11 @@ export function AdminReadingSection({
   onDraftChange,
   persistDraft,
 }: AdminReadingSectionProps) {
+  const activeReciters = React.useMemo(
+    () => getActiveReciters(draft.customReciters, draft.disabledReciters),
+    [draft.customReciters, draft.disabledReciters]
+  );
+
   return (
     <div className="space-y-6">
       <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-5">
@@ -69,7 +74,7 @@ export function AdminReadingSection({
               }
               className="mt-1.5 h-10 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-3 text-sm text-[var(--ink-primary)]"
             >
-              {getActiveReciters(draft.customReciters, draft.disabledReciters).map((r) => (
+              {activeReciters.map((r) => (
                 <option key={r.slug} value={r.slug}>
                   {r.name} ({r.styleLabel})
                 </option>
@@ -123,7 +128,7 @@ export function AdminReadingSection({
 
       <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-5">
         <h2 className="font-display text-lg font-bold text-[var(--ink-primary)]">
-          القراء النشطون ومصادر البيانات ({toArabicDigits(RECITERS.length)} قارئاً)
+          القراء النشطون ومصادر البيانات ({toArabicDigits(activeReciters.length)} قارئاً)
         </h2>
         <div className="studio-scroll mt-3 max-h-[380px] overflow-auto">
           <table className="w-full text-right text-sm">
@@ -136,7 +141,7 @@ export function AdminReadingSection({
               </tr>
             </thead>
             <tbody>
-              {RECITERS.map((r) => (
+              {activeReciters.map((r) => (
                 <tr
                   key={r.slug}
                   className="border-b border-[var(--border-hairline)] last:border-none"
@@ -148,7 +153,7 @@ export function AdminReadingSection({
                     {r.styleLabel}
                   </td>
                   <td className="py-2 text-xs tabular-nums text-[var(--brand-emerald)] dark:text-[#E6C75A]">
-                    {r.bitrate}kbps
+                    {toArabicDigits(r.bitrate)}kbps
                   </td>
                   <td className="py-2 font-mono text-xs text-[var(--ink-muted)]">
                     {r.slug}

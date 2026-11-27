@@ -2,29 +2,38 @@
 
 import React from 'react';
 import {
-  Check,
-  Info,
   Languages,
   Loader2,
   Mic,
   Minus,
-  Play,
   Plus,
-  Search,
-  Square,
   Upload,
   X,
 } from 'lucide-react';
 import {
-  RECITERS,
   TRANSLATIONS,
   type QulChapter,
   type StudioState,
   type TextSourceMode,
 } from '@/lib/quran-data';
+import {
+  areAllCurtainsCollapsed,
+  areAllCurtainsExpanded,
+  collapseAllCurtains,
+  DEFAULT_OPEN_RECITATION_CURTAINS,
+  expandAllCurtains,
+  isCurtainOpen,
+  RECITATION_CURTAIN_IDS,
+  toggleCurtainId,
+} from '@/lib/accordion-state';
 import { clampVerseRange, toArabicDigits } from '@/lib/quran-utils';
 import { getStudioActiveReciters } from '@/lib/reciter-filter';
 import { useApp } from '../AppProvider';
+import {
+  StudioAccordionCurtain,
+  StudioCurtainToolbar,
+} from './StudioAccordionCurtain';
+import { StudioReciterDirectory } from './StudioReciterDirectory';
 import { StudioSelect } from './StudioSelect';
 import { StudioSurahSelector } from './StudioSurahSelector';
 
@@ -60,15 +69,6 @@ interface StudioRecitationPanelProps {
   onPreviewReciter: (slug: string) => void;
 }
 
-const RECITER_FILTER_TABS: { id: ReciterFilter; label: string }[] = [
-  { id: 'all', label: 'الكل' },
-  { id: 'popular', label: 'الأشهر' },
-  { id: 'murattal', label: 'مرتل' },
-  { id: 'mujawwad', label: 'مجود' },
-  { id: 'warsh', label: 'ورش' },
-  { id: 'muallim', label: 'معلم' },
-];
-
 const TEXT_SOURCE_OPTIONS: { id: TextSourceMode; label: string }[] = [
   { id: 'uthmani', label: 'عثماني' },
   { id: 'both', label: 'مع الترجمة' },
@@ -100,6 +100,17 @@ export function StudioRecitationPanel({
 }: StudioRecitationPanelProps) {
   const maxVerse = totalChapterVerses || 286;
   const { config } = useApp();
+  const [openCurtains, setOpenCurtains] = React.useState<string[]>(() => [
+    ...DEFAULT_OPEN_RECITATION_CURTAINS,
+  ]);
+  const allCurtainsOpen = areAllCurtainsExpanded(
+    openCurtains,
+    RECITATION_CURTAIN_IDS
+  );
+  const allCurtainsClosed = areAllCurtainsCollapsed(
+    openCurtains,
+    RECITATION_CURTAIN_IDS
+  );
 
   const activeReciters = React.useMemo(() => {
     return getStudioActiveReciters(config?.customReciters, config?.disabledReciters);
@@ -138,18 +149,48 @@ export function StudioRecitationPanel({
       className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] xl:h-full"
     >
       {/* Panel Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-hairline)] px-4 py-3">
-        <h2 className="font-display flex items-center gap-2 text-sm font-bold text-[var(--ink-primary)]">
-          <Mic className="h-4 w-4 text-[var(--brand-gold)]" aria-hidden="true" />
-          <span>التلاوة والآيات</span>
-        </h2>
-        <span className="text-xs font-medium text-[var(--ink-muted)] tabular-nums">
-          {toArabicDigits(selectedVersesCount)} آية
-        </span>
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display flex items-center gap-2 text-sm font-bold text-[var(--ink-primary)]">
+            <Mic className="h-4 w-4 text-[var(--brand-gold)]" aria-hidden="true" />
+            <span>التلاوة والآيات</span>
+          </h2>
+          <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--ink-muted)] tabular-nums">
+            {toArabicDigits(selectedVersesCount)} آية
+          </span>
+        </div>
+        <StudioCurtainToolbar
+          allOpen={allCurtainsOpen}
+          allClosed={allCurtainsClosed}
+          onExpandAll={() =>
+            setOpenCurtains((prev) =>
+              expandAllCurtains(prev, RECITATION_CURTAIN_IDS)
+            )
+          }
+          onCollapseAll={() =>
+            setOpenCurtains((prev) =>
+              collapseAllCurtains(prev, RECITATION_CURTAIN_IDS)
+            )
+          }
+          testIdPrefix="recitation-curtains"
+        />
       </div>
 
-      <div className="studio-scroll min-h-0 min-w-0 flex-1 space-y-4 overflow-y-auto overflow-x-hidden p-4">
-        {/* Surah Selection */}
+      <div className="studio-scroll min-h-0 min-w-0 flex-1 space-y-2.5 overflow-y-auto overflow-x-hidden p-3 sm:p-3.5">
+        {/* Surah Selection Curtain */}
+        <StudioAccordionCurtain
+          id="rec-surah"
+          title="السورة ونطاق الآيات والنص"
+          open={isCurtainOpen(openCurtains, 'rec-surah')}
+          onToggle={() =>
+            setOpenCurtains((prev) => toggleCurtainId(prev, 'rec-surah'))
+          }
+          badge={
+            <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)] tabular-nums">
+              {toArabicDigits(state.fromAyah)}–{toArabicDigits(state.toAyah)}
+            </span>
+          }
+        >
         <div className="space-y-3">
           <StudioSurahSelector
             currentSurahId={state.surah}
@@ -361,25 +402,36 @@ export function StudioRecitationPanel({
             )}
           </div>
         </div>
+        </StudioAccordionCurtain>
 
-        {/* Custom Audio Upload Section */}
-        <div className="border-t border-[var(--border-hairline)] pt-4">
+        {/* Custom Audio Upload Curtain */}
+        <StudioAccordionCurtain
+          id="rec-custom-audio"
+          title="ملف صوتي مخصص"
+          open={isCurtainOpen(openCurtains, 'rec-custom-audio')}
+          onToggle={() =>
+            setOpenCurtains((prev) => toggleCurtainId(prev, 'rec-custom-audio'))
+          }
+          badge={
+            customAudioUrl ? (
+              <span className="rounded-md bg-emerald-500/15 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                نشط
+              </span>
+            ) : undefined
+          }
+        >
+        <div>
           <div className="flex items-center justify-between gap-2">
-            <div>
-              <span className="block text-xs font-bold text-[var(--ink-primary)]">
-                ملف صوتي مخصص
-              </span>
-              <span className="block text-[10px] text-[var(--ink-muted)]">
-                لمزامنة تلاوتك الخاصة
-              </span>
-            </div>
+            <span className="block text-[11px] text-[var(--ink-muted)]">
+              لمزامنة تلاوتك الخاصة مع الشرائح
+            </span>
             <button
               type="button"
               onClick={() => audioFileInputRef.current?.click()}
               className="inline-flex items-center gap-1.5 whitespace-nowrap rounded-lg border border-[var(--brand-gold)]/60 bg-[var(--brand-gold)]/15 px-3 py-1.5 text-xs font-bold text-[var(--ink-primary)] shadow-sm transition-all hover:bg-[var(--brand-gold)] hover:text-[#1F1705]"
             >
               <Upload className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-              <span>رفع تلاوة 🎙️</span>
+              <span>رفع تلاوة</span>
             </button>
             <input
               ref={audioFileInputRef}
@@ -404,132 +456,39 @@ export function StudioRecitationPanel({
               </button>
             </div>
           ) : (
-            <p className="mt-1 text-[11px] leading-relaxed text-[var(--ink-muted)]">
+            <p className="mt-1.5 text-[11px] leading-relaxed text-[var(--ink-muted)]">
               إذا كان لديك مقطع مقتطع للآية، ارفعه هنا ليتطابق مع الشريحة فوراً.
             </p>
           )}
         </div>
+        </StudioAccordionCurtain>
 
-        {/* Reciter Directory */}
-        <div className="border-t border-[var(--border-hairline)] pt-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-xs font-bold text-[var(--ink-primary)]">
-              القرّاء المتاحون للمزامنة
-            </h3>
-            <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold text-emerald-600 dark:text-emerald-400 tabular-nums">
-              {toArabicDigits(filteredReciters.length)} قارئ مجزأ آية بآية ⚡
+        {/* Reciter Directory Curtain */}
+        <StudioAccordionCurtain
+          id="rec-reciters"
+          title="القرّاء المتاحون للمزامنة"
+          open={isCurtainOpen(openCurtains, 'rec-reciters')}
+          onToggle={() =>
+            setOpenCurtains((prev) => toggleCurtainId(prev, 'rec-reciters'))
+          }
+          badge={
+            <span className="rounded-md bg-emerald-500/12 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300 tabular-nums">
+              {toArabicDigits(filteredReciters.length)} قارئ
             </span>
-          </div>
-
-          <div className="relative mt-2">
-            <Search
-              className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--ink-muted)]"
-              aria-hidden="true"
-            />
-            <input
-              type="text"
-              value={reciterQuery}
-              onChange={(e) => onReciterQueryChange(e.target.value)}
-              placeholder="ابحث باسم القارئ..."
-              aria-label="بحث عن قارئ"
-              className="h-9 w-full rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] pl-7 pr-8 text-xs text-[var(--ink-primary)] placeholder:text-[var(--ink-muted)] focus:border-[var(--brand-gold)] focus:outline-none"
-            />
-            {reciterQuery && (
-              <button
-                type="button"
-                onClick={() => onReciterQueryChange('')}
-                aria-label="مسح البحث"
-                className="absolute left-2 top-1/2 -translate-y-1/2 text-[var(--ink-muted)] hover:text-[var(--ink-primary)]"
-              >
-                <X className="h-3.5 w-3.5" aria-hidden="true" />
-              </button>
-            )}
-          </div>
-
-          {/* Filter Tabs */}
-          <div className="mt-2 grid grid-cols-3 gap-1 rounded-lg bg-[var(--surface-subtle)] p-1">
-            {RECITER_FILTER_TABS.map((rf) => (
-              <button
-                key={rf.id}
-                type="button"
-                aria-pressed={reciterFilter === rf.id}
-                onClick={() => onReciterFilterChange(rf.id)}
-                className={`whitespace-nowrap rounded-md px-1.5 py-1 text-[11px] font-semibold transition-colors ${
-                  reciterFilter === rf.id
-                    ? 'bg-[var(--brand-gold)] text-[#1F1705]'
-                    : 'text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
-                }`}
-              >
-                {rf.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Reciters List */}
-          <div className="studio-scroll mt-2.5 max-h-[300px] divide-y divide-[var(--border-hairline)]/60 overflow-y-auto rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-subtle)]/35">
-            {filteredReciters.length === 0 ? (
-              <div className="py-6 text-center text-xs text-[var(--ink-muted)]">
-                لا يوجد قارئ مطابق للبحث
-              </div>
-            ) : (
-              filteredReciters.map((r) => {
-                const selected = state.reciter === r.slug;
-                const isPrev = previewingReciter === r.slug;
-                return (
-                  <div
-                    key={r.slug}
-                    className={`flex items-center justify-between gap-2 px-3 py-2 transition-colors ${
-                      selected
-                        ? 'bg-[var(--brand-gold)]/12'
-                        : 'hover:bg-[var(--surface-subtle)]/80'
-                    }`}
-                  >
-                    <button
-                      type="button"
-                      onClick={() => onSelectReciter(r.slug)}
-                      className="flex min-w-0 flex-1 items-center gap-2.5 text-right"
-                    >
-                      <span
-                        className={`grid h-4 w-4 shrink-0 place-items-center rounded-full border transition-colors ${
-                          selected
-                            ? 'border-[var(--brand-emerald)] bg-[var(--brand-emerald)] text-[#FAF7F0] dark:border-[var(--brand-gold)] dark:bg-[var(--brand-gold)] dark:text-[#1F1705]'
-                            : 'border-[var(--border-hairline)]'
-                        }`}
-                      >
-                        {selected && <Check className="h-2.5 w-2.5" aria-hidden="true" />}
-                      </span>
-                      <span className="min-w-0">
-                        <span className="block truncate text-xs font-bold text-[var(--ink-primary)]">
-                          {r.name}
-                        </span>
-                        <span className="block text-[10px] text-[var(--ink-muted)]">
-                          {r.styleLabel} · {toArabicDigits(r.bitrate)}kbps · <span className="font-semibold text-emerald-600 dark:text-emerald-400">متزامن ⚡</span>
-                        </span>
-                      </span>
-                    </button>
-
-                    <button
-                      type="button"
-                      onClick={() => onPreviewReciter(r.slug)}
-                      aria-label={isPrev ? `إيقاف عينة ${r.name}` : `سماع عينة ${r.name}`}
-                      className={`grid h-7 w-7 shrink-0 place-items-center rounded-md transition-colors ${
-                        isPrev
-                          ? 'bg-[var(--brand-gold)] text-[#1F1705]'
-                          : 'bg-[var(--surface-card)] text-[var(--ink-muted)] hover:bg-[var(--brand-emerald)] hover:text-[#FAF7F0]'
-                      }`}
-                    >
-                      {isPrev ? (
-                        <Square className="h-3 w-3" aria-hidden="true" />
-                      ) : (
-                        <Play className="h-3 w-3" aria-hidden="true" />
-                      )}
-                    </button>
-                  </div>
-                );
-              })
-            )}
-          </div>
-        </div>
+          }
+        >
+          <StudioReciterDirectory
+            selectedSlug={state.reciter}
+            reciterQuery={reciterQuery}
+            reciterFilter={reciterFilter}
+            filteredReciters={filteredReciters}
+            previewingReciter={previewingReciter}
+            onReciterQueryChange={onReciterQueryChange}
+            onReciterFilterChange={onReciterFilterChange}
+            onSelectReciter={onSelectReciter}
+            onPreviewReciter={onPreviewReciter}
+          />
+        </StudioAccordionCurtain>
       </div>
     </aside>
   );

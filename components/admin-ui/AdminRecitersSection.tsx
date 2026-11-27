@@ -71,6 +71,7 @@ export function AdminRecitersSection({
 
   // Audio preview playback
   const [previewingSlug, setPreviewingSlug] = useState<string | null>(null);
+  const [confirmDeleteSlug, setConfirmDeleteSlug] = useState<string | null>(null);
   const audioRef = useRef<HTMLAudioElement | null>(null);
 
   const allReciters = useMemo(() => {
@@ -177,12 +178,12 @@ export function AdminRecitersSection({
     persistDraft(next, `تمت إضافة القارئ ${reciter.name} بنجاح`);
   };
 
-  // Delete custom reciter
+  // Delete custom reciter (no native window.confirm — inline confirmation UI)
   const handleDeleteCustomReciter = (slug: string) => {
-    if (!window.confirm('هل أنت متأكد من حذف هذا القارئ المخصص؟')) return;
     const currentCustoms = draft.customReciters ?? [];
     const nextCustoms = currentCustoms.filter((r) => r.slug !== slug);
     const next = { ...draft, customReciters: nextCustoms };
+    setConfirmDeleteSlug(null);
     onDraftChange(next);
     persistDraft(next, 'تم حذف القارئ المخصص بنجاح');
   };
@@ -196,7 +197,7 @@ export function AdminRecitersSection({
           <div className="mt-1 text-2xl font-bold tabular-nums text-[var(--ink-primary)]">
             {toArabicDigits(allReciters.length)}
           </div>
-          <span className="text-[10px] text-[var(--ink-muted)]">موزعون عبر 3 مكتبات عالمية</span>
+          <span className="text-[10px] text-[var(--ink-muted)]">موزعون عبر ٣ مكتبات عالمية</span>
         </div>
 
         <div className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-4 shadow-sm">
@@ -467,16 +468,37 @@ export function AdminRecitersSection({
                             {r.isDisabled ? 'تفعيل ✓' : 'تعطيل'}
                           </button>
 
-                          {/* Delete Custom Reciter */}
+                          {/* Delete Custom Reciter (Inline Confirmation) */}
                           {r.isCustom && (
-                            <button
-                              type="button"
-                              onClick={() => handleDeleteCustomReciter(r.slug)}
-                              title="حذف هذا القارئ المخصص"
-                              className="grid h-7 w-7 place-items-center rounded-lg text-rose-500/70 transition-colors hover:bg-rose-500/15 hover:text-rose-500"
-                            >
-                              <Trash2 className="h-3.5 w-3.5" />
-                            </button>
+                            confirmDeleteSlug === r.slug ? (
+                              <div className="inline-flex items-center gap-1 rounded-lg border border-rose-500/40 bg-rose-500/10 px-1.5 py-0.5">
+                                <button
+                                  type="button"
+                                  onClick={() => handleDeleteCustomReciter(r.slug)}
+                                  className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[10px] font-bold text-rose-600 hover:bg-rose-500/20 dark:text-rose-400"
+                                >
+                                  <Check className="h-3 w-3" aria-hidden="true" />
+                                  <span>تأكيد</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => setConfirmDeleteSlug(null)}
+                                  className="rounded px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)] hover:text-[var(--ink-primary)]"
+                                >
+                                  إلغاء
+                                </button>
+                              </div>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => setConfirmDeleteSlug(r.slug)}
+                                aria-label={`حذف القارئ ${r.name}`}
+                                title="حذف هذا القارئ المخصص"
+                                className="grid h-7 w-7 place-items-center rounded-lg text-rose-500/70 transition-colors hover:bg-rose-500/15 hover:text-rose-500"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                              </button>
+                            )
                           )}
                         </div>
                       </td>

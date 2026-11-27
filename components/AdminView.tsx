@@ -183,9 +183,9 @@ export function AdminView() {
   const todayStats = todayBucket(stats);
 
   return (
-    <div className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 gap-5 px-4 pb-24 pt-5 sm:px-6 lg:grid-cols-[256px_1fr]">
+    <div className="mx-auto grid w-full max-w-[1440px] flex-1 grid-cols-1 gap-5 px-4 pb-24 pt-5 sm:px-6 lg:grid-cols-[256px_1fr] 2xl:max-w-[1680px]">
       {/* Sidebar Navigation */}
-      <aside className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-4 lg:sticky lg:top-4 lg:flex lg:h-[calc(100dvh-6.5rem)] lg:flex-col">
+      <aside className="rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-3.5 sm:p-4 lg:sticky lg:top-4 lg:flex lg:h-[calc(100dvh-6.5rem)] lg:flex-col">
         <div className="border-b border-[var(--border-hairline)] pb-3">
           <p className="font-display text-base font-bold text-[var(--brand-emerald)] dark:text-[#E6C75A]">
             إدارة المنصة
@@ -197,7 +197,7 @@ export function AdminView() {
 
         <nav
           aria-label="أقسام لوحة التحكم"
-          className="mt-3 flex flex-wrap gap-1 lg:flex-col"
+          className="studio-scroll mt-3 flex flex-nowrap gap-1 overflow-x-auto pb-1 lg:flex-col lg:overflow-visible lg:pb-0"
         >
           {NAV_ITEMS.map((item) => {
             const Icon = item.icon;

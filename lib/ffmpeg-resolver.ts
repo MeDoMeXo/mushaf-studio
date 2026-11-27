@@ -96,26 +96,41 @@ function resolveBinary(bareName: string, envVar: string): string {
   const envVal = process.env[envVar];
   if (envVal && existsSync(envVal)) return envVal;
 
+  // 2. Bundled npm static binaries (preferred over potentially outdated OS packages).
+  const bundledPath =
+    bareName === 'ffmpeg'
+      ? path.join(process.cwd(), 'node_modules', 'ffmpeg-static', fileName)
+      : path.join(
+          process.cwd(),
+          'node_modules',
+          'ffprobe-static',
+          'bin',
+          process.platform,
+          process.arch,
+          fileName
+        );
+  if (existsSync(bundledPath)) return bundledPath;
+
   if (process.platform === 'win32') {
-    // 2. Version-agnostic WinGet / Scoop package scan.
+    // 3. Version-agnostic WinGet / Scoop package scan.
     for (const root of windowsScanRoots()) {
       const hit = findUnderRoot(root, fileName);
       if (hit) return hit;
     }
-    // 3. Well-known direct install locations.
+    // 4. Well-known direct install locations.
     for (const dir of windowsDirectDirs()) {
       const cand = path.join(dir, fileName);
       if (existsSync(cand)) return cand;
     }
   }
 
-  // 4. Walk every PATH entry (platform-correct separator + extension).
+  // 5. Walk every PATH entry (platform-correct separator + extension).
   for (const dir of buildPathDirs()) {
     const cand = path.join(dir, fileName);
     if (existsSync(cand)) return cand;
   }
 
-  // 5. Last resort: bare name (callers detect failure and fall back).
+  // 6. Last resort: bare name (callers detect failure and fall back).
   return bareName;
 }
 

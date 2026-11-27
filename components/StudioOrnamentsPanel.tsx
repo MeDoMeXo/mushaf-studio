@@ -158,11 +158,18 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
     onPatch({ ayahNumberStyle, showAyahNumber: true });
   };
 
+  const activeFrameName = ISLAMIC_FRAME_OPTIONS.find(
+    (f) => f.id === ornaments.frameStyle
+  )?.name;
+  const activePatternName = ISLAMIC_PATTERN_OPTIONS.find(
+    (p) => p.id === ornaments.patternStyle
+  )?.name;
+
   return (
-    <div className="space-y-5">
+    <div className="space-y-2.5">
       {/* Quick Harmonizer Header */}
       <StudioInspectorSection id="orn-harmony" title="التنسيق الزخرفي السريع">
-      <div className="flex items-center justify-between gap-2 border-b border-[var(--border-hairline)] pb-3">
+      <div className="flex items-center justify-between gap-2">
         <button
           type="button"
           onClick={handleCycleHarmony}
@@ -184,20 +191,19 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
       </StudioInspectorSection>
 
       {/* 1. Islamic Frame Style */}
-      <StudioInspectorSection id="orn-frame" title="الإطار الإسلامي">
-      <section aria-labelledby="ornament-frame-heading">
-        <div className="mb-2 flex items-center justify-between">
-          <h4
-            id="ornament-frame-heading"
-            className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-primary)]"
-          >
-            <Frame className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-            <span>الإطار الإسلامي</span>
-          </h4>
-          <span className="text-[11px] font-medium text-[var(--ink-muted)]">
-            {ISLAMIC_FRAME_OPTIONS.find((f) => f.id === ornaments.frameStyle)?.name}
-          </span>
-        </div>
+      <StudioInspectorSection
+        id="orn-frame"
+        title="الإطار الإسلامي"
+        icon={<Frame className="h-3.5 w-3.5" />}
+        badge={
+          activeFrameName && (
+            <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+              {activeFrameName}
+            </span>
+          )
+        }
+      >
+      <section aria-label="الإطار الإسلامي">
         <div className="grid grid-cols-2 gap-2">
           {ISLAMIC_FRAME_OPTIONS.map((opt) => {
             const active = ornaments.frameStyle === opt.id;
@@ -235,23 +241,19 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
       </StudioInspectorSection>
 
       {/* 2. Islamic Geometric Background Pattern */}
-      <StudioInspectorSection id="orn-pattern" title="النقش الهندسي الخلفي">
-      <section
-        aria-labelledby="ornament-pattern-heading"
-        className="border-t border-[var(--border-hairline)] pt-4"
+      <StudioInspectorSection
+        id="orn-pattern"
+        title="النقش الهندسي الخلفي"
+        icon={<Grid2x2 className="h-3.5 w-3.5" />}
+        badge={
+          activePatternName && (
+            <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-medium text-[var(--ink-muted)]">
+              {activePatternName}
+            </span>
+          )
+        }
       >
-        <div className="mb-2 flex items-center justify-between">
-          <h4
-            id="ornament-pattern-heading"
-            className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-primary)]"
-          >
-            <Grid2x2 className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-            <span>النقش الهندسي الخلفي</span>
-          </h4>
-          <span className="text-[11px] font-medium text-[var(--ink-muted)]">
-            {ISLAMIC_PATTERN_OPTIONS.find((p) => p.id === ornaments.patternStyle)?.name}
-          </span>
-        </div>
+      <section aria-label="النقش الهندسي الخلفي">
         <div className="grid grid-cols-2 gap-2">
           {ISLAMIC_PATTERN_OPTIONS.map((opt) => {
             const active = ornaments.patternStyle === opt.id;
@@ -305,20 +307,12 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
       </StudioInspectorSection>
 
       {/* 3. Corner Illumination Style */}
-      <StudioInspectorSection id="orn-corner" title="زخارف الزوايا">
-      <section
-        aria-labelledby="ornament-corner-heading"
-        className="border-t border-[var(--border-hairline)] pt-4"
+      <StudioInspectorSection
+        id="orn-corner"
+        title="زخارف الزوايا"
+        icon={<Compass className="h-3.5 w-3.5" />}
       >
-        <div className="mb-2 flex items-center justify-between">
-          <h4
-            id="ornament-corner-heading"
-            className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-primary)]"
-          >
-            <Compass className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-            <span>زخارف الزوايا</span>
-          </h4>
-        </div>
+      <section aria-label="زخارف الزوايا">
         <div className="grid grid-cols-2 gap-1.5">
           {ISLAMIC_CORNER_OPTIONS.map((opt) => {
             const active = ornaments.cornerStyle === opt.id;
@@ -344,20 +338,12 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
       </StudioInspectorSection>
 
       {/* 4. Surah Title Banner Style */}
-      <StudioInspectorSection id="orn-banner" title="خرطوشة اسم السورة">
-      <section
-        aria-labelledby="ornament-banner-heading"
-        className="border-t border-[var(--border-hairline)] pt-4"
+      <StudioInspectorSection
+        id="orn-banner"
+        title="خرطوشة اسم السورة"
+        icon={<Tag className="h-3.5 w-3.5" />}
       >
-        <div className="mb-2 flex items-center justify-between">
-          <h4
-            id="ornament-banner-heading"
-            className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-primary)]"
-          >
-            <Tag className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-            <span>خرطوشة اسم السورة</span>
-          </h4>
-        </div>
+      <section aria-label="خرطوشة اسم السورة">
         <div className="grid grid-cols-2 gap-1.5">
           {SURAH_BANNER_OPTIONS.map((opt) => {
             const active = ornaments.surahBannerStyle === opt.id;
@@ -384,14 +370,11 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
 
       {/* 5. Ayah Medallion Style */}
       <StudioInspectorSection id="orn-ayah" title="فاصلة رقم الآية">
-      <section
-        aria-labelledby="ornament-ayah-heading"
-        className="border-t border-[var(--border-hairline)] pt-4"
-      >
+      <section aria-labelledby="ornament-ayah-heading">
         <div id="ornament-ayah-heading" className="mb-2">
           <StudioSwitch
             id="ornament-show-ayah-switch"
-            label="فاصلة رقم الآية الإسلامية"
+            label="إظهار فاصلة رقم الآية"
             checked={state.showAyahNumber}
             onCheckedChange={(checked) => onPatch({ showAyahNumber: checked })}
             compact
@@ -424,23 +407,17 @@ export function StudioOrnamentsPanel({ state, onPatch }: StudioOrnamentsPanelPro
       </StudioInspectorSection>
 
       {/* 6. Ornament Metallic Color */}
-      <StudioInspectorSection id="orn-color" title="لون التذهيب والزخارف">
-      <section
-        aria-labelledby="ornament-color-heading"
-        className="border-t border-[var(--border-hairline)] pt-4"
-      >
-        <div className="mb-2 flex items-center justify-between">
-          <h4
-            id="ornament-color-heading"
-            className="flex items-center gap-1.5 text-xs font-bold text-[var(--ink-primary)]"
-          >
-            <Palette className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-            <span>لون التذهيب والزخارف</span>
-          </h4>
-          <span className="font-mono text-[11px] text-[var(--ink-muted)]">
+      <StudioInspectorSection
+        id="orn-color"
+        title="لون التذهيب والزخارف"
+        icon={<Palette className="h-3.5 w-3.5" />}
+        badge={
+          <span className="font-mono text-[10px] text-[var(--ink-muted)]">
             {ornaments.ornamentColor.toUpperCase()}
           </span>
-        </div>
+        }
+      >
+      <section aria-label="لون التذهيب والزخارف">
         <div className="flex flex-wrap items-center gap-2">
           {ORNAMENT_COLOR_PRESETS.map((preset) => {
             const active =

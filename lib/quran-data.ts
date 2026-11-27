@@ -243,6 +243,7 @@ export const CONFIG_DEFAULTS: SiteConfig = {
     color: '#FAF7F0',
     watermark: 'مصحف الاستوديو',
     footer: true,
+    hiddenInspectorSections: [],
   },
   footer: {
     enabled: true,

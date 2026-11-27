@@ -220,6 +220,7 @@ export interface SiteConfig {
     color: string;
     watermark: string;
     footer: boolean;
+    hiddenInspectorSections?: string[];
   };
   footer: SiteFooterConfig;
   customReciters?: ReciterOption[];

@@ -1,6 +1,7 @@
 # Dependencies / build
 node_modules/
 .next/
+.next-dev/
 coverage/
 
 # Local environment & logs

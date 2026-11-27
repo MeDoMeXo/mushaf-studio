@@ -32,7 +32,7 @@ export function Footer({ compact = false }: FooterProps) {
         data-testid="site-footer"
         className="shrink-0 border-t border-[var(--border-hairline)] bg-[var(--surface-card)]/95 px-4 py-2 transition-colors sm:px-6"
       >
-        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-[var(--ink-muted)]">
+        <div className="mx-auto flex max-w-[1440px] flex-wrap items-center justify-between gap-x-4 gap-y-1 text-[11px] text-[var(--ink-muted)] 2xl:max-w-[1680px]">
           <div className="flex items-center gap-2">
             <Link
               href="/"
@@ -113,7 +113,7 @@ export function Footer({ compact = false }: FooterProps) {
         audioState.visible ? 'pb-24' : ''
       }`}
     >
-      <div className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-[1440px] px-4 py-7 sm:px-6 lg:px-8 2xl:max-w-[1680px]">
         <div className="flex flex-col gap-5 md:flex-row md:items-center md:justify-between">
           {/* Brand & short description */}
           <div className="max-w-md space-y-1.5">

@@ -98,7 +98,7 @@ export function QuranIndexView() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-6">
+    <main className="mx-auto w-full max-w-[1440px] flex-1 px-4 pb-28 pt-6 sm:px-6 2xl:max-w-[1680px]">
       <div className="flex flex-wrap items-end justify-between gap-4 border-b border-[var(--border-hairline)] pb-5">
         <div>
           <h1 className="font-display text-2xl font-bold text-[var(--brand-emerald)] sm:text-3xl dark:text-[#E6C75A]">
@@ -162,7 +162,7 @@ export function QuranIndexView() {
       {activeTab === 'surahs' ? (
         <section className="mt-5">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative min-w-[240px] max-w-md flex-1">
+            <div className="relative w-full min-w-0 sm:min-w-[240px] sm:max-w-md sm:flex-1">
               <Search
                 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-muted)]"
                 aria-hidden="true"
@@ -226,7 +226,7 @@ export function QuranIndexView() {
           </div>
 
           {loading ? (
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {Array.from({ length: 12 }).map((_, i) => (
                 <div
                   key={i}
@@ -251,7 +251,7 @@ export function QuranIndexView() {
               </button>
             </div>
           ) : (
-            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            <div className="mt-5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5">
               {filtered.map((ch) => (
                 <div
                   key={ch.id}
@@ -294,7 +294,7 @@ export function QuranIndexView() {
         <section className="mt-5">
           {/* Reciter Search & Style Filter Bar */}
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="relative min-w-[240px] max-w-md flex-1">
+            <div className="relative w-full min-w-0 sm:min-w-[240px] sm:max-w-md sm:flex-1">
               <Search
                 className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--ink-muted)]"
                 aria-hidden="true"
@@ -378,7 +378,7 @@ export function QuranIndexView() {
               </button>
             </div>
           ) : (
-            <div className="mt-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-5 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
               {filteredReciters.map((r) => {
                 const isFav = favoriteSet.has(r.slug);
                 return (

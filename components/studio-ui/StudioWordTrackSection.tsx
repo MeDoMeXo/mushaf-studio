@@ -20,16 +20,11 @@ interface StudioWordTrackSectionProps {
 
 export function StudioWordTrackSection({ state, onPatchState }: StudioWordTrackSectionProps) {
   return (
-    <div className="space-y-3 border-t border-[var(--border-hairline)] pt-4">
-      <div className="flex items-center justify-between gap-2">
-        <div>
-          <p className="text-xs font-bold text-[var(--ink-primary)]">تتبّع الكلمة المتلوة</p>
-          <p className="mt-0.5 text-[10px] leading-relaxed text-[var(--ink-muted)]">
-            يتلوّن/يتظلّل لفظ الآية أثناء نطقه بالتزامن مع الصوت — دون تغيير لون
-            النص الأساسي للآيات.
-          </p>
-        </div>
-      </div>
+    <div className="space-y-3">
+      <p className="text-[11px] leading-relaxed text-[var(--ink-muted)]">
+        يتلوّن/يتظلّل لفظ الآية أثناء نطقه بالتزامن مع الصوت — دون تغيير لون
+        النص الأساسي للآيات.
+      </p>
       <StudioSwitch
         id="switch-word-highlight"
         label="تشغيل التتبّع مع التلاوة"

@@ -65,7 +65,7 @@ export function AudioPlayerBar() {
             data-testid="audio-player-bar"
             className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--border-hairline)] bg-[var(--surface-card)]/96 shadow-2xl backdrop-blur-md"
           >
-            <div className="mx-auto flex max-w-[1440px] items-center gap-2.5 px-3 py-2.5 sm:gap-5 sm:px-6">
+            <div className="mx-auto flex max-w-[1440px] items-center gap-2 px-3 py-2.5 sm:gap-5 sm:px-6 2xl:max-w-[1680px]">
               {/* Active Surah & Verse Info */}
               <div className="min-w-0 flex-1 sm:flex-initial sm:min-w-[180px]">
                 <p className="truncate text-sm font-bold text-[var(--ink-primary)]">

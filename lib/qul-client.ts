@@ -14,9 +14,14 @@ export async function fetchChapters(): Promise<QulChapter[]> {
   if (chaptersCache) return chaptersCache;
   if (chaptersPromise) return chaptersPromise;
 
-  chaptersPromise = fetch('/api/qul/chapters')
+  chaptersPromise = fetch('/api/qul/chapters', {
+    credentials: 'same-origin',
+    headers: { Accept: 'application/json' },
+  })
     .then(async (res) => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const ct = (res.headers.get('content-type') || '').toLowerCase();
+      if (ct.includes('text/html')) throw new Error('HTML response');
       const data = (await res.json()) as { chapters?: QulChapter[] };
       const list = Array.isArray(data.chapters) && data.chapters.length > 0
         ? data.chapters
@@ -45,9 +50,15 @@ export async function fetchChapterVerses(
 
   try {
     const res = await fetch(
-      `/api/qul/chapters/${surahId}/verses?translation=${translationId}`
+      `/api/qul/chapters/${surahId}/verses?translation=${translationId}`,
+      {
+        credentials: 'same-origin',
+        headers: { Accept: 'application/json' },
+      }
     );
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const ct = (res.headers.get('content-type') || '').toLowerCase();
+    if (ct.includes('text/html')) throw new Error('HTML response');
     const data = (await res.json()) as { verses?: QulVerse[] };
     const verses = Array.isArray(data.verses) ? data.verses : [];
     if (verses.length > 0) {

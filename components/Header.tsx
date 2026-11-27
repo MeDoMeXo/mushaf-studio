@@ -28,7 +28,7 @@ export function Header() {
 
   return (
     <header className="relative z-40 h-16 shrink-0 border-b border-[var(--border-hairline)] bg-[var(--surface-card)]/95 backdrop-blur-md">
-      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-6 px-4 sm:px-6">
+      <div className="mx-auto flex h-full max-w-[1440px] items-center justify-between gap-4 px-4 sm:gap-6 sm:px-6 2xl:max-w-[1680px]">
         {/* Zone 1: Clean single-line brand wordmark */}
         <Link
           href="/"

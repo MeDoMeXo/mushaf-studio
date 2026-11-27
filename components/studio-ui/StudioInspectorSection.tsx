@@ -1,61 +1,60 @@
 'use client';
 
 /**
- * StudioInspectorSection — غلاف قسم قابل للإخفاء داخل تبويبات لوحة التنسيق.
- * وهو ظاهر يُرسم المحتوى كما هو تماماً (صفر تغيير بصري على التصميم الحالي)،
- * وعند الإخفاء يعرض عنوان القسم فقط مع زر «إظهار». الحالة تمر عبر سياق
- * مشترك توفّره اللوحة الأم (StudioDesignInspector) كي لا تحتاج كل لوحة
- * تنسيق props جديدة — وتُدار المفاتيح كلها من شريط الأدوات العلوي.
+ * StudioInspectorSection — غلاف قسم خاضع لإعدادات لوحة التحكم
+ * (SiteConfig.studio.hiddenInspectorSections) ويعرضه كستارة أكورديون منسدلة
+ * من الأعلى للأسفل قابلة للفرد والطي منفردةً أو جماعياً.
  */
-import React, { createContext, useContext } from 'react';
-import { Eye } from 'lucide-react';
-import type { InspectorSectionVisibilityApi } from '@/hooks/use-inspector-section-visibility';
-
-interface InspectorSectionsContextValue {
-  api: InspectorSectionVisibilityApi;
-}
-
-const InspectorSectionsContext = createContext<InspectorSectionsContextValue | null>(null);
-
-interface InspectorSectionsProviderProps {
-  api: InspectorSectionVisibilityApi;
-  children: React.ReactNode;
-}
-
-export function InspectorSectionsProvider({ api, children }: InspectorSectionsProviderProps) {
-  const value = React.useMemo(() => ({ api }), [api]);
-  return <InspectorSectionsContext.Provider value={value}>{children}</InspectorSectionsContext.Provider>;
-}
+import React, { useState } from 'react';
+import { isInspectorSectionHidden } from '@/lib/inspector-sections';
+import { useApp } from '../AppProvider';
+import {
+  StudioAccordionCurtain,
+  useInspectorAccordion,
+} from './StudioAccordionCurtain';
 
 interface StudioInspectorSectionProps {
   /** معرّف القسم المسجّل في lib/inspector-sections.ts */
   id: string;
-  /** التسمية العربية للقسم — تظهر فقط حين يكون القسم مخفياً */
+  /** التسمية العربية للقسم في رأس الستارة */
   title: string;
+  /** شارة إضافية مختصرة في رأس الستارة */
+  badge?: React.ReactNode;
+  /** أيقونة اختيارية في رأس الستارة */
+  icon?: React.ReactNode;
   children: React.ReactNode;
 }
 
-export function StudioInspectorSection({ id, title, children }: StudioInspectorSectionProps) {
-  const ctx = useContext(InspectorSectionsContext);
-  const hidden = ctx?.api.isHidden(id) ?? false;
+export function StudioInspectorSection({
+  id,
+  title,
+  badge,
+  icon,
+  children,
+}: StudioInspectorSectionProps) {
+  const { config } = useApp();
+  const accordion = useInspectorAccordion();
+  const [fallbackOpen, setFallbackOpen] = useState(true);
 
-  if (!hidden) return <>{children}</>;
+  if (isInspectorSectionHidden(config.studio.hiddenInspectorSections, id)) {
+    return null;
+  }
+
+  const open = accordion ? accordion.isOpen(id) : fallbackOpen;
+  const onToggle = accordion
+    ? () => accordion.toggle(id)
+    : () => setFallbackOpen((prev) => !prev);
 
   return (
-    <div
-      data-inspector-section-hidden={id}
-      className="flex items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--border-hairline)] bg-[var(--surface-subtle)]/50 px-3 py-2"
+    <StudioAccordionCurtain
+      id={id}
+      title={title}
+      open={open}
+      onToggle={onToggle}
+      badge={badge}
+      icon={icon}
     >
-      <p className="truncate text-xs font-bold text-[var(--ink-muted)]">{title}</p>
-      <button
-        type="button"
-        onClick={() => ctx?.api.showSection(id)}
-        aria-label={`إظهار قسم ${title}`}
-        className="inline-flex shrink-0 items-center gap-1 rounded-lg border border-[var(--brand-gold)]/60 bg-[var(--brand-gold)]/10 px-2 py-1 text-[10px] font-bold text-[var(--ink-primary)] transition-colors hover:bg-[var(--brand-gold)]/25 focus-visible:outline-2 focus-visible:outline-[var(--brand-gold)]"
-      >
-        <Eye className="h-3 w-3" aria-hidden="true" />
-        <span>إظهار</span>
-      </button>
-    </div>
+      {children}
+    </StudioAccordionCurtain>
   );
 }

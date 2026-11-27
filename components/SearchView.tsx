@@ -149,7 +149,7 @@ export function SearchView() {
   };
 
   return (
-    <main className="mx-auto w-full max-w-[1040px] flex-1 px-4 pb-28 pt-6 sm:px-6">
+    <main className="mx-auto w-full max-w-[1040px] flex-1 px-4 pb-28 pt-6 sm:px-6 2xl:max-w-[1200px]">
       <div className="border-b border-[var(--border-hairline)] pb-5">
         <h1 className="font-display text-2xl font-bold text-[var(--brand-emerald)] sm:text-3xl dark:text-[#E6C75A]">
           البحث في آيات القرآن الكريم
@@ -162,10 +162,10 @@ export function SearchView() {
       {/* Unified Studio Command Search Surface */}
       <form
         onSubmit={handleSearch}
-        className="mt-5 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-5"
+        className="mt-5 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-3.5 sm:p-5"
       >
         <div className="flex flex-wrap gap-2.5">
-          <div className="relative min-w-[240px] flex-1">
+          <div className="relative w-full min-w-0 sm:min-w-[240px] sm:flex-1">
             <Search
               className="pointer-events-none absolute right-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--brand-gold)]"
               aria-hidden="true"

@@ -30,7 +30,7 @@ const childEnv = {
 
 // Resolve the next CLI entry directly to avoid shell-escaping pitfalls.
 const nextBin = join(projectRoot, 'node_modules', 'next', 'dist', 'bin', 'next');
-const child = spawn(process.execPath, [nextBin, 'dev', '-p', '3000'], {
+const child = spawn(process.execPath, [nextBin, 'dev', '-p', '3000', '-H', '0.0.0.0'], {
   cwd: projectRoot,
   stdio: ['inherit', 'pipe', 'pipe'],
   env: childEnv,

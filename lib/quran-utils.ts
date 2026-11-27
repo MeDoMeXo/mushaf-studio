@@ -16,6 +16,7 @@ import {
 } from './quran-data';
 import { buildCustomReciterSpecQuery } from './custom-reciter-spec';
 import { getClientCustomReciters } from './custom-reciters-registry';
+import { sanitizeHiddenInspectorSections } from './inspector-sections';
 
 // Exact Hafs verse counts for all 114 Surahs (sum = 6236)
 export const SURAH_VERSE_COUNTS: readonly number[] = [
@@ -271,6 +272,9 @@ export function mergeSiteConfig(raw: Partial<SiteConfig> | null | undefined): Si
     studio: {
       ...CONFIG_DEFAULTS.studio,
       ...(safe.studio ?? {}),
+      hiddenInspectorSections: sanitizeHiddenInspectorSections(
+        safe.studio?.hiddenInspectorSections
+      ),
     },
     footer: {
       ...CONFIG_DEFAULTS.footer,

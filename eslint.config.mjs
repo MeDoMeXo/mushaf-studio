@@ -7,7 +7,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 export default defineConfig([
-    { ignores: ["graphify-out/**"] },
+    { ignores: ["graphify-out/**", ".next-dev/**"] },
     {
         extends: [...next],
     },

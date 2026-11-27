@@ -154,9 +154,17 @@ export default function RootLayout({
     <html
       lang="ar"
       dir="rtl"
+      data-scroll-behavior="smooth"
       suppressHydrationWarning
       className={FONT_VARIABLES}
     >
+      <head>
+        <link
+          rel="manifest"
+          href="/manifest.webmanifest"
+          crossOrigin="use-credentials"
+        />
+      </head>
       <body
         suppressHydrationWarning
         className="h-dvh overflow-hidden bg-[var(--surface-canvas)] text-[var(--ink-primary)] transition-colors duration-200"

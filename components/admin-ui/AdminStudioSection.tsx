@@ -12,6 +12,7 @@ import {
   type SiteConfig,
 } from '@/lib/quran-data';
 import { StudioSlider, StudioSwitch } from '../studio-ui/StudioControls';
+import { AdminStudioSectionsCard } from './AdminStudioSectionsCard';
 
 export interface AdminStudioSectionProps {
   draft: SiteConfig;
@@ -72,6 +73,7 @@ export function AdminStudioSection({
   }, [draft.studio]);
 
   return (
+    <div className="space-y-6">
     <div className="grid gap-6 lg:grid-cols-2">
       <div className="rounded-xl border border-[var(--border-hairline)] bg-[var(--surface-card)] p-5 space-y-4">
         <h2 className="font-display text-lg font-bold text-[var(--ink-primary)]">
@@ -234,6 +236,13 @@ export function AdminStudioSection({
           />
         </div>
       </div>
+    </div>
+
+    <AdminStudioSectionsCard
+      draft={draft}
+      onDraftChange={onDraftChange}
+      persistDraft={persistDraft}
+    />
     </div>
   );
 }

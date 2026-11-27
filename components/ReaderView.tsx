@@ -244,7 +244,7 @@ export function ReaderView({ surahId }: ReaderViewProps) {
 
 
   return (
-    <main className="mx-auto w-full max-w-[1060px] flex-1 px-4 pb-32 pt-4 sm:px-6">
+    <main className="mx-auto w-full max-w-[1060px] flex-1 px-3 pb-32 pt-4 sm:px-6 2xl:max-w-[1220px]">
       {/* Studio-Consistent Command Ribbon */}
       <div className="z-20 flex flex-wrap items-center justify-between gap-2.5 rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)]/96 px-3.5 py-2.5 shadow-sm backdrop-blur-md sm:sticky sm:top-3 sm:gap-3 sm:px-4">
         <div className="flex items-center gap-2">
@@ -456,7 +456,7 @@ export function ReaderView({ surahId }: ReaderViewProps) {
       {/* Next / Prev Surah Footer Navigation */}
       <nav
         aria-label="التنقل بين السور"
-        className="mt-8 flex items-center justify-between gap-4 border-t border-[var(--border-hairline)] pt-6"
+        className="mt-8 flex flex-wrap items-center justify-between gap-2.5 border-t border-[var(--border-hairline)] pt-6"
       >
         {prevChapter ? (
           <Link

@@ -37,11 +37,24 @@ import type { BuiltinBackground } from '@/lib/background-library';
 import { StudioBackgroundPanel } from './StudioBackgroundPanel';
 import { StudioTextPanel } from './StudioTextPanel';
 import {
-  InspectorSectionsProvider,
-  StudioInspectorSection,
-} from './StudioInspectorSection';
-import { StudioInspectorSectionsToolbar } from './StudioInspectorSectionsToolbar';
-import { useInspectorSectionVisibility } from '@/hooks/use-inspector-section-visibility';
+  areAllCurtainsCollapsed,
+  areAllCurtainsExpanded,
+  collapseAllCurtains,
+  DEFAULT_OPEN_INSPECTOR_CURTAINS,
+  expandAllCurtains,
+  isCurtainOpen,
+  toggleCurtainId,
+} from '@/lib/accordion-state';
+import {
+  getInspectorSectionsByTab,
+  isInspectorSectionHidden,
+} from '@/lib/inspector-sections';
+import { useApp } from '../AppProvider';
+import {
+  InspectorAccordionProvider,
+  StudioCurtainToolbar,
+} from './StudioAccordionCurtain';
+import { StudioInspectorSection } from './StudioInspectorSection';
 import {
   StudioTabPanel,
   StudioTabsList,
@@ -157,9 +170,34 @@ export function StudioDesignInspector({
     [templateCat]
   );
 
-  // إدارة ظهور الأقسام: تفضيل محلي في المتصفح (localStorage) — الترطيب بعد
-  // التحميل فقط كي لا يكسر SSR ولا يسبب تعارض ترطيب.
-  const sectionVisibility = useInspectorSectionVisibility();
+  const { config } = useApp();
+  const [openCurtains, setOpenCurtains] = React.useState<string[]>(() => [
+    ...DEFAULT_OPEN_INSPECTOR_CURTAINS,
+  ]);
+
+  const visibleTabSectionIds = React.useMemo(
+    () =>
+      getInspectorSectionsByTab(styleTab)
+        .filter(
+          (sec) =>
+            !isInspectorSectionHidden(config.studio.hiddenInspectorSections, sec.id)
+        )
+        .map((sec) => sec.id),
+    [config.studio.hiddenInspectorSections, styleTab]
+  );
+
+  const activeTabEmpty = visibleTabSectionIds.length === 0;
+  const allCurtainsOpen = areAllCurtainsExpanded(openCurtains, visibleTabSectionIds);
+  const allCurtainsClosed = areAllCurtainsCollapsed(openCurtains, visibleTabSectionIds);
+
+  const accordionCtxValue = React.useMemo(
+    () => ({
+      isOpen: (id: string) => isCurtainOpen(openCurtains, id),
+      toggle: (id: string) =>
+        setOpenCurtains((prev) => toggleCurtainId(prev, id)),
+    }),
+    [openCurtains]
+  );
 
   return (
     <aside
@@ -167,26 +205,36 @@ export function StudioDesignInspector({
       className="flex min-h-0 flex-col overflow-hidden rounded-2xl border border-[var(--border-hairline)] bg-[var(--surface-card)] xl:h-full"
     >
       {/* Inspector Header */}
-      <div className="flex shrink-0 items-center justify-between border-b border-[var(--border-hairline)] px-4 py-3">
-        <h2 className="font-display flex items-center gap-2 text-sm font-bold text-[var(--ink-primary)]">
-          <Palette className="h-4 w-4 text-[var(--brand-gold)]" aria-hidden="true" />
-          <span>التصميم والتنسيق</span>
-        </h2>
-        <span className="text-[11px] font-medium text-[var(--ink-muted)]">
-          {STYLE_TABS.find((t) => t.id === styleTab)?.label}
-        </span>
-      </div>
-
-      {/* شريط إدارة ظهور الأقسام (كل الأقسام عبر التبويبات الخمسة) */}
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-4 py-1.5">
-        <span className="text-[10px] font-semibold text-[var(--ink-muted)]">
-          ظهور أقسام اللوحة
-        </span>
-        <StudioInspectorSectionsToolbar api={sectionVisibility} />
+      <div className="flex shrink-0 flex-wrap items-center justify-between gap-2 border-b border-[var(--border-hairline)] px-4 py-3">
+        <div className="flex items-center gap-2">
+          <h2 className="font-display flex items-center gap-2 text-sm font-bold text-[var(--ink-primary)]">
+            <Palette className="h-4 w-4 text-[var(--brand-gold)]" aria-hidden="true" />
+            <span>التصميم والتنسيق</span>
+          </h2>
+          <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[11px] font-semibold text-[var(--ink-muted)]">
+            {STYLE_TABS.find((t) => t.id === styleTab)?.label}
+          </span>
+        </div>
+        {!activeTabEmpty && (
+          <StudioCurtainToolbar
+            allOpen={allCurtainsOpen}
+            allClosed={allCurtainsClosed}
+            onExpandAll={() =>
+              setOpenCurtains((prev) =>
+                expandAllCurtains(prev, visibleTabSectionIds)
+              )
+            }
+            onCollapseAll={() =>
+              setOpenCurtains((prev) =>
+                collapseAllCurtains(prev, visibleTabSectionIds)
+              )
+            }
+            testIdPrefix="inspector-curtains"
+          />
+        )}
       </div>
 
       {/* Hydration-Safe Tabs with Motion Shared Indicator */}
-      <InspectorSectionsProvider api={sectionVisibility}>
       <StudioTabsRoot
         idPrefix="studio-inspector"
         dir="rtl"
@@ -232,10 +280,24 @@ export function StudioDesignInspector({
         {/* Scrollable Inspector Body — overflow-x-hidden keeps wide content
             (link rows, font grids) inside the 364px frame instead of spilling
             خارج الإطار on Windows / narrow viewports. */}
-        <div className="studio-scroll min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-4">
+        <div className="studio-scroll min-h-0 min-w-0 flex-1 overflow-y-auto overflow-x-hidden p-3 sm:p-3.5">
+          {activeTabEmpty && (
+            <div className="rounded-xl border border-dashed border-[var(--border-hairline)] bg-[var(--surface-subtle)]/50 px-4 py-8 text-center text-xs text-[var(--ink-muted)]">
+              جميع أقسام هذا التبويب معطّلة حالياً من لوحة التحكم.
+            </div>
+          )}
+          <InspectorAccordionProvider value={accordionCtxValue}>
           {/* TAB 1: Templates */}
-          <StudioTabPanel value="templates" className="space-y-4 focus:outline-none">
-            <StudioInspectorSection id="tpl-gallery" title="قوالب التصميم الجاهزة">
+          <StudioTabPanel value="templates" className="space-y-2.5 focus:outline-none">
+            <StudioInspectorSection
+              id="tpl-gallery"
+              title="قوالب التصميم الجاهزة"
+              badge={
+                <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)] tabular-nums">
+                  {toArabicDigits(filteredTemplates.length)}
+                </span>
+              }
+            >
             <div className="flex flex-wrap gap-1">
               {TEMPLATE_CATEGORIES.map((cat) => (
                 <button
@@ -320,16 +382,21 @@ export function StudioDesignInspector({
             </StudioInspectorSection>
 
             {/* Saved Custom Templates */}
-            <StudioInspectorSection id="tpl-custom" title="قوالبي المحفوظة ومشاركتها">
-            <div className="border-t border-[var(--border-hairline)] pt-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-xs font-bold text-[var(--ink-primary)]">
-                  قوالبي المحفوظة ({toArabicDigits(customTemplates.length)})
-                </h3>
-              </div>
+            <StudioInspectorSection
+              id="tpl-custom"
+              title="قوالبي المحفوظة ومشاركتها"
+              badge={
+                customTemplates.length > 0 ? (
+                  <span className="rounded-md bg-[var(--surface-subtle)] px-1.5 py-0.5 text-[10px] font-semibold text-[var(--ink-muted)] tabular-nums">
+                    {toArabicDigits(customTemplates.length)}
+                  </span>
+                ) : undefined
+              }
+            >
+            <div>
               <form
                 onSubmit={onSaveCustomTemplate}
-                className="mt-2 flex items-center gap-1.5"
+                className="flex items-center gap-1.5"
               >
                 <input
                   type="text"
@@ -455,9 +522,9 @@ export function StudioDesignInspector({
             onAspectSelect={onAspectSelect}
             onOpenExportModal={onOpenExportModal}
           />
+          </InspectorAccordionProvider>
         </div>
       </StudioTabsRoot>
-      </InspectorSectionsProvider>
     </aside>
   );
 }

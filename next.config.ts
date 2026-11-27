@@ -1,9 +1,12 @@
 import type { NextConfig } from 'next';
+import { PHASE_DEVELOPMENT_SERVER } from 'next/constants';
 import ffmpegPath from 'ffmpeg-static';
 import ffprobeStatic from 'ffprobe-static';
 
-const nextConfig: NextConfig = {
-  reactStrictMode: true,
+export default function createNextConfig(phase: string): NextConfig {
+  return {
+    distDir: phase === PHASE_DEVELOPMENT_SERVER ? '.next-dev' : '.next',
+    reactStrictMode: true,
   eslint: {
     ignoreDuringBuilds: true,
   },
@@ -72,6 +75,5 @@ const nextConfig: NextConfig = {
     }
     return config;
   },
-};
-
-export default nextConfig;
+  };
+}

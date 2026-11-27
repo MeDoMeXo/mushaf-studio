@@ -168,10 +168,25 @@ test('mergeSiteConfig safely merges partial nested studio and footer configs', (
   assert.equal(merged.footer.showQuickLinks, false);
   assert.equal(merged.footer.customLinks.length, 2);
   assert.equal(merged.footer.customLinks[0].href, '/privacy');
+  assert.deepEqual(merged.studio.hiddenInspectorSections, []);
+
+  const withHidden = mergeSiteConfig({
+    studio: {
+      fontFamily: 'Amiri Quran',
+      bgIdx: 2,
+      fontSize: 82,
+      color: '#FAF7F0',
+      watermark: '',
+      footer: true,
+      hiddenInspectorSections: ['txt-watermark', 'unknown-id', 'txt-watermark', 'aud-dsp'],
+    },
+  });
+  assert.deepEqual(withHidden.studio.hiddenInspectorSections, ['txt-watermark', 'aud-dsp']);
 
   const legacyMerged = mergeSiteConfig({ siteName: 'قديم' });
   assert.equal(legacyMerged.footer.enabled, true);
   assert.equal(legacyMerged.footer.showQuickLinks, true);
+  assert.deepEqual(legacyMerged.studio.hiddenInspectorSections, []);
 });
 
 test('sanitizeFooterLinkHref permits safe relative/http/mailto URLs and blocks unsafe schemes', () => {

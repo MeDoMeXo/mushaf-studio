@@ -198,6 +198,11 @@ export function StudioView() {
     handleRedo,
     handleSelectSurah,
     handleSelectReciter,
+    handleStageTogglePlay,
+    handleSelectCoverSlide,
+    handleSelectVerseIndex,
+    handlePrevSlide,
+    handleNextSlide,
     previewTargetDims,
     previewEstimatedSizeMb,
   } = useStudioMisc({
@@ -207,9 +212,14 @@ export function StudioView() {
     setExportSettings,
     setHistory,
     commitState,
+    replaceStateSilent,
     studioAudioRef,
+    isPlaying,
+    activeIdxInRange,
     setIsPlaying,
     setActiveIdxInRange,
+    handleTogglePlay,
+    playVerseAtIndex,
     setCustomAudioUrl,
     setCustomAudioFile,
     setCustomAudioName,
@@ -255,49 +265,6 @@ export function StudioView() {
     cacheRetryNonce,
     exportSettings,
   });
-  const handleStageTogglePlay = useCallback(() => {
-    if (!isPlaying && state.coverMode) replaceStateSilent((prev) => ({ ...prev, coverMode: false }));
-    handleTogglePlay();
-  }, [handleTogglePlay, isPlaying, replaceStateSilent, state.coverMode]);
-
-  const handleSelectCoverSlide = useCallback(() => {
-    studioAudioRef.current?.pause();
-    setIsPlaying(false);
-    if (!state.coverMode) replaceStateSilent((p) => ({ ...p, coverMode: true }));
-  }, [replaceStateSilent, setIsPlaying, state.coverMode, studioAudioRef]);
-
-  const handleSelectVerseIndex = useCallback(
-    (idx: number) => {
-      if (state.coverMode) replaceStateSilent((p) => ({ ...p, coverMode: false }));
-      setActiveIdxInRange(idx);
-      if (isPlaying) playVerseAtIndex(idx);
-    },
-    [isPlaying, playVerseAtIndex, replaceStateSilent, setActiveIdxInRange, state.coverMode]
-  );
-
-  const handlePrevSlide = useCallback(() => {
-    if (!state.coverMode && activeIdxInRange === 0) {
-      studioAudioRef.current?.pause();
-      setIsPlaying(false);
-      replaceStateSilent((p) => ({ ...p, coverMode: true }));
-      return;
-    }
-    const prev = Math.max(0, activeIdxInRange - 1);
-    setActiveIdxInRange(prev);
-    if (isPlaying) playVerseAtIndex(prev);
-  }, [activeIdxInRange, isPlaying, playVerseAtIndex, replaceStateSilent, setActiveIdxInRange, setIsPlaying, state.coverMode, studioAudioRef]);
-
-  const handleNextSlide = useCallback(() => {
-    if (state.coverMode) {
-      replaceStateSilent((p) => ({ ...p, coverMode: false }));
-      setActiveIdxInRange(0);
-      if (isPlaying) playVerseAtIndex(0);
-      return;
-    }
-    const next = Math.min(selectedVerses.length - 1, activeIdxInRange + 1);
-    setActiveIdxInRange(next);
-    if (isPlaying) playVerseAtIndex(next);
-  }, [activeIdxInRange, isPlaying, playVerseAtIndex, replaceStateSilent, selectedVerses.length, setActiveIdxInRange, state.coverMode]);
 
   useStudioShortcuts({
     commandOpen, exportModalOpen, fullscreenOpen, canvasRef, fullscreenCanvasRef, setCommandOpen,
@@ -355,7 +322,7 @@ export function StudioView() {
   }, [previewAudioRef, setIsPlaying, setPreviewingReciter, studioAudioRef]);
 
   return (
-      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-4 py-3 sm:px-6 xl:min-h-0 xl:overflow-hidden">
+      <main className="mx-auto flex w-full max-w-[1440px] flex-1 flex-col px-3 py-2.5 sm:px-6 sm:py-3 2xl:max-w-[1720px] xl:min-h-0 xl:overflow-hidden">
         {/* Pro Top Studio Command Ribbon */}
         <StudioCommandBar
           surahId={state.surah}
@@ -374,8 +341,8 @@ export function StudioView() {
           onExportVideo={handleOpenExportModal}
         />
 
-        {/* 3-Pane Creative Workbench Grid */}
-        <div className="grid grid-cols-1 items-start gap-3.5 xl:min-h-0 xl:flex-1 xl:grid-cols-[336px_minmax(0,1fr)_364px] xl:items-stretch xl:overflow-hidden">
+        {/* 3-Pane Creative Workbench Grid (Mobile 1-col -> Tablet Stage+2-col -> Desktop 3-pane centered Stage) */}
+        <div className="grid grid-cols-1 items-start gap-3.5 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-[336px_minmax(0,1fr)_364px] xl:items-stretch xl:overflow-hidden 2xl:grid-cols-[380px_minmax(0,1fr)_410px]">
           {/* Right Rail (RTL start): Recitation & Verses */}
           <StudioRecitationPanel
             state={state}

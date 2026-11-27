@@ -26,6 +26,8 @@ import {
   abortableSleep,
   extractErrorMessage,
   fetchWithRateLimitRetry,
+  safeParseJsonResponse,
+  uploadExportSetupAssets,
 } from '@/lib/export-network';
 import {
   BG_VIDEO_CHUNK_BYTES,
@@ -233,6 +235,7 @@ export async function runExportPipeline(
       },
       {
         signal,
+        expectJson: true,
         onRetry: () =>
           cb.onStageLabel('الخادم مزدحم مؤقتاً — جاري إعادة محاولة بدء الجلسة تلقائياً...'),
       }
@@ -247,6 +250,7 @@ export async function runExportPipeline(
       },
       {
         signal,
+        expectJson: true,
         onRetry: () =>
           cb.onStageLabel('الخادم مزدحم مؤقتاً — جاري إعادة محاولة بدء الجلسة تلقائياً...'),
       }
@@ -257,7 +261,13 @@ export async function runExportPipeline(
     throw new Error(await extractErrorMessage(sessionRes, 'تعذّر بدء جلسة التصدير'));
   }
 
-  const { jobId } = (await sessionRes.json()) as { jobId: string };
+  const { jobId } = await safeParseJsonResponse<{ jobId: string }>(
+    sessionRes,
+    'بدء جلسة التصدير'
+  );
+  if (!jobId) {
+    throw new Error('تعذّر استلام معرّف جلسة التصدير من الخادم');
+  }
   cb.onJobCreated?.(jobId);
 
   // 1b) If animated video background is active, upload it in 8MB chunks with 429 backoff & pacing
@@ -283,6 +293,7 @@ export async function runExportPipeline(
         {
           signal,
           maxAttempts: 6,
+          expectJson: true,
           onRetry: () =>
             cb.onStageLabel(
               `الخادم مزدحم مؤقتاً — إعادة رفع جزء الفيديو الخلفي (${toArabicDigits(c + 1)}/${toArabicDigits(totalChunks)})...`
@@ -377,6 +388,18 @@ export async function runExportPipeline(
   const uploadStartPct = hasBgVideo ? 12 : 4;
   const uploadSpanPct = hasBgVideo ? 22 : 30;
 
+  if (backdropBlob || overlayBlob || ambientFrames.length > 0) {
+    cb.onStageLabel('جاري رفع الخلفية وإطارات التأثيرات إلى الخادم...');
+    await uploadExportSetupAssets({
+      jobId,
+      backdropBlob,
+      overlayBlob,
+      ambientFrames,
+      signal,
+      onRetryLabel: cb.onStageLabel,
+    });
+  }
+
   for (let bIdx = 0; bIdx < batches.length; bIdx++) {
     const batch = batches[bIdx];
     if (signal.aborted) {
@@ -391,21 +414,6 @@ export async function runExportPipeline(
     );
 
     const batchForm = new FormData();
-    if (bIdx === 0 && backdropBlob) {
-      batchForm.append('backdrop', backdropBlob, 'backdrop.png');
-    }
-    if (bIdx === 0 && overlayBlob) {
-      batchForm.append('overlay', overlayBlob, 'overlay.png');
-    }
-    if (bIdx === 0 && ambientFrames.length) {
-      for (let f = 0; f < ambientFrames.length; f++) {
-        batchForm.append(
-          `ambient_${String(f).padStart(3, '0')}`,
-          ambientFrames[f],
-          `ambient_${String(f).padStart(3, '0')}.png`
-        );
-      }
-    }
     let batchAudioBytes = 0;
     // First slide index of every verse inside the word timeline — verse audio
     // blobs attach only there (word slides of one verse share that audio).
@@ -493,6 +501,7 @@ export async function runExportPipeline(
       {
         signal,
         maxAttempts: 6,
+        expectJson: true,
         onRetry: () =>
           cb.onStageLabel(
             `الخادم مزدحم مؤقتاً — إعادة رفع دفعة الشرائح (${toArabicDigits(bIdx + 1)}/${toArabicDigits(batches.length)})...`
@@ -529,6 +538,7 @@ export async function runExportPipeline(
     {
       signal,
       maxAttempts: 6,
+      expectJson: true,
       onRetry: () =>
         cb.onStageLabel('الخادم مزدحم مؤقتاً — إعادة محاولة بدء الترميز تلقائياً...'),
     }
