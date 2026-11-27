@@ -89,3 +89,4 @@ npx --yes tsx scripts/check-reciters.ts
 # تشغيل نسخة الإنتاج
 npm run start
 ```
+- [15 — إصلاحات تصدير الفيديو: الجمود وOOM](15-video-export-oom-and-freeze-fixes.md)

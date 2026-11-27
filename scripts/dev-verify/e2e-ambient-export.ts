@@ -165,7 +165,7 @@ writeFileSync(`${auroraDir}/slides_list.txt`, "file 'slide_0.png'\nduration 3.0\
 videoArgs2.push('-f', 'concat', '-safe', '0', '-i', `${auroraDir}/slides_list.txt`);
 const filters2 = [
   ...auroraLayer.ambientFilters!,
-  `[2:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides]`,
+  `[2:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=yuva420p[slides]`,
   `[bgamb][slides]overlay=0:0,format=yuv420p[vout]`,
 ];
 videoArgs2.push('-filter_complex', filters2.join(';'), '-map', '[vout]');

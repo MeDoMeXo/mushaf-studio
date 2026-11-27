@@ -213,8 +213,19 @@ export async function runExportPipeline(jobId: string): Promise<void> {
           processedAudioPath,
         }))
       );
-    } else if (hasBackdropFile && xfadeName && slidePaths.length > 1 && slidePaths.length <= XFADE_MAX_SLIDES) {
-      // Stationary backdrop [0:v] + smoothly xfade transparent verse overlay slides + mux audio
+    } else if (
+      hasBackdropFile &&
+      xfadeName &&
+      !hasAmbientFrames &&
+      slidePaths.length > 1 &&
+      slidePaths.length <= XFADE_MAX_SLIDES
+    ) {
+      // Stationary backdrop [0:v] + smoothly xfade transparent verse overlay slides + mux audio.
+      // NOTE: animated ambient frames force the concat engine below — chained
+      // xfade holds N+2 full-frame filter buffers and peaked at ~1.6 GB RSS at
+      // 1080p (OOM-killed on 4 GB hosts, fix 2026-11-27); concat composites the
+      // same layers at ~675 MB and still honors the transition via per-slide
+      // fade-in (getConcatSlideFadeSec).
       const shortestSlide = Math.min(...normalizedDurs);
       const requestedTransSec = meta.transitionDurationMs / 1000;
       const transDur = Math.min(requestedTransSec, Math.max(0.25, shortestSlide * 0.45));
@@ -296,14 +307,20 @@ export async function runExportPipeline(jobId: string): Promise<void> {
       );
       const ambientFilters = ambientLayer.ambientFilters;
       const slidesSrc = hasAmbientFrames ? 'bgamb' : '0:v';
+      // yuva420p slide prep (not rgba): halves per-frame filter-buffer RAM —
+      // the rgba graph OOM-killed FFmpeg at 1080p on 4 GB hosts (fix 2026-11-27).
+      // No fade filter here: an in-chain fade on this branch bloated peak RSS
+      // past 2 GB in measurement (vs 620 MB without); verse changes cut cleanly
+      // when animated ambient frames are active — same treatment as karaoke.
+      const slidesInputIdx = hasAmbientFrames ? 2 : 1;
       const filters = hasAmbientFrames && ambientFilters
         ? [
             ...ambientFilters,
-            `[2:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides]`,
+            `[${slidesInputIdx}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=yuva420p[slides]`,
             `[${slidesSrc}][slides]overlay=0:0,format=yuv420p[vout]`,
           ]
         : [
-            `[1:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=rgba[slides]`,
+            `[${slidesInputIdx}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,fps=${effectiveFps},format=yuva420p[slides]`,
             `[${slidesSrc}][slides]overlay=0:0,format=yuv420p[vout]`,
           ];
       videoArgs.push(

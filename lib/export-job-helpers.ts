@@ -291,7 +291,10 @@ export function buildChainedXfadeFilters(params: {
     finalLabel = 'ov',
   } = params;
   const vFilters: string[] = [];
-  const fmt = isRgba ? 'format=rgba' : 'format=yuv420p';
+  // yuva420p (not rgba) for transparent slides: halves per-frame filter-buffer
+  // RAM — the rgba graph OOM-killed FFmpeg at 1080p with ambient + slides
+  // (peak ~1.3 GB → ~675 MB, identical visual output; fix 2026-11-27).
+  const fmt = isRgba ? 'format=yuva420p' : 'format=yuv420p';
   const padColor = isRgba ? ':color=black@0' : '';
   const trans = xfadeName || 'fade';
 

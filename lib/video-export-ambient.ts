@@ -117,14 +117,19 @@ export function buildAmbientOverlayFilters(params: {
   if (params.effect === 'aurora') {
     // Sway a single wide frame: x oscillates ±8% of canvas width at 0.6 rad/s,
     // mirroring the live preview's drawAmbientEffect('aurora') motion exactly.
+    // yuva420p (not rgba): a 1080p RGBA frame costs 8.3 MB of filter-buffer RAM
+    // while yuva420p costs half that — with three overlaid streams the rgba
+    // graph peaked at ~1.3 GB and got OOM-killed on 4 GB hosts; yuva420p
+    // completes at ~675 MB with identical visual output (OOM fix 2026-11-27).
     return [
-      `scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,setsar=1,format=rgba[amb]`,
-      `[${params.inputLabel}][amb]overlay=x='(W-w)/2+sin(t*0.6)*W*0.08':y=0,format=rgba[${params.outputLabel}]`,
+      `scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,setsar=1,format=yuva420p[amb]`,
+      `[${params.inputLabel}][amb]overlay=x='(W-w)/2+sin(t*0.6)*W*0.08':y=0,format=yuva420p[${params.outputLabel}]`,
     ].join(';');
   }
-  // stars / gold-dust: looping particle frames scaled to the full canvas
+  // stars / gold-dust / fireflies / petals / bokeh / rain / snow: looping
+  // particle frames scaled to the full canvas — yuva420p for the same OOM fix.
   return [
-    `scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,setsar=1,fps=${safeFps},format=rgba[amb]`,
-    `[${params.inputLabel}][amb]overlay=0:0,format=rgba[${params.outputLabel}]`,
+    `scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,setsar=1,fps=${safeFps},format=yuva420p[amb]`,
+    `[${params.inputLabel}][amb]overlay=0:0,format=yuva420p[${params.outputLabel}]`,
   ].join(';');
 }

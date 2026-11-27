@@ -74,7 +74,9 @@ test('buildAmbientOverlayFilters composites looping particles or swaying aurora 
     fps: 24,
   });
   assert.ok(stars!.includes('overlay=0:0'));
-  assert.ok(stars!.includes('format=rgba'));
+  // yuva420p (not rgba) since the 2026-11-27 OOM fix: halves filter-buffer RAM
+  assert.ok(stars!.includes('format=yuva420p'));
+  assert.ok(!stars!.includes('format=rgba'));
   assert.ok(!stars!.includes('sin(t')); // particles animate via frames, not expressions
   // The filter must reference its own ambient input stream label
   assert.ok(/:v\]/.test(stars!) === false); // pure filter chain, no input mapping inside
@@ -90,7 +92,8 @@ test('buildAmbientOverlayFilters composites looping particles or swaying aurora 
   });
   assert.ok(aurora!.includes('sin(t*0.6)'));
   assert.ok(aurora!.includes('overlay=x='));
-  assert.ok(aurora!.includes('format=rgba'));
+  assert.ok(aurora!.includes('format=yuva420p'));
+  assert.ok(!aurora!.includes('format=rgba'));
 
   // none yields no filter chain at all
   assert.equal(

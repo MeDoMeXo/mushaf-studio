@@ -382,9 +382,11 @@ export function buildVideoBackgroundFilterGraph(params: {
   if (scaledBlur > 0) {
     bgSteps.push(`gblur=sigma=${scaledBlur}`);
   }
-  bgSteps.push(`fps=${safeFps}`, 'format=rgba');
+  // yuva420p (not rgba): halves per-frame filter RAM for the bg→slides
+  // overlay chain — the rgba graph OOM-killed FFmpeg at 1080p (fix 2026-11-27).
+  bgSteps.push(`fps=${safeFps}`, 'format=yuva420p');
 
-  return `[0:v]${bgSteps.join(',')}[bg];[1:v]scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,pad=${safeW}:${safeH}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,format=rgba[ov];[bg][ov]overlay=0:0:shortest=1:eof_action=repeat,format=yuv420p[vout]`;
+  return `[0:v]${bgSteps.join(',')}[bg];[1:v]scale=${safeW}:${safeH}:force_original_aspect_ratio=decrease,pad=${safeW}:${safeH}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,format=yuva420p[ov];[bg][ov]overlay=0:0:shortest=1:eof_action=repeat,format=yuv420p[vout]`;
 }
 
 /**

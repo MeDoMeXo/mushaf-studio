@@ -41,8 +41,10 @@ function buildOrnamentOverlayFilters(
   width: number,
   height: number
 ): string[] {
+  // yuva420p (not rgba): halves per-frame filter RAM — part of the 2026-11-27
+  // OOM fix (rgba 3-stream overlay graphs peaked ~1.3 GB at 1080p).
   return [
-    `[${overlayInputIdx}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,format=rgba[ovframe]`,
+    `[${overlayInputIdx}:v]scale=${width}:${height}:force_original_aspect_ratio=decrease,pad=${width}:${height}:(ow-iw)/2:(oh-ih)/2:color=black@0,setsar=1,format=yuva420p[ovframe]`,
     `[${baseLabel}][ovframe]overlay=0:0[bgfr]`,
   ];
 }

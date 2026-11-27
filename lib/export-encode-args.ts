@@ -80,6 +80,11 @@ export function appendEncodeTail(videoArgs: string[], params: EncodeTailParams):
   const bitrateBounds = resolveVideoBitrateBounds(meta.resolution, meta.quality, params.hasBgVideoFile);
   // stillimage tune is only for fully static slides; animated layers need normal tuning
   const useStillImageTune = !params.hasBgVideoFile && !params.hasAnimatedVisualLayer;
+  // Thread cap (OOM fix 2026-11-27): ffmpeg's default thread pool (frame
+  // threads × filter threads) more than doubles encoder RSS — measured 1.0–1.6 GB
+  // at 1080p getting OOM-killed on 4 GB hosts vs ~650 MB with an explicit cap.
+  // 2 threads keeps full speed on typical 2-core containers and small VPSes.
+  const threadCap = ['-threads', '2'];
 
   if (meta.format === 'mp4') {
     const mp4EncArgs = [
@@ -90,6 +95,7 @@ export function appendEncodeTail(videoArgs: string[], params: EncodeTailParams):
       '-crf', String(crf),
       '-maxrate', bitrateBounds.maxrate,
       '-bufsize', bitrateBounds.bufsize,
+      ...threadCap,
     ];
     if (useStillImageTune) {
       mp4EncArgs.push('-tune', 'stillimage');
@@ -119,6 +125,7 @@ export function appendEncodeTail(videoArgs: string[], params: EncodeTailParams):
       params.hasBgVideoFile || slideCount > 60 ? '8' : slideCount > 24 ? '6' : '4',
       '-crf', String(crf),
       '-b:v', bitrateBounds.maxrate,
+      ...threadCap,
       '-pix_fmt', 'yuv420p',
       '-fps_mode', 'cfr',
       '-r', String(effectiveFps),
