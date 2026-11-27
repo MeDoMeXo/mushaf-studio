@@ -66,7 +66,7 @@ export function ReaderSettingsPanel({
                   className="mb-1.5 flex items-center gap-1.5 text-xs font-bold text-[var(--ink-muted)]"
                 >
                   <Languages className="h-3.5 w-3.5 text-[var(--brand-gold)]" aria-hidden="true" />
-                  <span>الترجمة المعتمدة (من QUL)</span>
+                  <span>الترجمة المعتمدة من QUL</span>
                 </label>
                 <select
                   id="reader-translation"

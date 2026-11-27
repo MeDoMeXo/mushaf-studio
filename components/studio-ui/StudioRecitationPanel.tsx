@@ -398,7 +398,7 @@ export function StudioRecitationPanel({
                       className="h-3.5 w-3.5 text-[var(--brand-gold)]"
                       aria-hidden="true"
                     />
-                    <span>الترجمة المعتمدة (من QUL)</span>
+                    <span>الترجمة المعتمدة من QUL</span>
                   </label>
                   <span className="inline-flex items-center gap-1 text-[10px] font-medium text-[var(--ink-muted)] tabular-nums">
                     {loadingTranslation ? (

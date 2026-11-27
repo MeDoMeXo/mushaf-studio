@@ -257,7 +257,7 @@ export function StudioCommandPalette({
 
               {/* QUL Translations */}
               <Command.Group
-                heading="الترجمات المعتمدة (من QUL)"
+                heading="الترجمات المعتمدة من QUL"
                 className="mt-2 border-t border-[var(--border-hairline)] pt-2 [&_[cmdk-group-heading]]:px-2.5 [&_[cmdk-group-heading]]:py-1.5 [&_[cmdk-group-heading]]:text-[11px] [&_[cmdk-group-heading]]:font-bold [&_[cmdk-group-heading]]:text-[var(--ink-muted)]"
               >
                 {TRANSLATIONS.map((tr) => (

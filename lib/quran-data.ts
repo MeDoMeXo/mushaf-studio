@@ -106,10 +106,10 @@ export const RECITERS: ReciterOption[] = [
 ];
 
 export const TRANSLATIONS: TranslationOption[] = [
-  // ── العربية ──────────────────────────────────────────────────────────
-  { id: 78, name: 'وزارة الأوقاف المصرية', lang: 'ar', langLabel: 'العربية' },
-  { id: 79, name: 'أبو عادل (عبد الرحمن ناصر السعدي)', lang: 'ar', langLabel: 'العربية' },
-  { id: 81, name: 'Burhan Muhammad-Amin', lang: 'ar', langLabel: 'العربية' },
+  // ⚠️ لا توجد ترجمة عربية في QUL (مسح ids ١-٣٠٠ بالمحتوى الفعلي):
+  // المصدر مخصص للترجمات غير العربية. التصنيفات أدناه موثّقة بمحتوى
+  // الآية الأولى من كل ترجمة، لا باسم المترجم فقط (أسماء روسية تحمل
+  // أسماء مؤسسات عربية: «وزارة الأوقاف» و«أبو عادل» ترجمات روسية!).
 
   // ── الإنجليزية ───────────────────────────────────────────────────────
   { id: 131, name: 'د. مصطفى خطاب — The Clear Quran', lang: 'en', langLabel: 'الإنجليزية' },
@@ -120,17 +120,25 @@ export const TRANSLATIONS: TranslationOption[] = [
   { id: 206, name: 'Ruwwad Center', lang: 'en', langLabel: 'الإنجليزية' },
   { id: 207, name: 'Dr. T. B. Irving', lang: 'en', langLabel: 'الإنجليزية' },
   { id: 171, name: 'Abridged Explanation of the Quran', lang: 'en', langLabel: 'الإنجليزية' },
-  { id: 103, name: 'Helmi Nasr — البرتغالية', lang: 'pt', langLabel: 'البرتغالية' },
+  { id: 167, name: 'Maarif-ul-Quran (تفسيري)', lang: 'en', langLabel: 'الإنجليزية' },
+  { id: 95, name: 'Tafheem-ul-Quran — المودودي', lang: 'en', langLabel: 'الإنجليزية' },
 
   // ── الأردية ──────────────────────────────────────────────────────────
-  { id: 95, name: 'تفهيم القرآن — المودودي (Tafheem-ul-Quran)', lang: 'ur', langLabel: 'الأردية' },
   { id: 158, name: 'بیان القرآن — د. اسرار احمد', lang: 'ur', langLabel: 'الأردية' },
   { id: 97, name: 'Tafheem e Qur’an — Syed Abu Ali Maududi', lang: 'ur', langLabel: 'الأردية' },
+  { id: 151, name: 'Shaykh al-Hind Mahmud al-Hasan (مع تفسير عثماني)', lang: 'ur', langLabel: 'الأردية' },
+  { id: 156, name: 'في ظلال القرآن — سيد قطب', lang: 'ur', langLabel: 'الأردية' },
 
-  // ─ـ لغات أخرى ────────────────────────────────────────────────────────
-  { id: 167, name: 'معارف القرآن (تفسيري)', lang: 'en', langLabel: 'الإنجليزية' },
+  // ── الروسية ──────────────────────────────────────────────────────────
+  { id: 78, name: 'Ministry of Awqaf, Egypt — الروسية', lang: 'ru', langLabel: 'الروسية' },
+  { id: 79, name: 'Abu Adel — الروسية', lang: 'ru', langLabel: 'الروسية' },
+
+  // ── لغات أخرى ────────────────────────────────────────────────────────
   { id: 135, name: 'Persian — Rowwad Translation Center', lang: 'fa', langLabel: 'الفارسية' },
+  { id: 81, name: 'Burhan Muhammad-Amin — الكردية', lang: 'ku', langLabel: 'الكردية' },
+  { id: 143, name: 'Muhammad Saleh Bamoki — الكردية الصورانية', lang: 'ckb', langLabel: 'الكردية' },
   { id: 82, name: 'Suhel Farooq Khan — الهندية', lang: 'hi', langLabel: 'الهندية' },
+  { id: 103, name: 'Helmi Nasr — البرتغالية', lang: 'pt', langLabel: 'البرتغالية' },
 ];
 
 export const DEFAULT_TRANSLATION_ID = 131;
