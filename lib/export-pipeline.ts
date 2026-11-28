@@ -471,6 +471,12 @@ export async function runExportPipeline(
         activeVerseIndex: Math.max(0, vIdx),
         totalVerses: selectedVerses.length,
         activeWordIndex: timelineEntry?.wordIdx,
+        // شرائح مستوى العبارة (خفض التتبّع للمُدد الطويلة): تظليل نطاق
+        // الكلمات كاملاً [wordIdx..wordTo] بدل كلمة واحدة.
+        activeWordRange:
+          timelineEntry && timelineEntry.wordTo !== undefined
+            ? [timelineEntry.wordIdx, timelineEntry.wordTo]
+            : undefined,
       });
 
       const shouldAttachVerseAudio =

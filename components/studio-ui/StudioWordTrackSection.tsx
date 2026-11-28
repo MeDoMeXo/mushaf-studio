@@ -132,6 +132,8 @@ export function StudioWordTrackSection({ state, onPatchState }: StudioWordTrackS
           <p className="rounded-lg border border-[var(--brand-gold)]/45 bg-[var(--brand-gold)]/10 px-2.5 py-1.5 text-[10px] leading-relaxed text-[var(--ink-muted)]">
             التتبّع يعمل أثناء تشغيل المعاينة، وفي الفيديو المُصدّر تُولّد شرائح
             كلمة-بكلمة متزامنة مع مدة كل لظة — والباقي يبقى بلون النص الأصلي.
+            المدد الطويلة جداً تُخفَّض تلقائياً إلى تتبّع عبارة-بعبارة كي لا
+            يختفي التظليل من التصدير.
           </p>
         </>
       )}

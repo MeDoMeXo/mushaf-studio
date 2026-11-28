@@ -113,7 +113,7 @@ export function StudioExportModal({
   }, [isBusy]);
 
   // Derived export estimates: target dimensions, intro cover + ~5.5s/verse duration, size.
-  const { targetDims, estimatedSizeMb, karaokeSlideCount } = useMemo(() => {
+  const { targetDims, estimatedSizeMb, karaokeSlideCount, karaokeGranularity } = useMemo(() => {
     const dims = resolveExportDimensions(
       studioState.width,
       studioState.height,
@@ -142,6 +142,7 @@ export function StudioExportModal({
       targetDims: dims,
       estimatedSizeMb: sizeMb,
       karaokeSlideCount: plan ? plan.totalSlides : 0,
+      karaokeGranularity: plan ? plan.granularity : null,
     };
   }, [
     studioState,
@@ -435,6 +436,7 @@ export function StudioExportModal({
               <ExportSummaryStrip
                 verseCount={selectedVerses.length}
                 karaokeSlideCount={karaokeSlideCount}
+                karaokeGranularity={karaokeGranularity}
                 includeIntroCover={exportSettings.includeIntroCover !== false}
                 targetDims={targetDims}
                 customAudioFile={customAudioFile}

@@ -39,6 +39,10 @@ export interface RenderFramePayload {
   totalVerses?: number;
   /** Karaoke tracking — index of the word being recited in the current verse. */
   activeWordIndex?: number;
+  /** Karaoke range tracking — inclusive [from, to] of the phrase being recited
+   * (segment-granular export slides). When present it overrides activeWordIndex
+   * and highlights every word in the range. */
+  activeWordRange?: [number, number];
   preRenderedBackdrop?: HTMLCanvasElement | null;
   transparentBackdrop?: boolean;
   overlayOnly?: boolean;
@@ -371,6 +375,7 @@ export function drawStudioFrame(
     } else if (!state.hideVerses) {
       drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum, {
         activeWordIndex,
+        activeWordRange: payload.activeWordRange,
       });
       if (state.showProgressDots && totalVerses > 1 && totalVerses <= 24) {
         drawProgressDots(ctx, state, activeVerseIndex, totalVerses);
@@ -418,6 +423,7 @@ export function drawStudioFrame(
       ctx.globalAlpha = Math.max(0, Math.min(1, fadeAlpha));
       drawMainText(ctx, state, verseText, stripHtmlTags(translationText), resolvedAyahNum, {
         activeWordIndex,
+        activeWordRange: payload.activeWordRange,
       });
       ctx.restore();
     }

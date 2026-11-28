@@ -34,6 +34,9 @@ import {
 export interface MainTextExtras {
   /** Index of the word currently being recited (karaoke audio tracking). */
   activeWordIndex?: number;
+  /** Inclusive [from, to] phrase range currently being recited (segment-granular
+   * karaoke slides). Overrides activeWordIndex when present. */
+  activeWordRange?: [number, number];
 }
 
 export { computeSafeTextColumn } from './studio-text-karaoke';
@@ -71,10 +74,29 @@ export function drawMainText(
   const singleMode = (state.verseLineMode || 'wrap') === 'single';
   const timings = showArabic && arabicText ? buildAyahWordTimings(arabicText) : [];
   const activeWordIndex = extras?.activeWordIndex ?? -1;
+  // نطاق العبارة المتلوة (شرائح مستوى العبارة): يعلو على المؤشر المفرد —
+  // كل كلمات النطاق تتظلّل معاً كشريط يتحرك عبارة بعبارة.
+  const rawRange = extras?.activeWordRange;
+  const activeRange: [number, number] | null =
+    Array.isArray(rawRange) &&
+    rawRange.length === 2 &&
+    Number.isFinite(rawRange[0]) &&
+    Number.isFinite(rawRange[1])
+      ? [Math.max(0, Math.floor(rawRange[0])), Math.max(0, Math.floor(rawRange[1]))]
+      : null;
+  const normalizedRange =
+    activeRange && activeRange[0] <= activeRange[1]
+      ? [activeRange[0], Math.max(activeRange[0], activeRange[1])]
+      : null;
+  const rangeLo = normalizedRange ? normalizedRange[0] : -1;
+  const rangeHi = normalizedRange ? normalizedRange[1] : -1;
+  const hasRange = normalizedRange !== null;
+  const rangeInBounds = hasRange && rangeLo < timings.length;
   const highlightOn =
     state.wordHighlight === true &&
-    activeWordIndex >= 0 &&
-    activeWordIndex < timings.length;
+    (hasRange
+      ? rangeInBounds
+      : activeWordIndex >= 0 && activeWordIndex < timings.length);
   const highlightStyle: WordHighlightStyle = state.wordHighlightStyle || 'block';
   const highlightColor = state.wordHighlightColor || '#C9A227';
   const highlightOpacity = Math.max(0.15, Math.min(0.85, state.wordHighlightOpacity ?? 0.35));
@@ -315,9 +337,11 @@ export function drawMainText(
     // The token currently being recited — for disjointed-letter groups the
     // ACTIVE LETTER (not the whole group) drives the highlight zone, so the
     // tracing (التتبع) still advances letter-by-letter across the JOINED
-    // writing (الرسم متصل) exactly as the mushaf draws it.
+    // writing (الرسم متصل) exactly as the mushaf draws it. A phrase RANGE
+    // (segment slides) highlights whole units instead — its disjointed
+    // group is fully inside the recited phrase.
     const activeTok =
-      activeWordIndex >= 0 && activeWordIndex < timings.length
+      !hasRange && activeWordIndex >= 0 && activeWordIndex < timings.length
         ? timings[activeWordIndex]
         : null;
 
@@ -381,7 +405,17 @@ export function drawMainText(
         const textW = measure(text);
         let zones: { left: number; width: number }[] | null = null;
         let activeZone = -1;
-        if (group) {
+        if (hasRange) {
+          // عبارة مستوى الشريحة: أي وحدة يتقاطع نطاقها مع [lo..hi] تتظلّل
+          // كاملة — المجموعة المقطعة وحدة واحدة داخل العبارة فتتظلّل
+          // برمّتها (الرسم متصل، والتلوين كتلة واحدة متناغمة).
+          const unitFrom = slice[0].index;
+          const unitTo = slice[slice.length - 1].index;
+          if (highlightOn && unitFrom <= rangeHi && unitTo >= rangeLo) {
+            activeZone = 0;
+            zones = null;
+          }
+        } else if (group) {
           zones = letterZones(group, textW, cursorRight);
           if (
             highlightOn &&

@@ -37,6 +37,8 @@ export interface KaraokeWordTimelineEntry {
   verseIdx: number;
   /** Word being recited on this slide (segment-first word for segment slides). */
   wordIdx: number;
+  /** Inclusive highlight-range end (segment-granular slides — absent on word slides). */
+  wordTo?: number;
   /** Relative spoken-duration weight inside the verse. */
   weight: number;
 }
@@ -244,11 +246,23 @@ export async function createExportSession(
           return raw as Record<string, unknown> | null;
         })
         .filter((e): e is Record<string, unknown> => Boolean(e && typeof e === 'object'))
-        .map((e) => ({
-          verseIdx: Math.max(0, Math.min(verseIds.length - 1, Math.floor(Number(e.verseIdx ?? 0) || 0))),
-          wordIdx: Math.max(0, Math.min(999, Math.floor(Number(e.wordIdx ?? 0) || 0))),
-          weight: Math.max(0.1, Math.min(500, Number(e.weight ?? 1) || 1)),
-        }))
+        .map((e) => {
+          const from = Math.max(0, Math.min(999, Math.floor(Number(e.wordIdx ?? 0) || 0)));
+          const rawTo = Math.floor(Number(e.wordTo ?? from) || from);
+          const entry: KaraokeWordTimelineEntry = {
+            verseIdx: Math.max(
+              0,
+              Math.min(verseIds.length - 1, Math.floor(Number(e.verseIdx ?? 0) || 0))
+            ),
+            wordIdx: from,
+            weight: Math.max(0.1, Math.min(500, Number(e.weight ?? 1) || 1)),
+          };
+          // نطاق تظليل العبارة (شرائح مستوى العبارة فقط): نهاية صالحة ≥ البداية
+          if (Number.isFinite(rawTo) && rawTo >= from) {
+            entry.wordTo = Math.min(999, rawTo);
+          }
+          return entry;
+        })
     : undefined;
 
   const slideCeiling = wordTimeline && wordTimeline.length ? MAX_WORD_SLIDES : MAX_EXPORT_SLIDES;

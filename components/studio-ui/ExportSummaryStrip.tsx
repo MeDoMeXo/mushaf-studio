@@ -10,6 +10,8 @@ import { toArabicDigits } from '@/lib/quran-utils';
 interface ExportSummaryStripProps {
   verseCount: number;
   karaokeSlideCount: number;
+  /** مستوى التتبّع في التصدير: 'word' كلمة-بكلمة أو 'segment' عبارة-بعبارة (خُفّض لطول المدة). */
+  karaokeGranularity?: 'word' | 'segment' | null;
   includeIntroCover: boolean;
   targetDims: { width: number; height: number };
   customAudioFile: File | null;
@@ -21,6 +23,7 @@ interface ExportSummaryStripProps {
 export function ExportSummaryStrip({
   verseCount,
   karaokeSlideCount,
+  karaokeGranularity,
   includeIntroCover,
   targetDims,
   customAudioFile,
@@ -40,7 +43,9 @@ export function ExportSummaryStrip({
         </p>
         {karaokeSlideCount > 0 && (
           <p className="mt-0.5 text-[10px] text-[var(--brand-emerald)] dark:text-[#E6C75A]">
-            تتبّع كلمة-بكلمة متزامن مع التلاوة
+            {karaokeGranularity === 'segment'
+              ? 'تتبّع عبارة-بعبارة متزامن مع التلاوة (خُفّض من مستوى الكلمة لطول المدة)'
+              : 'تتبّع كلمة-بكلمة متزامن مع التلاوة'}
           </p>
         )}
       </div>
