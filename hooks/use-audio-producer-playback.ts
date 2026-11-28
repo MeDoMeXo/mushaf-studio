@@ -25,8 +25,16 @@ export function useProducerPlayback(options: {
   /** الصدى يمرّ في الرندر المشترك فتشغّل المعاينة نفس ما يُصدَّر. */
   echoRef: RefObject<ProducerEchoSettings | null>;
   showToast: (msg: string) => void;
+  /**
+   * سياق صوتي خارجي (استوديو الإنتاج): إن وُجد استُخدم بدل إنشاء سياق
+   * خاص — فيتّحد كل من التلاوة والموسيقى والمحيطات على مِكسر واحد قابل
+   * للتسجيل. لا يُغلق عند الفك (مالكه يغلقه).
+   */
+  sharedContextRef?: RefObject<AudioContext | null>;
+  /** عقدة الخرج (مِكسر الاستوديو) — إن وُجدت صبب إليها بدل destination. */
+  outputNodeRef?: RefObject<AudioNode | null>;
 }) {
-  const { sourceRef, editRef, echoRef, showToast } = options;
+  const { sourceRef, editRef, echoRef, showToast, sharedContextRef, outputNodeRef } = options;
 
   const [playheadEditedSec, setPlayheadEditedSec] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -154,7 +162,12 @@ export function useProducerPlayback(options: {
       gain.gain.value = volumeRef.current;
       node.playbackRate.value = rateRef.current;
       node.connect(gain);
-      gain.connect(ctx.destination);
+      // مِكسر الاستوديو إن وُجد **على السياق نفسه** — الاتصال بين سياقين
+      // مختلفين غير مشروع في Web Audio ويُجهض الصوت بصمت. (مِكسر الاستوديو
+      // يُنشأ مطلقاً على السياق المشترك نفسه — هذا تحصّل حماية.)
+      const mixerOut = outputNodeRef?.current;
+      if (mixerOut && mixerOut.context === ctx) gain.connect(mixerOut);
+      else gain.connect(ctx.destination);
       suppressEndedRef.current = false;
       node.onended = () => {
         if (suppressEndedRef.current) return;
@@ -178,7 +191,7 @@ export function useProducerPlayback(options: {
   const play = useCallback(async () => {
     const src = sourceRef.current;
     if (!src) return;
-    let ctx = ctxRef.current;
+    let ctx = ctxRef.current ?? sharedContextRef?.current ?? null;
     if (!ctx) {
       const Ctor: typeof AudioContext | undefined =
         window.AudioContext ??
@@ -188,8 +201,10 @@ export function useProducerPlayback(options: {
         return;
       }
       ctx = new Ctor();
-      ctxRef.current = ctx;
     }
+    // دائماً: startNodeAt/tick يقرآن ctxRef — فأياً كان مصدر السياق (خاص
+    // أو مِكسر الاستوديو المشترك) يُثبَّت هنا ليتّحد المحرّك كله عليه.
+    ctxRef.current = ctx;
     if (ctx.state === 'suspended') {
       void ctx.resume().catch(() => {});
     }
@@ -200,7 +215,7 @@ export function useProducerPlayback(options: {
       return;
     }
     startNodeAt(offset);
-  }, [ensureRendered, playheadEditedSec, showToast, sourceRef, startNodeAt]);
+  }, [ensureRendered, playheadEditedSec, sharedContextRef, showToast, sourceRef, startNodeAt]);
 
   const pause = useCallback(() => {
     stopPlayback();
@@ -268,10 +283,13 @@ export function useProducerPlayback(options: {
         // تجاهل
       }
       cancelAnimationFrame(rafRef.current);
-      ctxRef.current?.close().catch(() => {});
+      // السياق الخارجي (استوديو الإنتاج) يبقى لمالكه — نغلق الخاص بنا فقط.
+      if (ctxRef.current && ctxRef.current !== sharedContextRef?.current) {
+        ctxRef.current.close().catch(() => {});
+      }
       ctxRef.current = null;
     };
-  }, []);
+  }, [sharedContextRef]);
 
   return {
     isPlaying,

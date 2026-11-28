@@ -1,15 +1,10 @@
 'use client';
 
 /**
- * useAudioProducer — عقل صفحة «منتج الصوت»: تحميل المصدر (آيات قارئ أو
- * ملف)، نموذج التحرير غير المدمّر مع تراجع/إعادة (بلقطات تشمل تحرير
- * مقاطع الصوت **وحدود الآيات** معاً)، كشف السكوت وقصّه، تحرير موضع الآيات
- * (حدودها بالسحب أو الإزاحة)، حالة صدى الصوت، والتصدير/التسليم.
- *
- * كل الحسابات الثقيلة في lib/audio-producer/* (نقية قابلة للاختبار)،
- * محرّك التشغيل في hooks/use-audio-producer-playback.ts، إطار العرض في
- * use-producer-view.ts، والتصدير في use-producer-export.ts — هذا الخطاف
- * يربطها بالدورة التفاعلية فقط.
+ * useAudioProducer — عقل التحرير الصوتي: تحميل المصدر (آيات/ملف)،
+ * تحرير غير مدمّر بتراجع/إعادة (مقاطع + حدود آيات)، كشف السكوت،
+ * موضع الآيات، الصدى، والتصدير/التسليم. الحسابات في lib/audio-producer/*،
+ * التشغيل في use-audio-producer-playback، الرسم في use-producer-view.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { QulVerse } from '@/lib/quran-data';
@@ -64,17 +59,20 @@ export interface SilenceOptions {
   minSilenceSec: number;
 }
 
-/**
- * لقطة تراجع واحدة: حالة التحرير + حدود الآيات قبل التغيير. null في
- * verseMarkers يعني «هذا التغيير لم يمسّ الحدود» فتُترك الحدود الحالية.
- */
+/** لقطة تراجع: التحرير + حدود الآيات (null = لم تُمسّ). */
 interface ProducerSnapshot {
   edit: ProducerEditState;
   verseMarkers: number[] | null;
 }
 
-export function useAudioProducer(options: { showToast: (msg: string) => void }) {
-  const { showToast } = options;
+export function useAudioProducer(options: {
+  showToast: (msg: string) => void;
+  /** سياق مشترك (استوديو الإنتاج) — يوحّد الخلط والتسجيل. */
+  sharedContextRef?: React.RefObject<AudioContext | null>;
+  /** عقدة خرج (مِكسر الاستوديو) لتصبّ فيها التلاوة. */
+  outputNodeRef?: React.RefObject<AudioNode | null>;
+}) {
+  const { showToast, sharedContextRef, outputNodeRef } = options;
 
   const [source, setSource] = useState<ProducerSource | null>(null);
   const [loadState, setLoadState] = useState<ProducerLoadState>({
@@ -104,19 +102,20 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
 
   useEffect(() => {
     sourceRef.current = source;
-  }, [source]);
-  useEffect(() => {
     editRef.current = edit;
-  }, [edit]);
-  useEffect(() => {
     echoRef.current = echo;
-  }, [echo]);
-  useEffect(() => {
     historyRef.current = history;
-  }, [history]);
+  }, [source, edit, echo, history]);
 
-  // ── محرّك التشغيل (رندر + نقل + بحث) وإطار العرض والتصدير ─────────
-  const playback = useProducerPlayback({ sourceRef, editRef, echoRef, showToast });
+  // محرّك التشغيل + إطار العرض + التصدير
+  const playback = useProducerPlayback({
+    sourceRef,
+    editRef,
+    echoRef,
+    showToast,
+    sharedContextRef,
+    outputNodeRef,
+  });
   const { invalidateRender, resetEngine, stopAndReset, ensureRendered } = playback;
   const viewCtl = useProducerView(sourceRef);
   const exporter = useProducerExport({ sourceRef, editRef, echoRef, ensureRendered, showToast });
@@ -191,7 +190,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
   }, [invalidateRender]);
 
   // ── تحرير موضع الآيات (حدودها الزمنية) ─────────────────────────────
-  /** نقل بداية آية إلى زمن مطلق — بتراجع كامل وبإشعار. */
+  /** نقل بداية آية لزمن مطلق — بتراجع وإشعار. */
   const setVerseMarker = useCallback(
     (idx: number, sec: number) => {
       const src = sourceRef.current;
@@ -206,7 +205,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     [pushUndoSnapshot, showToast]
   );
 
-  /** إزاحة بداية آية بمقدار ±ثوانٍ (أزرار الموضع في الخط الزمني). */
+/** إزاحة بداية آية بثوانٍ (أزرار الموضع). */
   const nudgeVerse = useCallback(
     (idx: number, deltaSec: number) => {
       const src = sourceRef.current;
@@ -220,10 +219,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     [pushUndoSnapshot]
   );
 
-  /**
-   * سحب حدّ آية على الخط الزمني: لقطة واحدة عند البدء ثم معاينة حية بلا
-   * لقطات — فيبقى التراجع نقطة واحدة للسحب كله.
-   */
+  /** سحب حدّ آية: لقطة عند البدء + معاينة حية — تراجع نقطة واحدة. */
   const beginVerseMarkerDrag = useCallback(() => {
     const src = sourceRef.current;
     if (src) pushUndoSnapshot(src.verseMarkersSec);
@@ -237,6 +233,20 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     if (!next) return;
     setSource((p) => (p ? { ...p, verseMarkersSec: next } : p));
   }, []);
+
+  /** ضبط كل حدود الآيات جملةً (فتح مشروع) — بتراجع واحد. */
+  const setVerseMarkersBulk = useCallback(
+    (markers: number[]) => {
+      const src = sourceRef.current;
+      if (!src || !markers.length) return false;
+      const clean = markers.map(Number).filter((m) => Number.isFinite(m) && m >= 0 && m <= src.durationSec);
+      if (clean.length !== markers.length) return false;
+      pushUndoSnapshot(src.verseMarkersSec);
+      setSource((p) => (p ? { ...p, verseMarkersSec: clean } : p));
+      return true;
+    },
+    [pushUndoSnapshot]
+  );
 
   // ── صدى الصوت ──────────────────────────────────────────────────────
   /** يقيّد دائماً — لا تصل قيم خارج المدى إلى المحرّك أبداً. */
@@ -288,12 +298,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         }
       } catch (err) {
         if (controller.signal.aborted) return;
-        const message =
-          err instanceof DOMException && err.name === 'AbortError'
-            ? 'أُلغي التحميل'
-            : err instanceof Error
-              ? err.message
-              : 'تعذّر تحميل التلاوة';
+        const message = err instanceof Error ? err.message : 'تعذّر تحميل التلاوة';
         setLoadState({ status: 'error', done: 0, total: verses.length, message });
         showToast(message);
       }
@@ -313,9 +318,8 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         setLoadState({ status: 'ready', done: 1, total: 1 });
         showToast(`تم تحميل الملف: ${file.name}`);
       } catch (err) {
-        const message = err instanceof Error ? err.message : 'تعذّر تحميل الملف';
-        setLoadState({ status: 'error', done: 0, total: 1, message });
-        showToast(message);
+        setLoadState({ status: 'error', done: 0, total: 1, message: err instanceof Error ? err.message : 'تعذّر تحميل الملف' });
+        showToast('تعذّر تحميل الملف');
       }
     },
     [resetProducerState, showToast, viewCtl]
@@ -539,6 +543,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     setClipFades,
     // موضع الآيات
     setVerseMarker,
+    setVerseMarkersBulk,
     nudgeVerse,
     beginVerseMarkerDrag,
     previewVerseMarker,

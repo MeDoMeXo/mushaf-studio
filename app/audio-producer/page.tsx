@@ -1,10 +1,10 @@
 import React, { Suspense } from 'react';
-import { AudioProducerView } from '@/components/audio-producer-ui/AudioProducerView';
+import { ProductionStudioView } from '@/components/production-ui/ProductionStudioView';
 
 export const metadata = {
-  title: 'منتج الصوت — تحرير تلاوات القرآن',
+  title: 'استوديو تحرير القرآن الكريم — إنتاج صوتي ومرئي',
   description:
-    'محطة تحرير صوتي كاملة للتلاوات: تحميل التلاوة أو رفع ملف، قصّ وتقسيم واقتطاع، قصّ السكوت، المكسب والتطبيع والتلاشي، وتصدير WAV أو الإرسال المباشر إلى الاستوديو.',
+    'استوديو متكامل لإنتاج المصحف المرئي والصوتي: مكتبة القرآن والقراء، تحرير غير مدمّر للتلاوة مع صدى ومحيطات وموسيقى، مسارات زمنية متعددة، معاينة حية بالكاليوكي، وتصدير MP3 وWAV وMP4.',
 };
 
 export default function AudioProducerPage() {
@@ -12,11 +12,11 @@ export default function AudioProducerPage() {
     <Suspense
       fallback={
         <div className="mx-auto max-w-[1420px] px-4 py-12 text-center text-sm text-[var(--ink-muted)]">
-          جارٍ تهيئة منتج الصوت...
+          جارٍ تهيئة استوديو تحرير القرآن الكريم...
         </div>
       }
     >
-      <AudioProducerView />
+      <ProductionStudioView />
     </Suspense>
   );
 }
