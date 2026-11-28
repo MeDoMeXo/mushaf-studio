@@ -327,7 +327,7 @@ export function ProducerWaveform({
         onPointerUp={handlePointerUp}
         onPointerCancel={handlePointerUp}
         onWheel={handleWheel}
-        className="relative h-44 shrink-0 cursor-crosshair touch-none select-none sm:h-52"
+        className="relative h-40 shrink-0 cursor-crosshair touch-none select-none sm:h-44 xl:h-auto xl:min-h-[120px] xl:flex-1 xl:shrink"
       >
         <canvas ref={canvasRef} className="absolute inset-0" aria-hidden="true" />
 

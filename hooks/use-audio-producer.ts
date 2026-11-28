@@ -320,6 +320,23 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     showToast('أُعيد المقطع كاملاً');
   }, [applyEdit, showToast, stopAndReset]);
 
+  /** حذف آية كاملة من التلاوة (قصّ مداها في إحداثيات المصدر). */
+  const removeVerse = useCallback(
+    (idx: number) => {
+      const src = sourceRef.current;
+      if (!src || idx < 0 || idx >= src.verseMarkersSec.length) return false;
+      const startSec = src.verseMarkersSec[idx];
+      const endSec =
+        idx + 1 < src.verseMarkersSec.length ? src.verseMarkersSec[idx + 1] : src.durationSec;
+      if (endSec - startSec <= 0.01) return false;
+      applyEdit((prev) => removeRange(prev, startSec, endSec));
+      stopAndReset();
+      showToast(`حُذفت الآية ${src.verseNumbers[idx] ?? idx + 1} من التلاوة`);
+      return true;
+    },
+    [applyEdit, showToast, stopAndReset]
+  );
+
   const setMasterGain = useCallback(
     (db: number) => applyEdit((prev) => setMasterGainDbOp(prev, db)),
     [applyEdit]
@@ -505,6 +522,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     trimBeforePlayhead,
     trimAfterPlayhead,
     restoreFull,
+    removeVerse,
     setMasterGain,
     setNormalizeOn,
     setClipGain,
