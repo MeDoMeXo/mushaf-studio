@@ -6,7 +6,7 @@
  * البحث/القفز بإحداثيات الخط المحرَّر أو المصدر أو الآيات، والتحكم في
  * الصوت والسرعة.
  *
- * يعمل فوق مرجعين (المصدر/التحرير) يمتلكهما useAudioProducer — لا حالة
+ * يعمل فوق مراجع (المصدر/التحرير/الصدى) تمتلكها useAudioProducer — لا حالة
  * تحرير هنا؛ كل الحسابات الثقيلة في lib/audio-producer/*.
  */
 import { useCallback, useEffect, useRef, useState, type RefObject } from 'react';
@@ -17,13 +17,16 @@ import {
   totalKeptSec,
   type ProducerEditState,
 } from '@/lib/audio-producer/audio-producer-edit';
+import type { ProducerEchoSettings } from '@/lib/audio-producer/producer-echo';
 
 export function useProducerPlayback(options: {
   sourceRef: RefObject<ProducerSource | null>;
   editRef: RefObject<ProducerEditState | null>;
+  /** الصدى يمرّ في الرندر المشترك فتشغّل المعاينة نفس ما يُصدَّر. */
+  echoRef: RefObject<ProducerEchoSettings | null>;
   showToast: (msg: string) => void;
 }) {
-  const { sourceRef, editRef, showToast } = options;
+  const { sourceRef, editRef, echoRef, showToast } = options;
 
   const [playheadEditedSec, setPlayheadEditedSec] = useState(0);
   const [isPlaying, setIsPlaying] = useState(false);
@@ -63,7 +66,7 @@ export function useProducerPlayback(options: {
     if (!src || !st) return null;
     if (!renderDirtyRef.current && renderedRef.current) return renderedRef.current;
     if (renderJobRef.current) return renderJobRef.current;
-    const job = renderEdited(src, st)
+    const job = renderEdited(src, st, echoRef.current ?? undefined)
       .then((buffer) => {
         renderedRef.current = buffer;
         renderDirtyRef.current = false;
@@ -76,7 +79,7 @@ export function useProducerPlayback(options: {
       });
     renderJobRef.current = job;
     return job;
-  }, [editRef, sourceRef]);
+  }, [editRef, echoRef, sourceRef]);
 
   /** يُستدعى بعد أي تعديل/تراجع/إعادة — الرندر المخزَّن لم يعد صالحاً. */
   const invalidateRender = useCallback(() => {

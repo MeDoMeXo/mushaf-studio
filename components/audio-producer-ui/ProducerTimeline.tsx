@@ -3,9 +3,10 @@
 /**
  * ProducerTimeline — الخط الزمني الاحترافي (نمط محررات الفيديو):
  * شريط أدوات (فصل عند المؤشر، حذف الآية، قصّ التحديد، تراجع/إعادة،
- * المستوى والتطبيع، التقريب) فوق مسار مقاطع الآيات — كل آية مقطع مستقل
- * بموضعه الزمني الحقيقي — ثم مسار الموجة الكامل (ProducerWaveform)
- * بمسطرته وتحديده ومؤشره. مفتش المقاطع لوحة عائمة قابلة للإظهار.
+ * المستوى والتطبيع، التقريب، وأزرار موضع الآية) فوق مسار مقاطع الآيات —
+ * كل آية مقطع مستقل بموضعه الزمني الحقيقي، وحدوده تُسحب بالماوس
+ * (مقبض ذهبي على الحد بين آيتين يضبط بداية الآية التالية) — ثم مسار
+ * الموجة الكامل ومفتش المقاطع العائم.
  */
 import React, { useCallback, useRef, useState } from 'react';
 import {
@@ -67,6 +68,15 @@ interface ProducerTimelineProps {
   onClipFadesChange: (id: number, fadeIn: number, fadeOut: number) => void;
   onSeekEdited: (sec: number) => void;
   showToast: (msg: string) => void;
+  // موضع الآيات (حدودها الزمنية)
+  /** ضبط بداية آية بالفهرس إلى زمن مطلق — بتراجع كامل. */
+  onVerseMarkerChange: (idx: number, sec: number) => void;
+  /** لقطة تراجع واحدة قبل بدء سحب حدّ آية. */
+  onBeginVerseDrag: () => void;
+  /** معاينة حية لسحب حدّ آية (بلا لقطات — أُخذت واحدة عند البدء). */
+  onPreviewVerseMarker: (idx: number, sec: number) => void;
+  /** إزاحة بداية آية بمقدار ± (أزرار الموضع في شريط الأدوات). */
+  onNudgeVerse: (idx: number, deltaSec: number) => void;
 }
 
 export function ProducerTimeline(props: ProducerTimelineProps) {
@@ -108,10 +118,15 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
     onClipFadesChange,
     onSeekEdited,
     showToast,
+    onVerseMarkerChange,
+    onBeginVerseDrag,
+    onPreviewVerseMarker,
+    onNudgeVerse,
   } = props;
 
   const [inspectorOpen, setInspectorOpen] = useState(false);
   const clipsTrackRef = useRef<HTMLDivElement | null>(null);
+  const dragEdgeRef = useRef<{ markerIdx: number } | null>(null);
 
   // سحب المؤشر على مسار المقاطع = تقديم مستمر
   const seekFromPointer = useCallback(
@@ -123,6 +138,51 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
       onSeekSource(view.startSec + ratio * view.durSec);
     },
     [onSeekSource, view.durSec, view.startSec]
+  );
+
+  /** زمن مصدر من إحداثية أفقية على مسار المقاطع (للحدود المسحوبة). */
+  const secFromClientX = useCallback(
+    (clientX: number): number | null => {
+      const el = clipsTrackRef.current;
+      if (!el || view.durSec <= 0) return null;
+      const rect = el.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      return view.startSec + ratio * view.durSec;
+    },
+    [view.durSec, view.startSec]
+  );
+
+  /** سحب مقبض حدّ آية: لقطة واحدة عند البدء ثم معاينة حية. */
+  const edgeHandleHandlers = useCallback(
+    (markerIdx: number) => ({
+      onPointerDown: (e: React.PointerEvent<HTMLDivElement>) => {
+        e.stopPropagation();
+        e.preventDefault();
+        e.currentTarget.setPointerCapture(e.pointerId);
+        dragEdgeRef.current = { markerIdx };
+        onBeginVerseDrag();
+      },
+      onPointerMove: (e: React.PointerEvent<HTMLDivElement>) => {
+        const drag = dragEdgeRef.current;
+        if (!drag || !e.currentTarget.hasPointerCapture(e.pointerId)) return;
+        const sec = secFromClientX(e.clientX);
+        if (sec !== null) onPreviewVerseMarker(drag.markerIdx, sec);
+      },
+      onPointerUp: (e: React.PointerEvent<HTMLDivElement>) => {
+        const drag = dragEdgeRef.current;
+        if (!drag) return;
+        dragEdgeRef.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {
+          // تجاهل
+        }
+      },
+      onLostPointerCapture: () => {
+        dragEdgeRef.current = null;
+      },
+    }),
+    [onBeginVerseDrag, onPreviewVerseMarker, secFromClientX]
   );
 
   const pct = (r: number) => `${(Math.max(0, Math.min(1, r)) * 100).toFixed(2)}%`;
@@ -237,6 +297,46 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
           <Maximize2 className="h-3.5 w-3.5" aria-hidden="true" />
         </button>
         <span className="ms-auto shrink-0" />
+        {/* موضع الآية الجارية: إزاحة دقيقة بداية بدايتها */}
+        <div
+          className="flex h-8 shrink-0 items-center gap-1 rounded-lg border border-[var(--border-hairline)] bg-[var(--surface-subtle)] px-2"
+          title="موضع بداية الآية الجارية على الخط الزمني — أو اسحب المقبض الذهبي على حدّ المقطع"
+        >
+          <span className="text-[10px] font-bold text-[var(--ink-muted)]">موضع الآية</span>
+          <button
+            type="button"
+            onClick={() => onNudgeVerse(activeVerseIdx, -0.25)}
+            disabled={activeVerseIdx <= 0}
+            aria-label="تقديم بداية الآية ربع ثانية"
+            className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-primary)] transition-colors hover:bg-[var(--brand-gold)]/15 disabled:opacity-40"
+          >
+            −٠٫٢٥
+          </button>
+          <label className="flex items-center gap-0.5" dir="ltr">
+            <input
+              type="number"
+              min={0}
+              max={Math.max(0, source.durationSec)}
+              step={0.05}
+              value={Number((source.verseMarkersSec[activeVerseIdx] ?? 0).toFixed(2))}
+              onChange={(e) => onVerseMarkerChange(activeVerseIdx, Number(e.target.value) || 0)}
+              disabled={activeVerseIdx <= 0}
+              aria-label="بداية الآية الجارية بالثواني"
+              title="بداية الآية بالثواني — اضبط بدقة أو اسحب المقبض الذهبي"
+              className="w-14 rounded border border-[var(--border-hairline)] bg-[var(--surface-card)] px-1 py-0.5 text-center font-mono text-[9px] font-bold tabular-nums outline-none transition-colors focus:border-[var(--brand-gold)] disabled:opacity-40"
+            />
+            <span className="font-mono text-[9px] font-bold text-[var(--ink-muted)]">s</span>
+          </label>
+          <button
+            type="button"
+            onClick={() => onNudgeVerse(activeVerseIdx, 0.25)}
+            disabled={activeVerseIdx <= 0}
+            aria-label="تأخير بداية الآية ربع ثانية"
+            className="rounded-md px-1.5 py-0.5 font-mono text-[10px] font-bold tabular-nums text-[var(--ink-primary)] transition-colors hover:bg-[var(--brand-gold)]/15 disabled:opacity-40"
+          >
+            +٠٫٢٥
+          </button>
+        </div>
         <button
           type="button"
           onClick={() => setInspectorOpen((v) => !v)}
@@ -254,8 +354,8 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
         ref={clipsTrackRef}
         dir="ltr"
         role="application"
-        aria-label="مسار مقاطع الآيات — انقر مقطعاً للانتقال، أو اسحب المؤشر للتقديم"
-        title="اسحب للتقديم · انقر مقطع آية للانتقال إليها"
+        aria-label="مسار مقاطع الآيات — انقر مقطعاً للانتقال، أو اسحب المؤشر للتقديم، أو اسحب المقبض الذهبي على حدّ آية لضبط موضعها"
+        title="اسحب للتقديم · انقر مقطع آية للانتقال إليها · المقبض الذهبي على حدّ المقطع يضبط موضع الآية"
         onPointerDown={(e) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           seekFromPointer(e.clientX);
@@ -289,9 +389,19 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
           const removed = v.status === 'removed';
           const text = verseTexts?.[v.idx] ?? null;
           const keptBarPct = v.totalSec > 0 ? Math.min(100, (v.keptSec / v.totalSec) * 100) : 0;
+          // مقبض الحد الأيسر: يضبط بداية هذه الآية (= نهاية سابقتها) —
+          // أول آية تبدأ عند ٠ دائماً فلا مقبض لها.
+          const showStartHandle = v.idx > 0 && verseViews.length > 1;
           return (
-            <button
+            <div
               key={v.idx}
+              dir="ltr"
+              className={`absolute inset-y-1.5 z-10 min-w-0 ${
+                removed ? 'opacity-60' : ''
+              }`}
+              style={{ left: pct(startRatio), width: pct(w) }}
+            >
+            <button
               type="button"
               onClick={(e) => {
                 e.stopPropagation();
@@ -302,7 +412,7 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
                 removed ? ' — محذوفة' : ''
               }`}
               title={`الآية ${v.number}${removed ? ' (محذوفة)' : v.status === 'partial' ? ' (مقصوصة جزئياً)' : ''} · ${formatAudioTime(v.keptSec)}/${formatAudioTime(v.totalSec)}`}
-              className={`absolute inset-y-1.5 z-10 flex min-w-0 cursor-pointer flex-col justify-between overflow-hidden rounded-md border px-1.5 py-1 text-start transition-colors ${
+              className={`relative flex h-full min-w-0 cursor-pointer flex-col justify-between overflow-hidden rounded-md border px-1.5 py-1 text-start transition-colors ${
                 removed
                   ? 'border-dashed border-[var(--border-hairline)] bg-transparent'
                   : isActive
@@ -311,7 +421,6 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
                       ? 'border-[var(--brand-emerald)] bg-[var(--brand-emerald)]/15'
                       : 'border-[#B8962B]/70 bg-[#0F2A1E]/85 hover:bg-[#153324]/90'
               }`}
-              style={{ left: pct(startRatio), width: pct(w) }}
             >
               {/* صف الرقم + المدة */}
               <span className="flex w-full items-center gap-1 text-[9px] font-bold leading-none">
@@ -355,6 +464,33 @@ export function ProducerTimeline(props: ProducerTimelineProps) {
                 </span>
               )}
             </button>
+              {/* مقبض حدّ الآية (يسار المقطع): اسحبه لضبط بداية هذه الآية */}
+              {showStartHandle && (
+                <div
+                  role="separator"
+                  aria-orientation="vertical"
+                  aria-label={`حدّ بداية الآية ${v.number} — اسحب أو استخدم الأسهم لضبط الموضع`}
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'ArrowLeft') {
+                      e.preventDefault();
+                      onNudgeVerse(v.idx, -0.25);
+                    } else if (e.key === 'ArrowRight') {
+                      e.preventDefault();
+                      onNudgeVerse(v.idx, 0.25);
+                    }
+                  }}
+                  title={`اسحب لضبط موضع بداية الآية ${v.number} (أو أسهم لوحة المفاتيح)`}
+                  {...edgeHandleHandlers(v.idx)}
+                  className="group/handle absolute inset-y-0 left-0 z-20 flex w-2.5 -translate-x-1/2 cursor-ew-resize touch-none items-center justify-center"
+                >
+                  <span
+                    className="h-full w-[3px] rounded-full bg-[var(--brand-gold)]/60 transition-colors group-focus/handle:bg-[var(--brand-gold)] group-hover/handle:bg-[var(--brand-gold)] group-hover/handle:shadow-[0_0_8px_rgba(212,175,55,0.9)]"
+                    aria-hidden="true"
+                  />
+                </div>
+              )}
+            </div>
           );
         })}
 

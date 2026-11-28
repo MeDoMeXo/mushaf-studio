@@ -8,6 +8,7 @@
 import React, { useMemo, useRef } from 'react';
 import {
   AudioWaveform,
+  Clapperboard,
   Download,
   FileAudio,
   Loader2,
@@ -42,6 +43,8 @@ interface ProducerSourceBarProps {
   onFileUpload: (file: File) => void;
   onExportWav: () => void;
   onSendToStudio: () => void;
+  /** فتح حوار «إنتاج الفيديو الكامل» (صدى + خلفيات + تسليم). */
+  onOpenVideoStudio: () => void;
 }
 
 export function ProducerSourceBar({
@@ -68,6 +71,7 @@ export function ProducerSourceBar({
   onFileUpload,
   onExportWav,
   onSendToStudio,
+  onOpenVideoStudio,
 }: ProducerSourceBarProps) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const chapter = chapters.find((c) => c.id === surahId);
@@ -239,6 +243,16 @@ export function ProducerSourceBar({
             <Download className="h-3.5 w-3.5" aria-hidden="true" />
           )}
           <span className="hidden sm:inline">{rendering ? 'جارٍ الرندر…' : 'تصدير WAV'}</span>
+        </button>
+        <button
+          type="button"
+          onClick={onOpenVideoStudio}
+          disabled={!hasRenderable || rendering}
+          title="إنتاج الفيديو الكامل: صدى الصوت + خلفية متحركة ثم الرندر في الاستوديو"
+          className="inline-flex h-9 items-center gap-1.5 whitespace-nowrap rounded-lg border border-[#B8962B] bg-[#0F2A1E]/85 px-2.5 text-xs font-bold text-[#E6C75A] transition-colors hover:bg-[#153324] disabled:opacity-40"
+        >
+          <Clapperboard className="h-3.5 w-3.5" aria-hidden="true" />
+          <span className="hidden sm:inline">إنتاج الفيديو</span>
         </button>
         <button
           type="button"

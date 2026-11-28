@@ -5,11 +5,16 @@
  * لوحة داكنة تعرض الآية بالرسم العثماني بخط «أميري قرآن» + شارة السورة
  * والقارئ + نقاط الآيات، وأسفلها شريط النقل الكامل (تنقّل آيات، تشغيل،
  * سرعة، صوت، الوقت).
+ *
+ * وضع «الآية في سطر واحد»: نص الآية سطر واحد أفقي يتحرك أفقياً مع تقدّم
+ * التلاوة (verseProgress) فيتابع النص المكتوب الصوتَ كلمةً كلمة — كنمط
+ * كاريوكي المتاجر.
  */
-import React from 'react';
+import React, { useCallback, useEffect, useLayoutEffect, useRef } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
+  MoveHorizontal,
   Pause,
   Play,
   SkipBack,
@@ -43,6 +48,11 @@ interface ProducerPreviewPanelProps {
   onVolumeChange: (v: number) => void;
   onRateChange: (r: number) => void;
   onSelectVerse: (idx: number) => void;
+  // وضع «الآية في سطر واحد»
+  oneLine: boolean;
+  onToggleOneLine: (v: boolean) => void;
+  /** تقدّم التلاوة داخل الآية الجارية 0..1 — يحرّك النص في الواحد. */
+  verseProgress: number;
 }
 
 export function ProducerPreviewPanel({
@@ -66,6 +76,9 @@ export function ProducerPreviewPanel({
   onVolumeChange,
   onRateChange,
   onSelectVerse,
+  oneLine,
+  onToggleOneLine,
+  verseProgress,
 }: ProducerPreviewPanelProps) {
   const text = verseTexts && activeVerseIdx >= 0 ? verseTexts[activeVerseIdx] : null;
   const textSizeClass =
@@ -74,6 +87,45 @@ export function ProducerPreviewPanel({
       : text.length <= 90
         ? 'text-lg sm:text-2xl lg:text-3xl'
         : 'text-base sm:text-xl lg:text-2xl';
+
+  // ── قياس فيض السطر الواحد لتحريك النص مع الصوت ────────────────────
+  // بلا حالة: القياس في مرجع وكتابة transform مباشرة على العنصر — لا
+  // إعادة رندر لكل إطار، ولا setState داخل الآثار (react-hooks).
+  const lineViewportRef = useRef<HTMLDivElement | null>(null);
+  const lineTextRef = useRef<HTMLDivElement | null>(null);
+  const overflowPxRef = useRef(0);
+  const progressRef = useRef(0);
+
+  const applyPan = useCallback(() => {
+    const el = lineTextRef.current;
+    if (!el) return;
+    const x = progressRef.current * overflowPxRef.current;
+    el.style.transform = `translate(${x.toFixed(1)}px, -50%)`;
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!oneLine || !text) {
+      overflowPxRef.current = 0;
+      return;
+    }
+    const measure = () => {
+      const vp = lineViewportRef.current;
+      const el = lineTextRef.current;
+      if (!vp || !el) return;
+      overflowPxRef.current = Math.max(0, el.scrollWidth - vp.clientWidth);
+      applyPan();
+    };
+    measure();
+    const ro = new ResizeObserver(measure);
+    if (lineViewportRef.current) ro.observe(lineViewportRef.current);
+    return () => ro.disconnect();
+  }, [applyPan, oneLine, text]);
+
+  // الحركة مع تقدّم التلاوة — تحديث المرجع ثم كتابة الموضع مباشرة.
+  useEffect(() => {
+    progressRef.current = verseProgress;
+    applyPan();
+  }, [applyPan, verseProgress, text]);
 
   return (
     <section
@@ -111,10 +163,43 @@ export function ProducerPreviewPanel({
               {reciterName}
             </span>
           )}
+          {oneLine && text && (
+            <span className="rounded-full border border-[#D4AF37]/40 bg-[#D4AF37]/10 px-2 py-0.5 text-[9px] font-bold text-[#E6C75A]">
+              سطر واحد متتبِّع
+            </span>
+          )}
         </div>
 
-        {/* نص الآية الجارية */}
-        {text ? (
+        {/* نص الآية الجارية — سطر واحد يتحرك مع الصوت */}
+        {oneLine && text ? (
+          <div
+            ref={lineViewportRef}
+            className="relative z-10 w-full max-w-full overflow-hidden px-4"
+            aria-hidden={false}
+          >
+            {/* تلاشي حواف يلمّح باستمرار النص */}
+            <div
+              className="pointer-events-none absolute inset-y-0 left-0 z-10 w-10 bg-gradient-to-r from-[#081510] to-transparent"
+              aria-hidden="true"
+            />
+            <div
+              className="pointer-events-none absolute inset-y-0 right-0 z-10 w-10 bg-gradient-to-l from-[#081510] to-transparent"
+              aria-hidden="true"
+            />
+            <div
+              ref={lineTextRef}
+              dir="rtl"
+              className="font-quran absolute top-1/2 right-0 w-max min-h-[1.4em] whitespace-nowrap py-4 text-2xl leading-[2] text-[#F5EFDC] [text-shadow:0_2px_18px_rgba(212,175,55,0.35)] will-change-transform sm:text-3xl"
+              style={{ transform: 'translate(0px, -50%)' }}
+            >
+              {text}
+            </div>
+            {/* موضع الاحتياط لارتفاع السطر */}
+            <div className="font-quran invisible min-h-[2.8em] whitespace-nowrap text-2xl leading-[2] sm:text-3xl">
+              {text}
+            </div>
+          </div>
+        ) : text ? (
           <p
             className={`font-quran z-10 max-w-[42ch] leading-[2.2] ${textSizeClass} text-[#F5EFDC] [text-shadow:0_2px_18px_rgba(212,175,55,0.35)]`}
           >
@@ -228,8 +313,25 @@ export function ProducerPreviewPanel({
           </span>
         </div>
 
-        {/* السرعة والصوت */}
+        {/* السرعة والصوت ووضع السطر الواحد */}
         <div className="flex items-center gap-2">
+          {verseTexts && (
+            <button
+              type="button"
+              onClick={() => onToggleOneLine(!oneLine)}
+              aria-pressed={oneLine}
+              title="الآية في سطر واحد يتحرك مع التلاوة"
+              aria-label="وضع الآية في سطر واحد"
+              className={`flex h-8 items-center gap-1 rounded-lg border px-2 text-[10px] font-bold transition-colors ${
+                oneLine
+                  ? 'border-[var(--brand-gold)] bg-[var(--brand-gold)]/15 text-[var(--ink-primary)]'
+                  : 'border-[var(--border-hairline)] bg-[var(--surface-card)] text-[var(--ink-muted)] hover:border-[var(--brand-gold)] hover:text-[var(--ink-primary)]'
+              }`}
+            >
+              <MoveHorizontal className="h-3.5 w-3.5" aria-hidden="true" />
+              سطر واحد
+            </button>
+          )}
           <div role="group" aria-label="سرعة التشغيل" className="flex items-center gap-0.5 rounded-lg bg-[var(--surface-card)] p-0.5">
             {RATES.map((r) => (
               <button

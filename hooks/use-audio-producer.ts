@@ -2,19 +2,19 @@
 
 /**
  * useAudioProducer — عقل صفحة «منتج الصوت»: تحميل المصدر (آيات قارئ أو
- * ملف)، نموذج التحرير غير المدمّر مع تراجع/إعادة، كشف السكوت وقصّه،
- * التصدير WAV والتسليم إلى الاستوديو.
+ * ملف)، نموذج التحرير غير المدمّر مع تراجع/إعادة (بلقطات تشمل تحرير
+ * مقاطع الصوت **وحدود الآيات** معاً)، كشف السكوت وقصّه، تحرير موضع الآيات
+ * (حدودها بالسحب أو الإزاحة)، حالة صدى الصوت، والتصدير/التسليم.
  *
  * كل الحسابات الثقيلة في lib/audio-producer/* (نقية قابلة للاختبار)،
- * ومحرّك التشغيل/البحث في hooks/use-audio-producer-playback.ts — هذا
- * الخطاف يربطها بالدورة التفاعلية فقط.
+ * محرّك التشغيل في hooks/use-audio-producer-playback.ts، إطار العرض في
+ * use-producer-view.ts، والتصدير في use-producer-export.ts — هذا الخطاف
+ * يربطها بالدورة التفاعلية فقط.
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { QulVerse } from '@/lib/quran-data';
 import {
   computePeakLevels,
-  downloadBlob,
-  encodeWav16bit,
   loadSourceFromFile,
   loadSourceFromVerses,
   type ProducerSource,
@@ -24,7 +24,6 @@ import {
   findSilenceSpans,
   keptRatio,
   mapEditedToSourceSec,
-  mapSourceMarkersToEdited,
   removeRange,
   resetEdits,
   setMasterGainDb as setMasterGainDbOp,
@@ -39,13 +38,19 @@ import {
   type TimeSpan,
 } from '@/lib/audio-producer/audio-producer-edit';
 import {
-  buildProducerFilename,
-  setProducerHandoff,
-} from '@/lib/audio-producer/producer-handoff';
+  clampEchoSettings,
+  DEFAULT_ECHO,
+  type ProducerEchoSettings,
+} from '@/lib/audio-producer/producer-echo';
+import {
+  moveVerseMarker,
+  nudgeVerseMarker as nudgeMarkerOp,
+} from '@/lib/audio-producer/verse-markers';
 import { useProducerPlayback } from './use-audio-producer-playback';
+import { useProducerView } from './use-producer-view';
+import { useProducerExport } from './use-producer-export';
 
 const HISTORY_LIMIT = 40;
-const ZOOM_FACTOR = 0.6;
 
 export interface ProducerLoadState {
   status: 'idle' | 'loading' | 'ready' | 'error';
@@ -59,6 +64,15 @@ export interface SilenceOptions {
   minSilenceSec: number;
 }
 
+/**
+ * لقطة تراجع واحدة: حالة التحرير + حدود الآيات قبل التغيير. null في
+ * verseMarkers يعني «هذا التغيير لم يمسّ الحدود» فتُترك الحدود الحالية.
+ */
+interface ProducerSnapshot {
+  edit: ProducerEditState;
+  verseMarkers: number[] | null;
+}
+
 export function useAudioProducer(options: { showToast: (msg: string) => void }) {
   const { showToast } = options;
 
@@ -69,24 +83,22 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     total: 0,
   });
   const [edit, setEdit] = useState<ProducerEditState | null>(null);
-  const [undoStack, setUndoStack] = useState<ProducerEditState[]>([]);
-  const [redoStack, setRedoStack] = useState<ProducerEditState[]>([]);
-
-  const [selection, setSelection] = useState<TimeSpan | null>(null);
-  const [view, setView] = useState<{ startSec: number; durSec: number }>({
-    startSec: 0,
-    durSec: 1,
+  const [history, setHistory] = useState<{ undo: ProducerSnapshot[]; redo: ProducerSnapshot[] }>({
+    undo: [],
+    redo: [],
   });
+  const [selection, setSelection] = useState<TimeSpan | null>(null);
   const [silences, setSilences] = useState<TimeSpan[]>([]);
   const [silenceOpts, setSilenceOpts] = useState<SilenceOptions>({
     thresholdRatio: 0.06,
     minSilenceSec: 0.4,
   });
-
-  const [rendering, setRendering] = useState(false);
+  const [echo, setEchoState] = useState<ProducerEchoSettings>(DEFAULT_ECHO);
 
   const sourceRef = useRef<ProducerSource | null>(null);
   const editRef = useRef<ProducerEditState | null>(null);
+  const echoRef = useRef<ProducerEchoSettings | null>(null);
+  const historyRef = useRef(history);
   const loadAbortRef = useRef<AbortController | null>(null);
   const peakLevelsRef = useRef<{ peakLevels: number[]; windowSec: number } | null>(null);
 
@@ -96,52 +108,145 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
   useEffect(() => {
     editRef.current = edit;
   }, [edit]);
+  useEffect(() => {
+    echoRef.current = echo;
+  }, [echo]);
+  useEffect(() => {
+    historyRef.current = history;
+  }, [history]);
 
-  // ── محرّك التشغيل (رندر + نقل + بحث) ──────────────────────────────
-  const playback = useProducerPlayback({ sourceRef, editRef, showToast });
+  // ── محرّك التشغيل (رندر + نقل + بحث) وإطار العرض والتصدير ─────────
+  const playback = useProducerPlayback({ sourceRef, editRef, echoRef, showToast });
   const { invalidateRender, resetEngine, stopAndReset, ensureRendered } = playback;
+  const viewCtl = useProducerView(sourceRef);
+  const exporter = useProducerExport({ sourceRef, editRef, echoRef, ensureRendered, showToast });
 
-  // ── تحرير: تقديم + تراجع/إعادة ────────────────────────────────────
+  // ── التحرير: تقديم + تراجع/إعادة ────────────────────────────────────
+  /** يلتقط لقطة للحالة الحالية (التحرير والحدود معاً) قبل أي تغيير. */
+  const pushUndoSnapshot = useCallback(
+    (verseMarkers: number[] | null) => {
+      const st = editRef.current;
+      const src = sourceRef.current;
+      if (!st || !src) return;
+      setHistory((h) => ({
+        undo: [...h.undo.slice(-HISTORY_LIMIT + 1), { edit: st, verseMarkers }],
+        redo: [],
+      }));
+    },
+    []
+  );
+
   const applyEdit = useCallback(
     (updater: (prev: ProducerEditState) => ProducerEditState) => {
-      setEdit((prev) => {
-        if (!prev) return prev;
-        const next = updater(prev);
-        if (next === prev) return prev;
-        setUndoStack((stack) => [...stack.slice(-HISTORY_LIMIT + 1), prev]);
-        setRedoStack([]);
-        invalidateRender();
-        return next;
-      });
+      const prev = editRef.current;
+      if (!prev) return;
+      const next = updater(prev);
+      if (next === prev) return;
+      pushUndoSnapshot(null);
+      invalidateRender();
+      setEdit(next);
     },
-    [invalidateRender]
+    [invalidateRender, pushUndoSnapshot]
   );
 
   const undo = useCallback(() => {
-    setUndoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const prev = stack[stack.length - 1];
-      setEdit((cur) => {
-        if (cur) setRedoStack((redo) => [...redo, cur]);
-        return prev;
-      });
-      invalidateRender();
-      return stack.slice(0, -1);
-    });
+    const h = historyRef.current;
+    if (h.undo.length === 0) return;
+    const snap = h.undo[h.undo.length - 1];
+    const cur = editRef.current;
+    const src = sourceRef.current;
+    if (!cur || !src) return;
+    // لقطة الإعادة تحفظ الحدود الحالية إن كانت ستتغير بهذا التراجع.
+    const markersToRestore = snap.verseMarkers;
+    const redoSnap: ProducerSnapshot = {
+      edit: cur,
+      verseMarkers: markersToRestore !== null ? src.verseMarkersSec : null,
+    };
+    setEdit(snap.edit);
+    if (markersToRestore !== null) {
+      setSource((p) => (p ? { ...p, verseMarkersSec: markersToRestore } : p));
+    }
+    setHistory((hh) => ({ undo: hh.undo.slice(0, -1), redo: [...hh.redo, redoSnap] }));
+    invalidateRender();
   }, [invalidateRender]);
 
   const redo = useCallback(() => {
-    setRedoStack((stack) => {
-      if (stack.length === 0) return stack;
-      const next = stack[stack.length - 1];
-      setEdit((cur) => {
-        if (cur) setUndoStack((undo) => [...undo, cur]);
-        return next;
-      });
-      invalidateRender();
-      return stack.slice(0, -1);
-    });
+    const h = historyRef.current;
+    if (h.redo.length === 0) return;
+    const snap = h.redo[h.redo.length - 1];
+    const cur = editRef.current;
+    const src = sourceRef.current;
+    if (!cur || !src) return;
+    const markersToRestore = snap.verseMarkers;
+    const undoSnap: ProducerSnapshot = {
+      edit: cur,
+      verseMarkers: markersToRestore !== null ? src.verseMarkersSec : null,
+    };
+    setEdit(snap.edit);
+    if (markersToRestore !== null) {
+      setSource((p) => (p ? { ...p, verseMarkersSec: markersToRestore } : p));
+    }
+    setHistory((hh) => ({ undo: [...hh.undo, undoSnap], redo: hh.redo.slice(0, -1) }));
+    invalidateRender();
   }, [invalidateRender]);
+
+  // ── تحرير موضع الآيات (حدودها الزمنية) ─────────────────────────────
+  /** نقل بداية آية إلى زمن مطلق — بتراجع كامل وبإشعار. */
+  const setVerseMarker = useCallback(
+    (idx: number, sec: number) => {
+      const src = sourceRef.current;
+      if (!src) return false;
+      const next = moveVerseMarker(src.verseMarkersSec, src.durationSec, idx, sec);
+      if (!next) return false;
+      pushUndoSnapshot(src.verseMarkersSec);
+      setSource((p) => (p ? { ...p, verseMarkersSec: next } : p));
+      showToast(`ضُبط موضع الآية ${src.verseNumbers[idx] ?? idx + 1}`);
+      return true;
+    },
+    [pushUndoSnapshot, showToast]
+  );
+
+  /** إزاحة بداية آية بمقدار ±ثوانٍ (أزرار الموضع في الخط الزمني). */
+  const nudgeVerse = useCallback(
+    (idx: number, deltaSec: number) => {
+      const src = sourceRef.current;
+      if (!src) return null;
+      const next = nudgeMarkerOp(src.verseMarkersSec, src.durationSec, idx, deltaSec);
+      if (!next) return null;
+      pushUndoSnapshot(src.verseMarkersSec);
+      setSource((p) => (p ? { ...p, verseMarkersSec: next } : p));
+      return next[idx];
+    },
+    [pushUndoSnapshot]
+  );
+
+  /**
+   * سحب حدّ آية على الخط الزمني: لقطة واحدة عند البدء ثم معاينة حية بلا
+   * لقطات — فيبقى التراجع نقطة واحدة للسحب كله.
+   */
+  const beginVerseMarkerDrag = useCallback(() => {
+    const src = sourceRef.current;
+    if (src) pushUndoSnapshot(src.verseMarkersSec);
+  }, [pushUndoSnapshot]);
+
+  /** معاينة نقل حدّ آية أثناء السحب (بلا تراجع ولا إشعارات). */
+  const previewVerseMarker = useCallback((idx: number, sec: number) => {
+    const src = sourceRef.current;
+    if (!src) return;
+    const next = moveVerseMarker(src.verseMarkersSec, src.durationSec, idx, sec);
+    if (!next) return;
+    setSource((p) => (p ? { ...p, verseMarkersSec: next } : p));
+  }, []);
+
+  // ── صدى الصوت ──────────────────────────────────────────────────────
+  /** يقيّد دائماً — لا تصل قيم خارج المدى إلى المحرّك أبداً. */
+  const setEcho = useCallback(
+    (next: Partial<ProducerEchoSettings>) => {
+      setEchoState((prev) => clampEchoSettings({ ...prev, ...next }));
+      invalidateRender();
+    },
+    [invalidateRender]
+  );
 
   // ── تحميل المصدر ───────────────────────────────────────────────────
   const resetProducerState = useCallback(() => {
@@ -149,8 +254,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     setSelection(null);
     setSilences([]);
     peakLevelsRef.current = null;
-    setUndoStack([]);
-    setRedoStack([]);
+    setHistory({ undo: [], redo: [] });
   }, [resetEngine]);
 
   const loadVerses = useCallback(
@@ -171,8 +275,12 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         if (controller.signal.aborted) return;
         setSource(outcome.source);
         setEdit(createInitialEditState(outcome.source.durationSec));
-        setView({ startSec: 0, durSec: Math.max(1, outcome.source.durationSec) });
-        setLoadState({ status: 'ready', done: outcome.source.verseNumbers.length, total: outcome.source.verseNumbers.length });
+        viewCtl.fitToSource();
+        setLoadState({
+          status: 'ready',
+          done: outcome.source.verseNumbers.length,
+          total: outcome.source.verseNumbers.length,
+        });
         if (outcome.failedVerses.length > 0) {
           showToast(`تم التحميل مع تخطّي ${outcome.failedVerses.length} آية تعذّر جلبها`);
         } else {
@@ -190,7 +298,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         showToast(message);
       }
     },
-    [resetProducerState, showToast]
+    [resetProducerState, showToast, viewCtl]
   );
 
   const loadFile = useCallback(
@@ -201,7 +309,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         const src = await loadSourceFromFile(file);
         setSource(src);
         setEdit(createInitialEditState(src.durationSec));
-        setView({ startSec: 0, durSec: Math.max(1, src.durationSec) });
+        viewCtl.fitToSource();
         setLoadState({ status: 'ready', done: 1, total: 1 });
         showToast(`تم تحميل الملف: ${file.name}`);
       } catch (err) {
@@ -210,7 +318,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
         showToast(message);
       }
     },
-    [resetProducerState, showToast]
+    [resetProducerState, showToast, viewCtl]
   );
 
   const clearSource = useCallback(() => {
@@ -275,7 +383,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     [silenceOpts, showToast]
   );
 
-  // ── عمليات التحرير ────────────────────────────────────────────────
+  // ── عمليات التحرير (مقاطع الصوت) ───────────────────────────────────
   const cutSelection = useCallback(() => {
     const st = editRef.current;
     if (!st || !selection) return false;
@@ -355,7 +463,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     [applyEdit]
   );
 
-  // ── السكوت ────────────────────────────────────────────────────────
+  // ── السكوت ──────────────────────────────────────────────────────────
   const detectSilences = useCallback(() => {
     const src = sourceRef.current;
     if (!src) return 0;
@@ -383,105 +491,7 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     showToast('قُصّت فترات السكوت من المقطع');
   }, [applyEdit, silences, showToast, stopAndReset]);
 
-  // ── العرض/التقريب ─────────────────────────────────────────────────
-  const zoomBy = useCallback(
-    (factor: number, anchorRatio = 0.5) => {
-      const src = sourceRef.current;
-      if (!src) return;
-      setView((prev) => {
-        const nextDur = Math.max(1, Math.min(src.durationSec, prev.durSec * factor));
-        const anchor = prev.startSec + prev.durSec * anchorRatio;
-        const start = Math.max(0, Math.min(Math.max(0, src.durationSec - nextDur), anchor - nextDur * anchorRatio));
-        return { startSec: start, durSec: nextDur };
-      });
-    },
-    []
-  );
-
-  const zoomIn = useCallback(() => zoomBy(ZOOM_FACTOR), [zoomBy]);
-  const zoomOut = useCallback(() => zoomBy(1 / ZOOM_FACTOR), [zoomBy]);
-  const zoomFit = useCallback(() => {
-    const src = sourceRef.current;
-    if (!src) return;
-    setView({ startSec: 0, durSec: Math.max(1, src.durationSec) });
-  }, []);
-
-  const scrollBySec = useCallback((deltaSec: number) => {
-    setView((prev) => ({
-      startSec: Math.max(0, prev.startSec + deltaSec),
-      durSec: prev.durSec,
-    }));
-  }, []);
-
-  /** تقريب على نقطة مرساة (نسبة أفقية من العرض الحالي) — لعجلة ctrl+wheel. */
-  const zoomAt = useCallback(
-    (anchorRatio: number, factor: number) => zoomBy(factor, anchorRatio),
-    [zoomBy]
-  );
-
-  // ── التصدير والتسليم ──────────────────────────────────────────────
-  const buildExportFile = useCallback(async (): Promise<File | null> => {
-    const src = sourceRef.current;
-    const st = editRef.current;
-    if (!src || !st) {
-      showToast('حمّل مصدراً أولاً');
-      return null;
-    }
-    const total = totalKeptSec(st);
-    if (total <= 0) {
-      showToast('لا يوجد صوت محفوظ — المقطع مقصوص بالكامل');
-      return null;
-    }
-    setRendering(true);
-    try {
-      const buffer = await ensureRendered();
-      if (!buffer) {
-        showToast('تعذّر رندر المقطع');
-        return null;
-      }
-      const blob = encodeWav16bit(buffer);
-      const name = buildProducerFilename(src.label);
-      return new File([blob], name, { type: 'audio/wav' });
-    } finally {
-      setRendering(false);
-    }
-  }, [ensureRendered, showToast]);
-
-  const exportWav = useCallback(async () => {
-    const file = await buildExportFile();
-    if (!file) return;
-    downloadBlob(file, file.name);
-    showToast(`تم تصدير المقطع المحرَّر: ${file.name}`);
-  }, [buildExportFile, showToast]);
-
-  const sendToStudio = useCallback(
-    async (range?: { surahId: number; fromAyah: number; toAyah: number }): Promise<boolean> => {
-      const file = await buildExportFile();
-      if (!file) return false;
-      const src = sourceRef.current;
-      const st = editRef.current;
-      if (!src || !st) return false;
-      setProducerHandoff({
-        file,
-        label: `${src.label} — مُنتَج المحرر`,
-        verseBoundsSec: mapSourceMarkersToEdited(st, src.verseMarkersSec),
-        verseNumbers: src.verseNumbers,
-        surahId: range?.surahId ?? 1,
-        fromAyah: range?.fromAyah ?? 1,
-        toAyah:
-          range?.toAyah ??
-          (src.verseNumbers.length > 0
-            ? Math.max(...src.verseNumbers)
-            : src.verseMarkersSec.length),
-        createdAt: Date.now(),
-      });
-      showToast('جارٍ فتح الاستوديو مع المقطع المحرَّر…');
-      return true;
-    },
-    [buildExportFile, showToast]
-  );
-
-  // ── مشتقّات جاهزة للعرض ───────────────────────────────────────────
+  // ── مشتقّات جاهزة للعرض ────────────────────────────────────────────
   const playheadSourceSec = useMemo(() => {
     if (!edit) return 0;
     return mapEditedToSourceSec(edit, playback.playheadEditedSec);
@@ -515,8 +525,8 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     applyEdit,
     undo,
     redo,
-    canUndo: undoStack.length > 0,
-    canRedo: redoStack.length > 0,
+    canUndo: history.undo.length > 0,
+    canRedo: history.redo.length > 0,
     cutSelection,
     splitAtPlayhead,
     trimBeforePlayhead,
@@ -527,23 +537,31 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     setNormalizeOn,
     setClipGain,
     setClipFades,
+    // موضع الآيات
+    setVerseMarker,
+    nudgeVerse,
+    beginVerseMarkerDrag,
+    previewVerseMarker,
+    // صدى الصوت
+    echo,
+    setEcho,
     // السكوت
     silences,
     silenceOpts,
     setSilenceOpts,
     detectSilences,
     removeSilences,
-    // التحديد والعرض
+    // التحديد والعرض (use-producer-view)
     selection,
     setSelection,
     clearSelection: () => setSelection(null),
-    view,
-    zoomIn,
-    zoomOut,
-    zoomFit,
-    zoomAt,
-    scrollBySec,
-    setView,
+    view: viewCtl.view,
+    setView: viewCtl.setView,
+    zoomIn: viewCtl.zoomIn,
+    zoomOut: viewCtl.zoomOut,
+    zoomFit: viewCtl.zoomFit,
+    zoomAt: viewCtl.zoomAt,
+    scrollBySec: viewCtl.scrollBySec,
     // التشغيل (من محرّك useProducerPlayback)
     isPlaying: playback.isPlaying,
     playheadEditedSec: playback.playheadEditedSec,
@@ -562,10 +580,10 @@ export function useAudioProducer(options: { showToast: (msg: string) => void }) 
     setVolume: playback.setVolume,
     rate: playback.rate,
     setRate: playback.setRate,
-    // التصدير
-    rendering,
-    exportWav,
-    sendToStudio,
+    // التصدير والتسليم (use-producer-export)
+    rendering: exporter.rendering,
+    exportWav: exporter.exportWav,
+    sendToStudio: exporter.sendToStudio,
   };
 }
 

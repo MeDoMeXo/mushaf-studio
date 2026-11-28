@@ -22,6 +22,11 @@ import {
   type ProducerEditState,
   type TimeSpan,
 } from './audio-producer-edit';
+import {
+  echoTailSec,
+  isEchoAudible,
+  type ProducerEchoSettings,
+} from './producer-echo';
 
 /** سقف عدد الآيات المدمجة (حماية ذاكرة — ~٥٠ دقيقة كحد أقصى عملي). */
 export const MAX_PRODUCER_VERSES = 200;
@@ -292,10 +297,15 @@ function maxKeptPeak(source: ProducerSource, state: ProducerEditState): number {
 /**
  * رندر حالة التحرير إلى AudioBuffer نهائي (الخط المحرَّر): جدولة كل مقطع
  * محفوظ بمكسبه وتلاشياته على OfflineAudioContext — نسخ عينات سريع.
+ *
+ * عند تفعيل الصدى (echo) تُبنى سلسلة «الصندوق»: كل المقاطع تصب في ناقل
+ * واحد يُوزَّع على مسار جاف مباشر + مسار رطب عبر تأخير بتغذية راجعة —
+ * فيُرنَد المحتوى بذيله الصدوي كاملاً (تُمدّ المدة بذيل الصدى المحسوب).
  */
 export async function renderEdited(
   source: ProducerSource,
-  state: ProducerEditState
+  state: ProducerEditState,
+  echo?: ProducerEchoSettings | null
 ): Promise<AudioBuffer> {
   const totalSec = totalKeptSec(state);
   if (totalSec <= 0) {
@@ -311,7 +321,9 @@ export async function renderEdited(
 
   const sr = source.sampleRate;
   const channels = source.buffer.numberOfChannels;
-  const ctx = new OfflineCtor(channels, Math.ceil(totalSec * sr) + 1, sr);
+  const echoOn = isEchoAudible(echo ?? null);
+  const tailSec = echoOn && echo ? echoTailSec(echo) : 0;
+  const ctx = new OfflineCtor(channels, Math.ceil((totalSec + tailSec) * sr) + 1, sr);
 
   let normalizeLin = 1;
   if (state.normalize) {
@@ -319,6 +331,32 @@ export async function renderEdited(
     if (peak > 0.0001) normalizeLin = Math.min(8, 0.95 / peak);
   }
   const masterLin = dbToLinear(state.masterGainDb) * normalizeLin;
+
+  // ناقل مشترك: بلا صدى يتصل مباشرة بالخرج (مسار مستقيم بلا أي عقدة
+  // إضافية — ناتج مطابق للرندر السابق بتاً)، وبالصدى يغذي مساري الجاف
+  // والرطب معاً.
+  const bus = ctx.createGain();
+  if (echoOn && echo) {
+    const dry = ctx.createGain();
+    dry.gain.value = 1;
+    bus.connect(dry);
+    dry.connect(ctx.destination);
+
+    const delay = ctx.createDelay(2);
+    delay.delayTime.value = echo.delaySec;
+    const wet = ctx.createGain();
+    wet.gain.value = echo.wet;
+    const fb = ctx.createGain();
+    fb.gain.value = echo.feedback;
+    bus.connect(delay);
+    delay.connect(wet);
+    wet.connect(ctx.destination);
+    // التغذية الراجعة: خرج التأخير يعود إلى دخوله فيخفت التكرار بعد التكرار.
+    delay.connect(fb);
+    fb.connect(delay);
+  } else {
+    bus.connect(ctx.destination);
+  }
 
   let cursor = 0;
   for (const it of state.intervals) {
@@ -345,7 +383,7 @@ export async function renderEdited(
     }
 
     node.connect(gain);
-    gain.connect(ctx.destination);
+    gain.connect(bus);
     node.start(when, it.startSec, durSec);
     cursor += durSec;
   }

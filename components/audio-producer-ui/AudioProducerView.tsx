@@ -3,11 +3,13 @@
 /**
  * AudioProducerView — صفحة «منتج الصوت» (مسار /audio-producer) بتخطيط
  * محرر فيديو احترافي (NLE) وفق المراجع:
- * - المنطقة العلوية: مكتبة الآيات المجلوبة من الموقع (بطاقات قابلة
- *   للتحديد والحذف) | معاينة الآية الجارية بالرسم العثماني + النقل.
+ * - المنطقة العلوية: مكتبة الآيات (عمود قابل للتوسيع بالمقبض/الطيّ) |
+ *   معاينة الآية الجارية (بوضع «سطر واحد يتبع الصوت») + النقل.
  * - المنطقة السفلية: الخط الزمني — شريط أدوات (فصل/حذف/قصّ/تراجع/
- *   تطبيع/تقريب) + مسار مقاطع الآيات (كل آية مقطع مستقل) + مسار
- *   الموجة الكامل + مفتش المقاطع العائم.
+ *   تطبيع/تقريب/موضع الآية) + مسار مقاطع الآيات بحدود تُسحب بالماوس +
+ *   مسار الموجة + مفتش المقاطع.
+ * - حوار «إنتاج الفيديو الكامل»: صدى الصوت + خلفية من المكتبة ثم
+ *   الرندر والتسليم إلى الاستوديو للإنتاج الكامل.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -17,15 +19,21 @@ import { fetchChapterVerses, fetchChapters } from '@/lib/qul-client';
 import { RECITERS, type QulChapter, type QulVerse } from '@/lib/quran-data';
 import { getStudioActiveReciters } from '@/lib/reciter-filter';
 import { toArabicDigits } from '@/lib/quran-utils';
+import { mapSourceToEditedSec } from '@/lib/audio-producer/audio-producer-edit';
 import { buildVerseViews } from '@/lib/audio-producer/verse-views';
 import { useAudioProducer } from '@/hooks/use-audio-producer';
 import { ProducerSourceBar, ProducerEmptyState } from './ProducerSourceBar';
 import { ProducerVerseLibrary } from './ProducerVerseLibrary';
+import { ProducerLibraryPane } from './ProducerLibraryPane';
 import { ProducerPreviewPanel } from './ProducerPreviewPanel';
 import { ProducerTimeline } from './ProducerTimeline';
+import { ProducerVideoStudioDialog } from './ProducerVideoStudioDialog';
 
 const DEFAULT_FROM = 1;
 const DEFAULT_TO = 7;
+const LIB_W_KEY = 'mushaf-producer-lib-width';
+const LIB_COLLAPSED_KEY = 'mushaf-producer-lib-collapsed';
+const ONE_LINE_KEY = 'mushaf-producer-one-line';
 
 export function AudioProducerView() {
   const router = useRouter();
@@ -41,6 +49,11 @@ export function AudioProducerView() {
   const [boundaryCount, setBoundaryCount] = useState(7);
   const [sending, setSending] = useState(false);
   const [selectedVerseIdx, setSelectedVerseIdx] = useState<number | null>(null);
+  // تفضيلات محلية: توسيع المكتبة + وضع السطر الواحد
+  const [libraryWidth, setLibraryWidth] = useState(300);
+  const [libraryCollapsed, setLibraryCollapsed] = useState(false);
+  const [oneLine, setOneLine] = useState(false);
+  const [videoStudioOpen, setVideoStudioOpen] = useState(false);
 
   const producer = useAudioProducer({ showToast });
   const {
@@ -90,6 +103,52 @@ export function AudioProducerView() {
   }, [surahId]);
 
   const versesCount = verses.length || 7;
+
+  // ── استرجاع/حفظ التفضيلات المحلية (عرض المكتبة، طيّها، سطر واحد) ──
+  // الاسترجاع داخل مهمة كلية مؤجلة — نمط المشروع نفسه (set-state-in-effect).
+  useEffect(() => {
+    const tid = setTimeout(() => {
+      try {
+        const w = Number(window.localStorage.getItem(LIB_W_KEY));
+        if (w >= 240 && w <= 560) setLibraryWidth(w);
+        setLibraryCollapsed(window.localStorage.getItem(LIB_COLLAPSED_KEY) === '1');
+        setOneLine(window.localStorage.getItem(ONE_LINE_KEY) === '1');
+      } catch {
+        // وضع خاص/امتلاء — القيم الافتراضية تكفي
+      }
+    }, 0);
+    return () => clearTimeout(tid);
+  }, []);
+
+  const handleLibraryWidthChange = useCallback((w: number) => {
+    setLibraryWidth(w);
+    try {
+      window.localStorage.setItem(LIB_W_KEY, String(w));
+    } catch {
+      // تجاهل
+    }
+  }, []);
+
+  const handleToggleLibraryCollapsed = useCallback(() => {
+    setLibraryCollapsed((c) => {
+      const next = !c;
+      try {
+        window.localStorage.setItem(LIB_COLLAPSED_KEY, next ? '1' : '0');
+      } catch {
+        // تجاهل
+      }
+      return next;
+    });
+  }, []);
+
+  const handleToggleOneLine = useCallback((v: boolean) => {
+    setOneLine(v);
+    try {
+      window.localStorage.setItem(ONE_LINE_KEY, v ? '1' : '0');
+    } catch {
+      // تجاهل
+    }
+  }, []);
   // اختيار الآيات بفهرسة الشرائح — النمط نفسه المستخدم في الاستوديو
   // (بعض استجابات API بلا verse_number، والفهرسة دائماً متاحة).
   const selectedVerses = useMemo(() => {
@@ -203,7 +262,7 @@ export function AudioProducerView() {
   const handleSendToStudio = useCallback(async () => {
     setSending(true);
     try {
-      const ok = await producer.sendToStudio({ surahId, fromAyah, toAyah });
+      const ok = await producer.sendToStudio({ range: { surahId, fromAyah, toAyah } });
       if (ok) {
         router.push('/studio');
       }
@@ -211,6 +270,36 @@ export function AudioProducerView() {
       setSending(false);
     }
   }, [producer, router, surahId, fromAyah, toAyah]);
+
+  /** إنتاج الفيديو الكامل: رندر بالصدى + تسليم مع الخلفية المختارة. */
+  const handleProduceVideo = useCallback(
+    async (bgLibraryId: string | null) => {
+      setSending(true);
+      try {
+        const ok = await producer.sendToStudio({
+          range: { surahId, fromAyah, toAyah },
+          bgLibraryId,
+        });
+        if (ok) {
+          setVideoStudioOpen(false);
+          router.push('/studio');
+        }
+      } finally {
+        setSending(false);
+      }
+    },
+    [producer, router, surahId, fromAyah, toAyah]
+  );
+
+  /** إزاحة بداية آية (أزرار الموضع) مع إشعار موجز. */
+  const handleNudgeVerse = useCallback(
+    (idx: number, deltaSec: number) => {
+      if (idx <= 0) return;
+      const v = producer.nudgeVerse(idx, deltaSec);
+      if (v != null) showToast(`موضع بداية الآية: ${v.toFixed(2)}ث`);
+    },
+    [producer, showToast]
+  );
 
   /** اختيار آية (من المكتبة أو من مسار المقاطع): تحديد + قفز. */
   const handleSelectVerse = useCallback(
@@ -242,6 +331,20 @@ export function AudioProducerView() {
     const hit = edit.intervals.find((it) => t >= it.startSec && t < it.endSec);
     return hit?.id ?? null;
   }, [source, edit, producer.playheadSourceSec]);
+
+  /** تقدّم التلاوة داخل الآية الجارية (٠..١) لتحريك سطر الآية مع الصوت. */
+  const verseProgress = useMemo(() => {
+    if (!source || !edit || producer.activeVerseIdx < 0) return 0;
+    const i = producer.activeVerseIdx;
+    const start = mapSourceToEditedSec(edit, source.verseMarkersSec[i]);
+    const endSec =
+      i + 1 < source.verseMarkersSec.length
+        ? source.verseMarkersSec[i + 1]
+        : source.durationSec;
+    const end = mapSourceToEditedSec(edit, endSec);
+    if (end <= start) return 1;
+    return Math.max(0, Math.min(1, (producer.playheadEditedSec - start) / (end - start)));
+  }, [source, edit, producer.activeVerseIdx, producer.playheadEditedSec]);
 
   const currentChapter = chapters.find((c) => c.id === surahId) ?? null;
   const displayedReciterName = !isFileMode
@@ -277,13 +380,20 @@ export function AudioProducerView() {
         onFileUpload={(file) => void loadFile(file)}
         onExportWav={() => void producer.exportWav()}
         onSendToStudio={() => void handleSendToStudio()}
+        onOpenVideoStudio={() => setVideoStudioOpen(true)}
       />
 
       {hasSource && source && edit ? (
         <div className="mt-3 flex min-h-0 flex-1 flex-col gap-3 xl:overflow-hidden">
-          {/* ── المنطقة العلوية: المكتبة | المعاينة ─────────────────── */}
-          <div className="grid min-h-0 grid-cols-1 gap-3 md:grid-cols-2 xl:min-h-0 xl:flex-1 xl:grid-cols-[300px_minmax(0,1fr)] 2xl:grid-cols-[340px_minmax(0,1fr)]">
-            <ProducerVerseLibrary
+          {/* ── المنطقة العلوية: المكتبة (قابلة للتوسيع) | المعاينة ── */}
+          <div className="flex min-h-0 flex-col md:flex-row md:gap-2 xl:min-h-0 xl:flex-1">
+            <ProducerLibraryPane
+              width={libraryWidth}
+              onWidthChange={handleLibraryWidthChange}
+              collapsed={libraryCollapsed}
+              onToggleCollapsed={handleToggleLibraryCollapsed}
+            >
+              <ProducerVerseLibrary
               verseViews={verseViews}
               verseTexts={verseTexts}
               activeVerseIdx={producer.activeVerseIdx}
@@ -306,37 +416,43 @@ export function AudioProducerView() {
               onSelectVerse={handleSelectVerse}
               onRemoveVerse={producer.removeVerse}
             />
-            <ProducerPreviewPanel
-              verseTexts={verseTexts}
-              surahName={currentChapter?.name_arabic ?? null}
-              reciterName={displayedReciterName}
-              sourceLabel={source.label}
-              activeVerseIdx={producer.activeVerseIdx}
-              verseCount={source.verseMarkersSec.length}
-              activeVerseNumber={
-                source.verseNumbers[producer.activeVerseIdx] ?? null
-              }
-              isPlaying={producer.isPlaying}
-              playheadEditedSec={producer.playheadEditedSec}
-              editedTotalSec={producer.editedTotalSec}
-              keptPct={producer.keptPct}
-              volume={producer.volume}
-              rate={producer.rate}
-              onTogglePlay={producer.togglePlay}
-              onSeekToEdge={producer.seekToEdge}
-              onPrevVerse={() =>
-                producer.seekToVerse(Math.max(0, producer.activeVerseIdx - 1))}
-              onNextVerse={() =>
-                producer.seekToVerse(
-                  Math.min(
-                    Math.max(0, source.verseMarkersSec.length - 1),
-                    producer.activeVerseIdx + 1
-                  )
-                )}
-              onVolumeChange={producer.setVolume}
-              onRateChange={producer.setRate}
-              onSelectVerse={handleSelectVerse}
-            />
+            </ProducerLibraryPane>
+            <div className="mt-3 flex min-h-0 flex-1 flex-col md:mt-0 md:min-w-0">
+              <ProducerPreviewPanel
+                verseTexts={verseTexts}
+                surahName={currentChapter?.name_arabic ?? null}
+                reciterName={displayedReciterName}
+                sourceLabel={source.label}
+                activeVerseIdx={producer.activeVerseIdx}
+                verseCount={source.verseMarkersSec.length}
+                activeVerseNumber={
+                  source.verseNumbers[producer.activeVerseIdx] ?? null
+                }
+                isPlaying={producer.isPlaying}
+                playheadEditedSec={producer.playheadEditedSec}
+                editedTotalSec={producer.editedTotalSec}
+                keptPct={producer.keptPct}
+                volume={producer.volume}
+                rate={producer.rate}
+                onTogglePlay={producer.togglePlay}
+                onSeekToEdge={producer.seekToEdge}
+                onPrevVerse={() =>
+                  producer.seekToVerse(Math.max(0, producer.activeVerseIdx - 1))}
+                onNextVerse={() =>
+                  producer.seekToVerse(
+                    Math.min(
+                      Math.max(0, source.verseMarkersSec.length - 1),
+                      producer.activeVerseIdx + 1
+                    )
+                  )}
+                onVolumeChange={producer.setVolume}
+                onRateChange={producer.setRate}
+                onSelectVerse={handleSelectVerse}
+                oneLine={oneLine}
+                onToggleOneLine={handleToggleOneLine}
+                verseProgress={verseProgress}
+              />
+            </div>
           </div>
 
           {/* ── المنطقة السفلية: الخط الزمني (مسار مقاطع + موجة) ─────── */}
@@ -406,6 +522,10 @@ export function AudioProducerView() {
             onClipGainChange={producer.setClipGain}
             onClipFadesChange={producer.setClipFades}
             onSeekEdited={producer.seekEdited}
+            onVerseMarkerChange={producer.setVerseMarker}
+            onBeginVerseDrag={producer.beginVerseMarkerDrag}
+            onPreviewVerseMarker={producer.previewVerseMarker}
+            onNudgeVerse={handleNudgeVerse}
             showToast={showToast}
           />
         </div>
@@ -427,6 +547,19 @@ export function AudioProducerView() {
           </div>
         </div>
       )}
+
+      {/* ── حوار «إنتاج الفيديو الكامل» (صدى + خلفية + تسليم) ─────── */}
+      <ProducerVideoStudioDialog
+        open={videoStudioOpen}
+        onClose={() => setVideoStudioOpen(false)}
+        echo={producer.echo}
+        onEchoChange={producer.setEcho}
+        onProduce={(bgId) => void handleProduceVideo(bgId)}
+        producing={producer.rendering || sending}
+        disabled={!hasSource}
+        verseCount={source?.verseMarkersSec.length ?? 0}
+        editedTotalSec={producer.editedTotalSec}
+      />
     </main>
   );
 }

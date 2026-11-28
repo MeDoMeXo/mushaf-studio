@@ -26,6 +26,12 @@ export interface ProducerHandoff {
   surahId: number;
   fromAyah: number;
   toAyah: number;
+  /**
+   * خلفية مختارة من مكتبة الاستوديو المدمجة (bg-library) يطبّقها الاستوديو
+   * فور الاستلام — null تعني «ترك الخلفية كما هي». معرّف من القائمة
+   * البيضاء في lib/background-library فقط.
+   */
+  bgLibraryId?: string | null;
   createdAt: number;
 }
 

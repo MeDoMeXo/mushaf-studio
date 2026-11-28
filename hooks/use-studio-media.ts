@@ -9,6 +9,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   getBuiltinBackground,
   getBuiltinBackgroundPublicPath,
+  isBuiltinBackgroundId,
   type BuiltinBackground,
 } from '@/lib/background-library';
 import {
@@ -90,6 +91,22 @@ export function useStudioMedia({
         setCustomAudioUrl(url);
         setCustomAudioFile(handoff.file);
         setCustomAudioName(handoff.label);
+        // خلفية اختارها المستخدم في «إنتاج الفيديو» من منتج الصوت: من
+        // القائمة البيضاء للمكتبة المدمجة فقط — يطبَّق نمط الفيديو مباشرة.
+        const handoffBg =
+          handoff.bgLibraryId && isBuiltinBackgroundId(handoff.bgLibraryId)
+            ? handoff.bgLibraryId
+            : null;
+        if (handoffBg) {
+          const bgUrl = getBuiltinBackgroundPublicPath(handoffBg);
+          if (bgUrl) {
+            setBgVideoUrl(bgUrl);
+            setBgVideoFile(null);
+            setBgVideoName(getBuiltinBackground(handoffBg)?.name ?? '');
+            setBgVideoReady(false);
+            setBgVideoPlaying(true);
+          }
+        }
         commitState((p) => ({
           ...p,
           surah: handoff.surahId,
@@ -98,8 +115,13 @@ export function useStudioMedia({
           customVerseBounds: handoff.verseBoundsSec,
           customVerseBoundsSource: 'auto',
           customReciterName: handoff.label,
+          ...(handoffBg ? { bgType: 'video' as const, bgLibraryId: handoffBg } : {}),
         }));
-        showToast('تم إرفاق المقطع المحرَّر من منتج الصوت كتلاوة مخصّصة');
+        showToast(
+          handoffBg
+            ? 'تم إرفاق المقطع المحرَّر من منتج الصوت مع الخلفية المختارة'
+            : 'تم إرفاق المقطع المحرَّر من منتج الصوت كتلاوة مخصّصة'
+        );
       } else if (peekHandoffLost()) {
         clearHandoffFlag();
         showToast('وصل إرسال قديم من منتج الصوت لكن فُقد الملف بإعادة التحميل — صدّره من جديد');
