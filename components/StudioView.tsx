@@ -47,6 +47,7 @@ import {
 } from './studio-ui/StudioRecitationPanel';
 import { StudioStagePanel } from './studio-ui/StudioStagePanel';
 import { StudioFullscreenDialog } from './studio-ui/StudioFullscreenDialog';
+import { StudioBgVideoElement } from './studio-ui/StudioBgVideoElement';
 
 export function StudioView() {
   const searchParams = useSearchParams();
@@ -583,24 +584,15 @@ export function StudioView() {
 
         <audio ref={studioAudioRef} crossOrigin="anonymous" preload="auto" />
         <audio ref={previewAudioRef} crossOrigin="anonymous" preload="none" />
-        <video
-          ref={bgVideoElRef}
-          src={bgVideoUrl ?? undefined}
-          muted
-          loop
-          playsInline
-          autoPlay
-          preload="auto"
-          onLoadedData={() => {
+        <StudioBgVideoElement
+          videoRef={bgVideoElRef}
+          src={bgVideoUrl}
+          playing={bgVideoPlaying}
+          speed={state.bgVideoSpeed || 1}
+          onReady={() => {
             setBgVideoReady(true);
-            const vid = bgVideoElRef.current;
-            if (vid) {
-              vid.playbackRate = state.bgVideoSpeed || 1;
-              if (bgVideoPlaying) vid.play().catch(() => {});
-            }
             renderOnce(0);
           }}
-          className="hidden"
         />
       </main>
   );

@@ -12,6 +12,7 @@ const NAV_LINKS = [
   { href: '/', label: 'الرئيسية' },
   { href: '/quran', label: 'القرآن الكريم' },
   { href: '/studio', label: 'الاستوديو' },
+  { href: '/audio-producer', label: 'منتج الصوت' },
   { href: '/search', label: 'البحث' },
   { href: '/admin', label: 'لوحة التحكم' },
 ];

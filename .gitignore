@@ -33,3 +33,6 @@ tool-results/
 
 # sync.cmd dependency stamp (local only)
 .deps-stamp
+
+# AI Studio sandbox artifacts (agent environment, not part of the project)
+/.aistudio/

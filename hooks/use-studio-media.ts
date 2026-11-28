@@ -16,6 +16,11 @@ import {
   buildEvenFallbackBounds,
 } from '@/lib/custom-audio-boundaries';
 import type { StudioState } from '@/lib/quran-data';
+import {
+  clearHandoffFlag,
+  consumeProducerHandoff,
+  peekHandoffLost,
+} from '@/lib/audio-producer/producer-handoff';
 
 export interface UseStudioMediaInput {
   commitState: (
@@ -70,6 +75,38 @@ export function useStudioMedia({
   const [customAudioFile, setCustomAudioFile] = useState<File | null>(null);
   const [customAudioName, setCustomAudioName] = useState<string>('');
   const bgVideoElRef = useRef<HTMLVideoElement | null>(null);
+
+  // ── استلام مقطع «منتج الصوت» المحرَّر عند أول تركيب ─────────────────
+  // (تنقّل داخلي من صفحة /audio-producer: مرجع الوحدة يحمل الملف؛ إعادة
+  // تحميل كاملة تفقده فعندها يظهر تنبيه صادق بدل الصمت).
+  // الاستهلاك داخل مهمة كلية مؤجلة (نمط المشروع لـ set-state-in-effect)،
+  // وبلا علامة حرس: في StrictMode يُلغى الأول ويُعاد جدولته آمناً —
+  // الاستهلاك يحدث مرة واحدة من آخر مهلة نجت (consume يعيد null ثانيةً).
+  useEffect(() => {
+    const tid = setTimeout(() => {
+      const handoff = consumeProducerHandoff();
+      if (handoff) {
+        const url = URL.createObjectURL(handoff.file);
+        setCustomAudioUrl(url);
+        setCustomAudioFile(handoff.file);
+        setCustomAudioName(handoff.label);
+        commitState((p) => ({
+          ...p,
+          surah: handoff.surahId,
+          fromAyah: handoff.fromAyah,
+          toAyah: handoff.toAyah,
+          customVerseBounds: handoff.verseBoundsSec,
+          customVerseBoundsSource: 'auto',
+          customReciterName: handoff.label,
+        }));
+        showToast('تم إرفاق المقطع المحرَّر من منتج الصوت كتلاوة مخصّصة');
+      } else if (peekHandoffLost()) {
+        clearHandoffFlag();
+        showToast('وصل إرسال قديم من منتج الصوت لكن فُقد الملف بإعادة التحميل — صدّره من جديد');
+      }
+    }, 0);
+    return () => clearTimeout(tid);
+  }, [commitState, showToast]);
 
   // Template/share links can set bgLibraryId without touching local media
   // state (no File object) — sync the preview <video> src to the library clip
