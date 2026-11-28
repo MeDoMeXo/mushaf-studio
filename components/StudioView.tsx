@@ -455,6 +455,13 @@ export function StudioView() {
             previewEstimatedSizeMb={previewEstimatedSizeMb}
             bgFileInputRef={bgFileInputRef}
             bgVideoFileInputRef={bgVideoFileInputRef}
+            selectedVerses={selectedVerses}
+            isPlaying={isPlaying}
+            audioCurrentTime={audioCurrentTime}
+            audioDuration={audioDuration}
+            activeIdxInRange={activeIdxInRange}
+            customAudioFile={customAudioFile}
+            customAudioUrl={customAudioUrl}
             onStyleTabChange={setStyleTab}
             onTemplateCatChange={setTemplateCat}
             onPatchState={handlePatchState}
@@ -481,6 +488,10 @@ export function StudioView() {
             }}
             onAspectSelect={handleAspectSelect}
             onOpenExportModal={handleOpenExportModal}
+            onTogglePlay={handleStageTogglePlay}
+            onSeekAudio={handleSeekAudio}
+            onSelectVerseIndex={handleSelectVerseIndex}
+            showToast={showToast}
           />
         </div>
 

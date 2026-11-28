@@ -25,6 +25,7 @@ export const DEFAULT_OPEN_INSPECTOR_CURTAINS: readonly string[] = [
   'txt-layout',
   'aud-dsp',
   'aud-transitions',
+  'prd-timeline',
 ];
 
 export function isCurtainOpen(openIds: readonly string[], id: string): boolean {

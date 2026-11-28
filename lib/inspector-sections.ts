@@ -1,11 +1,11 @@
 /**
- * سجل أقسام لوحة التنسيق في الاستوديو (خمسة تبويبات) — المصدر الوحيد لهوية كل قسم:
+ * سجل أقسام لوحة التنسيق في الاستوديو (ستة تبويبات) — المصدر الوحيد لهوية كل قسم:
  * المعرّف + التبويب + التسمية العربية. تُدار إعدادات الظهور مركزيّاً من لوحة
  * التحكم (SiteConfig.studio.hiddenInspectorSections).
  * إضافة قسم جديد = سطر واحد هنا + غلاف StudioInspectorSection في اللوح.
  */
 
-export type InspectorSectionTab = 'templates' | 'ornaments' | 'background' | 'text' | 'audio';
+export type InspectorSectionTab = 'templates' | 'ornaments' | 'background' | 'text' | 'audio' | 'production';
 
 export interface InspectorSectionMeta {
   id: string;
@@ -19,6 +19,7 @@ export const INSPECTOR_TAB_ORDER: readonly InspectorSectionTab[] = [
   'background',
   'text',
   'audio',
+  'production',
 ];
 
 export const INSPECTOR_TAB_LABELS: Record<InspectorSectionTab, string> = {
@@ -27,6 +28,7 @@ export const INSPECTOR_TAB_LABELS: Record<InspectorSectionTab, string> = {
   background: 'الخلفية',
   text: 'النص',
   audio: 'الصوت',
+  production: 'منتج الصوت',
 };
 
 export const INSPECTOR_SECTIONS: InspectorSectionMeta[] = [
@@ -64,6 +66,10 @@ export const INSPECTOR_SECTIONS: InspectorSectionMeta[] = [
   { id: 'aud-transitions', tab: 'audio', label: 'الانتقالات وفاصل الآيات' },
   { id: 'aud-cinematic', tab: 'audio', label: 'فلاتر الألوان السينمائية' },
   { id: 'aud-quality', tab: 'audio', label: 'جودة الفيديو وإعدادات التصدير' },
+
+  // ── تبويب منتج الصوت ──
+  { id: 'prd-timeline', tab: 'production', label: 'الخط الزمني للتلاوة' },
+  { id: 'prd-tools', tab: 'production', label: 'أدوات المنتج' },
 ];
 
 const SECTION_IDS = new Set(INSPECTOR_SECTIONS.map((s) => s.id));

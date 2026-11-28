@@ -8,6 +8,7 @@
 import React from 'react';
 import { motion } from 'motion/react';
 import {
+  AudioWaveform,
   BookmarkPlus,
   Check,
   FileDown,
@@ -24,6 +25,7 @@ import {
 import {
   STUDIO_TEMPLATES,
   type AspectPresetId,
+  type QulVerse,
   type SavedCustomTemplate,
   type StudioState,
   type StudioTemplate,
@@ -33,6 +35,7 @@ import { filterTemplatesByCategory } from '@/lib/islamic-ornaments';
 import type { VideoExportSettings } from '@/lib/video-export';
 import { StudioOrnamentsPanel } from '../StudioOrnamentsPanel';
 import { StudioAudioPanel } from './StudioAudioPanel';
+import { StudioProductionPanel } from './StudioProductionPanel';
 import type { BuiltinBackground } from '@/lib/background-library';
 import { StudioBackgroundPanel } from './StudioBackgroundPanel';
 import { StudioTextPanel } from './StudioTextPanel';
@@ -62,7 +65,7 @@ import {
   StudioTabTrigger,
 } from './StudioTabs';
 
-export type StyleTab = 'templates' | 'ornaments' | 'background' | 'text' | 'audio';
+export type StyleTab = 'templates' | 'ornaments' | 'background' | 'text' | 'audio' | 'production';
 export type TemplateCategory =
   | 'all'
   | 'mushaf'
@@ -77,9 +80,10 @@ const STYLE_TABS: { id: StyleTab; label: string; icon: React.ComponentType<{ cla
   { id: 'background', label: 'الخلفية', icon: Video },
   { id: 'text', label: 'النص', icon: Type },
   { id: 'audio', label: 'الصوت', icon: Volume2 },
+  { id: 'production', label: 'منتج الصوت', icon: AudioWaveform },
 ];
 
-const STYLE_TAB_VALUES: StyleTab[] = ['templates', 'ornaments', 'background', 'text', 'audio'];
+const STYLE_TAB_VALUES: StyleTab[] = ['templates', 'ornaments', 'background', 'text', 'audio', 'production'];
 
 const TEMPLATE_CATEGORIES = [
   { id: 'all', label: `الكل (${toArabicDigits(STUDIO_TEMPLATES.length)})` },
@@ -107,6 +111,15 @@ interface StudioDesignInspectorProps {
   previewEstimatedSizeMb: number;
   bgFileInputRef: React.RefObject<HTMLInputElement | null>;
   bgVideoFileInputRef: React.RefObject<HTMLInputElement | null>;
+  /** تبويب «منتج الصوت»: الآيات المحدّدة للتلاوة المختارة. */
+  selectedVerses: QulVerse[];
+  /** تبويب «منتج الصوت»: حالة التشغيل الحالية للمعاينة. */
+  isPlaying: boolean;
+  audioCurrentTime: number;
+  audioDuration: number;
+  activeIdxInRange: number;
+  customAudioFile: File | null;
+  customAudioUrl: string | null;
   onStyleTabChange: (tab: StyleTab) => void;
   onTemplateCatChange: (cat: TemplateCategory) => void;
   onPatchState: (patch: Partial<StudioState>) => void;
@@ -126,6 +139,11 @@ interface StudioDesignInspectorProps {
   onSelectQualityPreset: (presetId: string) => void;
   onAspectSelect: (presetId: AspectPresetId) => void;
   onOpenExportModal: () => void;
+  /** تبويب «منتج الصوت»: التحكم بالتشغيل والتقديم وانتقال الآيات. */
+  onTogglePlay: () => void;
+  onSeekAudio: (timeSec: number) => void;
+  onSelectVerseIndex: (idx: number) => void;
+  showToast: (msg: string) => void;
 }
 
 export function StudioDesignInspector({
@@ -145,6 +163,13 @@ export function StudioDesignInspector({
   previewEstimatedSizeMb,
   bgFileInputRef,
   bgVideoFileInputRef,
+  selectedVerses,
+  isPlaying,
+  audioCurrentTime,
+  audioDuration,
+  activeIdxInRange,
+  customAudioFile,
+  customAudioUrl,
   onStyleTabChange,
   onTemplateCatChange,
   onPatchState,
@@ -164,6 +189,10 @@ export function StudioDesignInspector({
   onSelectQualityPreset,
   onAspectSelect,
   onOpenExportModal,
+  onTogglePlay,
+  onSeekAudio,
+  onSelectVerseIndex,
+  showToast,
 }: StudioDesignInspectorProps) {
   const filteredTemplates = React.useMemo(
     () => filterTemplatesByCategory(STUDIO_TEMPLATES, templateCat),
@@ -247,7 +276,7 @@ export function StudioDesignInspector({
         <div className="shrink-0 border-b border-[var(--border-hairline)] px-3 py-2">
           <StudioTabsList
             aria-label="أدوات التنسيق"
-            className="grid grid-cols-5 gap-1 rounded-xl bg-[var(--surface-subtle)] p-1"
+            className="grid grid-cols-6 gap-0.5 rounded-xl bg-[var(--surface-subtle)] p-1"
           >
             {STYLE_TABS.map((tab) => {
               const Icon = tab.icon;
@@ -256,7 +285,7 @@ export function StudioDesignInspector({
                 <StudioTabTrigger
                   key={tab.id}
                   value={tab.id}
-                  className={`relative flex flex-col items-center justify-center gap-1 whitespace-nowrap rounded-lg py-1.5 text-[11px] font-bold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-gold)] ${
+                  className={`relative flex flex-col items-center justify-center gap-1 rounded-lg px-1 py-1.5 text-center text-[11px] font-bold leading-tight transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--brand-gold)] ${
                     active
                       ? 'text-[#1F1705]'
                       : 'text-[var(--ink-muted)] hover:text-[var(--ink-primary)]'
@@ -521,6 +550,22 @@ export function StudioDesignInspector({
             onSelectQualityPreset={onSelectQualityPreset}
             onAspectSelect={onAspectSelect}
             onOpenExportModal={onOpenExportModal}
+          />
+
+          {/* TAB 6: منتج الصوت — الخط الزمني والتوليف */}
+          <StudioProductionPanel
+            state={state}
+            selectedVerses={selectedVerses}
+            isPlaying={isPlaying}
+            audioCurrentTime={audioCurrentTime}
+            audioDuration={audioDuration}
+            activeIdxInRange={activeIdxInRange}
+            customAudioFile={customAudioFile}
+            customAudioUrl={customAudioUrl}
+            onTogglePlay={onTogglePlay}
+            onSeekAudio={onSeekAudio}
+            onSelectVerseIndex={onSelectVerseIndex}
+            showToast={showToast}
           />
           </InspectorAccordionProvider>
         </div>
